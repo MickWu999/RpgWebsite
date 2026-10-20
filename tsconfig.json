@@ -39,6 +39,7 @@
     "node_modules",
     ".next",
     "test-results",
-    "playwright-report"
+    "playwright-report",
+    "worker"
   ]
 }

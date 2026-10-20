@@ -7,17 +7,18 @@
     "build": "tsx scripts/build-catalog.ts && next build",
     "start": "npx serve@14 out -l 3000",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
     "check": "npm run lint && npm run typecheck && npm run build",
     "ai": "tsx scripts/ai-server.ts",
     "generate": "tsx scripts/generate.ts",
     "validate": "tsx scripts/validate.ts",
     "review": "tsx scripts/review.ts",
     "catalog": "tsx scripts/build-catalog.ts",
-    "deploy": "NEXT_PUBLIC_SITE_MODE=player npm run build && wrangler deploy",
-    "deploy:dev": "NEXT_PUBLIC_SITE_MODE=creator npm run build && wrangler deploy --env dev",
+    "deploy": "NEXT_PUBLIC_SITE_MODE=player npm run build && tsx scripts/prune-build.ts player && wrangler deploy",
     "studio": "tsx scripts/studio.ts",
-    "game": "tsx scripts/game.ts"
+    "game": "tsx scripts/game.ts",
+    "studio:user": "tsx scripts/studio-user.ts",
+    "deploy:studio": "NEXT_PUBLIC_SITE_MODE=studio npm run build && tsx scripts/prune-build.ts studio && wrangler deploy --env studio"
   },
   "dependencies": {
     "next": "^16.4.2",
