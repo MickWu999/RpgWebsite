@@ -9,6 +9,10 @@
 3. **驗證由程式負責**：判斷能不能玩、會不會卡關，交給 `validate`、`playtest`、`quality`；AI 審查只負責判斷內容品質。
 4. **無人值守，但保留安全閥**：只有狀態為 `approved` 的遊戲可以自動發布；`needs_human_review` 不得自動發布。
 
+## 製作遊戲：請依照 docs/ai-development-spec.md
+
+製作遊戲的流程是 `npm run game -- new / apply / check / review / publish`，遊戲原始檔放在 `content/<id>/`。
+
 ## 常用指令（都可以直接執行，輸出也都能被機器讀取）
 
 ```bash

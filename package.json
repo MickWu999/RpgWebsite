@@ -16,7 +16,8 @@
     "catalog": "tsx scripts/build-catalog.ts",
     "deploy": "NEXT_PUBLIC_SITE_MODE=player npm run build && wrangler deploy",
     "deploy:dev": "NEXT_PUBLIC_SITE_MODE=creator npm run build && wrangler deploy --env dev",
-    "studio": "tsx scripts/studio.ts"
+    "studio": "tsx scripts/studio.ts",
+    "game": "tsx scripts/game.ts"
   },
   "dependencies": {
     "next": "^16.4.2",
