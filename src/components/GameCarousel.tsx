@@ -68,6 +68,7 @@ export default function GameCarousel({ games, onCreate }: { games: CatalogEntry[
                 )}
                 <span className="badge">{g.endings} 種結局</span>
                 {g.status === "approved" && <span className="badge ok">AI 生成・審查通過</span>}
+                {g.status === "demo" && <span className="badge">教學短篇</span>}
               </div>
               <p className="small muted game-card-desc">{g.description}</p>
             </div>

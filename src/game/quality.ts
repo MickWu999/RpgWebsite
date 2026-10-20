@@ -19,10 +19,13 @@ export const QUALITY_THRESHOLDS = {
   minMeaningfulChoices: 3,
   minStepsToEnding: 6,
   minAvgDialogueChars: 15,
-  // 規模上限：結局或角色太多時，結局文字與旗標組合容易互相矛盾（實測 8 個結局的版本審查一直不過）
+  // 規模上限：結局太多時，結局文字與旗標組合容易互相矛盾（實測 8 個結局的版本審查一直不過），所以結局維持最多 4 個；
+  // 其餘放寬到能做出 15～30 分鐘的遊戲
   maxEndings: 4,
-  maxNpcs: 6,
-  maxDialogueNodes: 50,
+  maxNpcs: 10,
+  maxDialogueNodes: 140,
+  /** 一般玩家預估時長（分鐘）的目標範圍 */
+  targetMinutes: [15, 30] as [number, number],
   // E3／互動回饋：至少 2 個可調查物件，讓環境分擔說明、降低迷失感
   minInteractables: 2,
 };
@@ -53,7 +56,8 @@ export type QualityReport = { metrics: QualityMetrics; blocking: ValidationIssue
 
 const PLACEHOLDER = /\b(todo|tbd|lorem|placeholder)\b|待補|範例文字|xxx/i;
 
-export function assessQuality(project: GameProject, playtest: PlaytestReport): QualityReport {
+/** checkDuration=false：手寫的教學短篇（demo）不套用時長目標 */
+export function assessQuality(project: GameProject, playtest: PlaytestReport, options: { checkDuration?: boolean } = {}): QualityReport {
   const t = QUALITY_THRESHOLDS;
   const blocking: ValidationIssue[] = [];
   const suggestions: ValidationIssue[] = [];
@@ -94,6 +98,11 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport): Q
   need(metrics.dialogueNodes >= t.minDialogueNodes, "dialogues", `對話節點至少 ${t.minDialogueNodes} 個（目前 ${metrics.dialogueNodes}）`);
   need(metrics.meaningfulChoices >= t.minMeaningfulChoices, "dialogues", `有效果或會分支的對話選項至少 ${t.minMeaningfulChoices} 個（目前 ${meaningfulChoices}）`);
   need(avgDialogueChars >= t.minAvgDialogueChars, "dialogues", `對話平均只有 ${avgDialogueChars} 字，內容過於單薄（至少 ${t.minAvgDialogueChars} 字）`);
+  const typical = metrics.duration?.typicalMinutes;
+  if (options.checkDuration !== false && typical) {
+    need(typical[1] >= t.targetMinutes[0], "duration", `預估遊玩時間只有 ${typical[0]}～${typical[1]} 分鐘，目標是 ${t.targetMinutes[0]}～${t.targetMinutes[1]} 分鐘：請增加章節、支線、場景與調查內容`);
+    need(typical[0] <= t.targetMinutes[1], "duration", `預估遊玩時間 ${typical[0]}～${typical[1]} 分鐘超過 ${t.targetMinutes[1]} 分鐘上限，請精簡`);
+  }
   need(metrics.endings <= t.maxEndings, "endings", `結局最多 ${t.maxEndings} 種（目前 ${metrics.endings}），規模太大容易讓結局文字與玩家路線矛盾`);
   need(metrics.npcs <= t.maxNpcs, "npcs", `NPC 最多 ${t.maxNpcs} 位（目前 ${metrics.npcs}），請合併或刪減次要角色`);
   need(metrics.dialogueNodes <= t.maxDialogueNodes, "dialogues", `對話節點最多 ${t.maxDialogueNodes} 個（目前 ${metrics.dialogueNodes}），超出 10 分鐘的遊玩預算`);

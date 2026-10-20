@@ -46,7 +46,8 @@ for (const dir of readdirSync(GAMES_DIR, { withFileTypes: true }).filter((d) => 
     skip(`自動試玩失敗：${playtest.issues[0]?.message ?? "狀態過多"}`);
     continue;
   }
-  const quality = assessQuality(project, playtest);
+  const quality = assessQuality(project, playtest, { checkDuration: meta.status !== "demo" });
+  if (playtest.truncated) console.log(`  ⚠ ${dir}：狀態太多，自動試玩探索 ${playtest.statesExplored} 個後截斷，卡死偵測不完整`);
   if (quality.blocking.length > 0) {
     skip(`品質指標未達標：${quality.blocking[0].message}`);
     continue;

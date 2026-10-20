@@ -25,7 +25,7 @@ import { reviewProject, type ReviewResult } from "./review";
 
 export const MAX_STORY_CHARS = 8000;
 export const MAX_REPAIR_ATTEMPTS = 2;
-export const MAX_REVIEW_ROUNDS = 2;
+export const MAX_REVIEW_ROUNDS = 3;
 const GENRES = ["fantasy", "modern", "sci-fi", "mystery"] as const;
 
 export type PipelineStatus = "approved" | "needs_human_review" | "invalid" | "unreviewed" | "fixture";

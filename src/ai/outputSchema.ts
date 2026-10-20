@@ -13,7 +13,7 @@ export const aiSceneSchema = sceneSchema
 
 export const aiProjectSchema = gameProjectSchema
   .omit({ schemaVersion: true, id: true, assetManifest: true })
-  .extend({ scenes: z.array(aiSceneSchema).min(1).max(4) });
+  .extend({ scenes: z.array(aiSceneSchema).min(1).max(5) });
 
 export type AiProjectOutput = z.infer<typeof aiProjectSchema>;
 

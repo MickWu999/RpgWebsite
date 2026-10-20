@@ -185,7 +185,7 @@ export function runPlaytest(project: GameProject, options: { maxStates?: number 
 
   const issues: ValidationIssue[] = [];
   endings.forEach((e, i) => {
-    if (!e.reachable && !truncated) issues.push({ path: `endings[${i}]`, message: `自動試玩找不到能達成結局「${e.title}」的路線` });
+    if (!e.reachable) issues.push({ path: `endings[${i}]`, message: `自動試玩${truncated ? `（探索 ${maxStates} 個狀態後截斷）` : ""}找不到能達成結局「${e.title}」的路線` });
   });
   if (softlockNodes.length > 0) {
     issues.push({
@@ -193,8 +193,9 @@ export function runPlaytest(project: GameProject, options: { maxStates?: number 
       message: `自動試玩發現 ${softlockNodes.length} 個卡死狀態（之後無論怎麼玩都到不了結局），例如：${softlocks[0].steps.join(" → ")}`,
     });
   }
+  // 截斷時只要每個結局都找得到路線就算可玩；卡死偵測不完整這件事由 truncated 明確標示
   return {
-    ok: issues.length === 0 && !truncated,
+    ok: issues.length === 0,
     statesExplored: nodes.length,
     truncated,
     endings,

@@ -30,7 +30,7 @@ try {
 
 const validation = validateProject(input);
 const playtest = validation.project ? runPlaytest(validation.project) : null;
-const quality = validation.project && playtest ? assessQuality(validation.project, playtest) : null;
+const quality = validation.project && playtest ? assessQuality(validation.project, playtest, { checkDuration: target !== "demo" }) : null;
 const ok = validation.isValid && Boolean(playtest?.ok) && quality?.blocking.length === 0;
 const result = {
   ok,
