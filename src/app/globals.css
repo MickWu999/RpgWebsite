@@ -261,11 +261,9 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #f2b84b55; border
 .game-card.placeholder.soon { cursor: default; }
 .placeholder-icon { font-size: 44px; color: var(--accent); }
 .placeholder-title { font-size: 18px; font-weight: 700; }
-.carousel-arrow { position: absolute; top: 42%; transform: translateY(-50%); z-index: 2; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: rgba(29, 32, 48, 0.9); color: var(--text); font-size: 16px; cursor: pointer; }
-.carousel-arrow.left { left: 4px; }
-.carousel-arrow.right { right: 4px; }
+.carousel-arrow { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border); background: rgba(29, 32, 48, 0.9); color: var(--text); font-size: 16px; cursor: pointer; }
 .carousel-arrow:disabled { opacity: 0.25; cursor: default; }
-.carousel-dots { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+.carousel-dots { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 12px; }
 .carousel-dot { width: 10px; height: 10px; border-radius: 50%; border: none; background: var(--border); cursor: pointer; padding: 0; }
 .carousel-dot.active { background: var(--accent); width: 26px; border-radius: 5px; }
 .rm-loading { color: #cfd5ee; font-size: 16px; letter-spacing: 0.1em; animation: rm-press 1.4s ease-in-out infinite; }
@@ -276,3 +274,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #f2b84b55; border
 .game-card-time { position: absolute; right: 10px; top: 104px; background: rgba(10, 16, 46, 0.8); border: 1px solid rgba(255, 255, 255, 0.45); color: #fff; font-size: 12px; padding: 2px 10px; border-radius: 999px; }
 .rm-autosave { position: absolute; left: 12px; bottom: 12px; z-index: 5; font-size: 13px; color: #fff; background: rgba(10, 16, 46, 0.75); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 999px; padding: 2px 12px; pointer-events: none; animation: rm-autosave 2.2s ease forwards; }
 @keyframes rm-autosave { 0% { opacity: 0; } 15%, 75% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---------- 玩家首頁 ---------- */
+.portal { padding-top: 28px; }
+.portal-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.portal-header h1 { font-size: 36px; letter-spacing: 0.08em; margin: 0 0 4px; color: #fff3cf; text-shadow: 0 0 16px rgba(255, 200, 90, 0.35); }
+.portal-header p { margin: 0; }
+.portal-footer { margin-top: 32px; text-align: center; line-height: 1.8; }

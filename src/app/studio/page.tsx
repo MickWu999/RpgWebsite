@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import CreatorOnly from "@/components/CreatorOnly";
 import StudioView from "@/components/StudioView";
 import { DEMO_PROJECT_ID } from "@/game/storage";
 
@@ -12,8 +13,10 @@ function StudioPage() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="container muted">載入中…</div>}>
-      <StudioPage />
-    </Suspense>
+    <CreatorOnly>
+      <Suspense fallback={<div className="container muted">載入中…</div>}>
+        <StudioPage />
+      </Suspense>
+    </CreatorOnly>
   );
 }

@@ -205,8 +205,8 @@ export default function StudioView({ projectId }: { projectId: string }) {
   return (
     <>
       <div className="topbar">
-        <Link href="/" className="small">
-          ← 首頁
+        <Link href="/create/" className="small">
+          ← 開發者工具
         </Link>
         <span className="title">{draft.title}</span>
         <span className="badge">{metadata.source === "demo" ? "內建 demo" : metadata.source}</span>

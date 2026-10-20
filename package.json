@@ -14,7 +14,7 @@
     "validate": "tsx scripts/validate.ts",
     "review": "tsx scripts/review.ts",
     "catalog": "tsx scripts/build-catalog.ts",
-    "deploy": "npm run build && wrangler deploy"
+    "deploy": "NEXT_PUBLIC_SITE_MODE=player npm run build && wrangler deploy"
   },
   "dependencies": {
     "next": "^16.4.2",

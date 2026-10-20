@@ -59,3 +59,4 @@ npm run check                                    # 修改程式後必須跑：li
 - TypeScript strict 模式；註解與使用者可見文字一律用繁體中文（台灣用語）。
 - React 19 的 lint 規則很嚴格：render 階段不能讀寫 ref，effect 裡不能直接呼叫 setState。
 - 網站採靜態輸出（`output: "export"`），所以不能使用 Next.js 的 API routes。需要伺服器的功能請放在 `scripts/`，在本機執行。
+- 玩家版（`NEXT_PUBLIC_SITE_MODE=player`）不能出現任何開發者工具或用語。開發者頁面要用 `CreatorOnly` 包起來；`npm run deploy` 一律用玩家版 build。

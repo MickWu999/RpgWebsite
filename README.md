@@ -17,6 +17,16 @@ npm run dev            # http://localhost:3000
   - 鍵盤：方向鍵或 WASD 移動，Z／Enter 確認，X／Esc 開啟選單
   - 手機（請橫向遊玩）：用搖桿移動、點擊地面移動、點擊 NPC 對話
 
+## 網站版本：玩家版與開發者版
+
+| | 玩家版（`npm run deploy`，部署到 Cloudflare） | 開發者版（`npm run dev`） |
+|---|---|---|
+| `/` | 遊戲選單 | 遊戲選單，以及「開發者工具」入口 |
+| `/play` | 遊戲畫面 | 遊戲畫面 |
+| `/create`、`/studio` | 不提供 | 建立遊戲、AI 生成、我的專案、匯入 JSON、編輯器 |
+
+版本由 build 時的環境變數 `NEXT_PUBLIC_SITE_MODE=player` 決定。
+
 ## 指令
 
 | 指令 | 用途 |

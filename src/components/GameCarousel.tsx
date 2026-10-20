@@ -10,10 +10,11 @@ import type { CatalogEntry } from "@/lib/packs";
  * 首頁的遊戲選單輪播：可以左右滑動（手機）、按箭頭或點圓點切換。
  * 遊戲數量少時補上「建立新遊戲」與「製作中」卡片，讓玩家一眼看出這裡可以選遊戲。
  */
-export default function GameCarousel({ games, onCreate }: { games: CatalogEntry[]; onCreate: () => void }) {
+export default function GameCarousel({ games, onCreate }: { games: CatalogEntry[]; onCreate?: () => void }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
-  const placeholders = games.length < 3 ? ["create", "soon"] : ["create"];
+  // 玩家版沒有建立遊戲的入口（onCreate 未提供），只顯示「製作中」
+  const placeholders = [...(onCreate ? ["create"] : []), ...(games.length < 3 ? ["soon"] : [])];
   const total = games.length + placeholders.length;
 
   const goTo = (index: number) => {
@@ -41,9 +42,6 @@ export default function GameCarousel({ games, onCreate }: { games: CatalogEntry[
 
   return (
     <div className="carousel" data-testid="library">
-      <button className="carousel-arrow left" aria-label="上一款" disabled={active === 0} onClick={() => goTo(active - 1)}>
-        ◀
-      </button>
       <div className="carousel-track" ref={trackRef} onScroll={onScroll}>
         {games.map((g, i) => (
           <Link key={g.id} className={`game-card${i === active ? " active" : ""}`} href={`/play/?pack=${encodeURIComponent(g.id)}`} data-pack={g.id}>
@@ -89,13 +87,16 @@ export default function GameCarousel({ games, onCreate }: { games: CatalogEntry[
           </div>
         )}
       </div>
-      <button className="carousel-arrow right" aria-label="下一款" disabled={active >= total - 1} onClick={() => goTo(active + 1)}>
-        ▶
-      </button>
       <div className="carousel-dots">
+        <button className="carousel-arrow left" aria-label="上一款" disabled={active === 0} onClick={() => goTo(active - 1)}>
+          ◀
+        </button>
         {Array.from({ length: total }, (_, i) => (
           <button key={i} className={`carousel-dot${i === active ? " active" : ""}`} aria-label={`第 ${i + 1} 張`} onClick={() => goTo(i)} />
         ))}
+        <button className="carousel-arrow right" aria-label="下一款" disabled={active >= total - 1} onClick={() => goTo(active + 1)}>
+          ▶
+        </button>
       </div>
     </div>
   );
