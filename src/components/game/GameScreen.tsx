@@ -652,9 +652,20 @@ export default function GameScreen({ source }: { source: GameSource }) {
     };
   }, [act, update, flash, newGame, enterMap, loadSlot, saveToSlot, router, source.kind]);
 
-  /** Android 等支援的瀏覽器：進入全螢幕並鎖定橫向（iPhone Safari 不支援，按鈕不顯示） */
+  /** Android 等支援的瀏覽器：切換全螢幕（進入時鎖定橫向，再按一次離開）；iPhone Safari 不支援，按鈕不顯示 */
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
   const enterFullscreen = useCallback(async () => {
     try {
+      if (document.fullscreenElement) {
+        (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
+        await document.exitFullscreen();
+        return;
+      }
       await document.documentElement.requestFullscreen();
       await (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape");
     } catch {
@@ -966,8 +977,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
         />
       )}
       {layout.touch && layout.canFullscreen && !layout.portrait && (
-        <button className="rm-fullscreen" onClick={enterFullscreen} aria-label="全螢幕">
-          ⛶
+        <button className="rm-fullscreen" onClick={enterFullscreen} aria-label={isFullscreen ? "離開全螢幕" : "全螢幕"} data-testid="fullscreen">
+          {isFullscreen ? "✕" : "⛶"}
         </button>
       )}
       {layout.touch && layout.portrait && !portraitOk && (

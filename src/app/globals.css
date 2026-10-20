@@ -281,3 +281,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #f2b84b55; border
 .portal-header h1 { font-size: 36px; letter-spacing: 0.08em; margin: 0 0 4px; color: #fff3cf; text-shadow: 0 0 16px rgba(255, 200, 90, 0.35); }
 .portal-header p { margin: 0; }
 .portal-footer { margin-top: 32px; text-align: center; line-height: 1.8; }
+/* 搖桿區：關掉 iOS 點擊時的灰白高亮與文字選取 */
+.rm-joystick-zone, .rm-joystick-zone * { -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+.rm-joystick-zone .back { border: 2px solid rgba(255, 255, 255, 0.35); box-sizing: border-box; }

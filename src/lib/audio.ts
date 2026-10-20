@@ -26,6 +26,8 @@ export const CHAR_INTERVAL_MS = { slow: 55, normal: 35, fast: 22 };
 
 class AudioManager {
   private ctx: AudioContext | null = null;
+  /** 總輸出：主音量 → 限幅器 → 喇叭。避免音樂、講話聲、音效同時播放時音量疊加而破音 */
+  private out: AudioNode | null = null;
   private buffers = new Map<string, Promise<AudioBuffer | null>>();
   private stepIndex = 0;
   private music: { src: string; source: AudioBufferSourceNode; gain: GainNode } | null = null;
@@ -54,6 +56,16 @@ class AudioManager {
     if (!this.ctx) {
       try {
         this.ctx = new AudioContext();
+        const master = this.ctx.createGain();
+        master.gain.value = 0.85;
+        const limiter = this.ctx.createDynamicsCompressor();
+        limiter.threshold.value = -6;
+        limiter.knee.value = 4;
+        limiter.ratio.value = 12;
+        limiter.attack.value = 0.003;
+        limiter.release.value = 0.15;
+        master.connect(limiter).connect(this.ctx.destination);
+        this.out = master;
       } catch {
         return;
       }
@@ -81,9 +93,12 @@ class AudioManager {
       const gain = ctx.createGain();
       source.buffer = buffer;
       source.loop = true;
+      const { start, end } = loopBounds(buffer);
+      source.loopStart = start;
+      source.loopEnd = end;
       gain.gain.setValueAtTime(0, ctx.currentTime);
       gain.gain.setTargetAtTime(volume, ctx.currentTime, 0.5);
-      source.connect(gain).connect(ctx.destination);
+      source.connect(gain).connect(this.out!);
       source.start();
       this.music = { src, source, gain };
     });
@@ -122,7 +137,7 @@ class AudioManager {
       source.buffer = buffer;
       source.playbackRate.value = rate;
       gain.gain.value = volume;
-      source.connect(gain).connect(ctx.destination);
+      source.connect(gain).connect(this.out!);
       source.start();
     });
   }
@@ -142,7 +157,7 @@ class AudioManager {
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(BLIP_GAIN[voice.timbre], now + 0.004);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.out!);
     osc.start(now);
     osc.stop(now + 0.06);
   }
@@ -224,4 +239,19 @@ let instance: AudioManager | null = null;
 export function getAudio() {
   instance ??= new AudioManager();
   return instance;
+}
+
+/**
+ * MP3 編碼會在頭尾留下一小段空白／不連續的取樣，循環播放時接縫處容易出現「喀」聲。
+ * 找出頭尾第一個有聲音的取樣，把循環區間設在中間。
+ */
+function loopBounds(buffer: AudioBuffer): { start: number; end: number } {
+  const data = buffer.getChannelData(0);
+  const threshold = 0.002;
+  let first = 0;
+  while (first < data.length && Math.abs(data[first]) < threshold) first++;
+  let last = data.length - 1;
+  while (last > first && Math.abs(data[last]) < threshold) last--;
+  if (last - first < buffer.sampleRate) return { start: 0, end: buffer.duration };
+  return { start: first / buffer.sampleRate, end: (last + 1) / buffer.sampleRate };
 }

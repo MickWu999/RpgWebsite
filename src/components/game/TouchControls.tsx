@@ -46,7 +46,14 @@ export default function TouchControls({
     };
     import("nipplejs").then(({ default: nipplejs }) => {
       if (destroyed || !zoneRef.current) return;
-      const collection = nipplejs.create({ zone: zoneRef.current, mode: "dynamic", size: 110, color: "white", fadeTime: 120 });
+      // 搖桿配色跟遊戲視窗一致：深藍半透明底盤＋金色搖桿頭（不用預設的白色底）
+      const collection = nipplejs.create({
+        zone: zoneRef.current,
+        mode: "dynamic",
+        size: 110,
+        color: { front: "rgba(255, 215, 106, 0.9)", back: "rgba(20, 30, 70, 0.45)" },
+        fadeTime: 120,
+      });
       collection.on("start", (evt) => {
         tapStart = { ...evt.data.position };
         dragged = false;
