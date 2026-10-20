@@ -1,0 +1,1953 @@
+{
+  "schemaVersion": "2.0",
+  "id": "demo-lantern",
+  "title": "迷霧森林的燈火",
+  "description": "守望燈塔熄滅了三夜，迷霧從東邊森林湧進燈火村。找到星光燈芯，決定它的歸屬。",
+  "genre": "fantasy",
+  "system": {
+    "start": {
+      "mapId": "start",
+      "x": 6,
+      "y": 9,
+      "direction": "up"
+    },
+    "playerActorId": "player",
+    "initialItems": []
+  },
+  "actors": [
+    {
+      "id": "player",
+      "name": "艾琳",
+      "profile": "村裡最會走夜路的年輕人，不信鬼神，但很信承諾。",
+      "spriteAssetId": "char_hero"
+    },
+    {
+      "id": "elder",
+      "name": "村長莫倫",
+      "profile": "想要：讓燈塔重新亮起。秘密：燈芯當年是他父親從森林古樹裡取走的。說話慢、愛用「孩子」稱呼人。",
+      "spriteAssetId": "char_wizard",
+      "voice": {
+        "pitch": "low",
+        "speed": "slow",
+        "timbre": "soft"
+      }
+    },
+    {
+      "id": "karl",
+      "name": "守林人卡爾",
+      "profile": "想要：森林不再被村子索取。說話短、不客套。",
+      "spriteAssetId": "char_ranger",
+      "voice": {
+        "pitch": "low",
+        "speed": "normal",
+        "timbre": "buzzy"
+      }
+    },
+    {
+      "id": "hoa",
+      "name": "小禾",
+      "profile": "怕黑的孩子，每晚數燈塔亮幾下才敢睡。",
+      "spriteAssetId": "char_youth",
+      "voice": {
+        "pitch": "high",
+        "speed": "fast",
+        "timbre": "bright"
+      }
+    }
+  ],
+  "items": [
+    {
+      "id": "old_key",
+      "name": "生鏽的鑰匙",
+      "description": "柄上刻著一片葉子，是守林人的記號。",
+      "iconAssetId": "icon_key"
+    },
+    {
+      "id": "wick",
+      "name": "星光燈芯",
+      "description": "握在手裡會微微發熱，像一顆睡著的星星。",
+      "iconAssetId": "icon_potion_blue"
+    }
+  ],
+  "quests": [
+    {
+      "id": "q_main",
+      "title": "熄滅的燈塔",
+      "description": "村長說，燈塔需要新的星光燈芯。",
+      "steps": [
+        {
+          "text": "到東邊的迷霧森林，找守林人卡爾"
+        },
+        {
+          "text": "找到打開古樹的方法"
+        },
+        {
+          "text": "把星光燈芯帶回去給村長"
+        },
+        {
+          "text": "把燈芯放回森林的古樹"
+        }
+      ]
+    }
+  ],
+  "endings": [
+    {
+      "id": "end_light",
+      "title": "燈火重燃",
+      "text": "星光燈芯在燈塔頂端亮起，迷霧像退潮一樣離開了燈火村。村民們在廣場上點起火堆，一直唱到天亮。",
+      "mood": "triumphant",
+      "epilogues": [
+        {
+          "condition": {
+            "type": "switch",
+            "id": "karl_upset",
+            "value": true
+          },
+          "text": "卡爾從此不再踏進村子。有人說，起霧的夜裡會看見他站在森林邊，望著燈塔。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "karl_upset",
+            "value": false
+          },
+          "text": "卡爾在森林邊點了一盞小燈。每到起霧的夜晚，兩道光會隔著田野互相閃一下。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "comforted_hoa",
+            "value": true
+          },
+          "text": "小禾不再數燈塔了。她現在會數星星，說那是燈塔的朋友。"
+        }
+      ]
+    },
+    {
+      "id": "end_forest",
+      "title": "森林的心",
+      "text": "燈芯回到古樹的根間，森林深處亮起一片溫柔的光。燈塔沒有再亮，但迷霧再也沒有越過田野。",
+      "mood": "bittersweet",
+      "epilogues": [
+        {
+          "condition": {
+            "type": "switch",
+            "id": "karl_upset",
+            "value": true
+          },
+          "text": "卡爾很久之後才承認，他沒想過村子裡的人會做這樣的選擇。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "comforted_hoa",
+            "value": true
+          },
+          "text": "小禾學會了在黑暗裡唱歌。她說，只要有人陪著，黑也沒那麼可怕。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "comforted_hoa",
+            "value": false
+          },
+          "text": "小禾還是怕黑，但她開始提著自己的小燈，走到森林邊去看那片光。"
+        }
+      ]
+    }
+  ],
+  "chapters": [
+    {
+      "id": "ch1",
+      "title": "第一章　熄滅的燈塔",
+      "summary": "迷霧逼近，村子需要光。",
+      "testStart": {
+        "mapId": "start",
+        "x": 6,
+        "y": 9
+      }
+    },
+    {
+      "id": "ch2",
+      "title": "第二章　燈芯的歸屬",
+      "summary": "光該照亮村子，還是留給森林？",
+      "testStart": {
+        "mapId": "forest",
+        "x": 14,
+        "y": 8,
+        "switches": [
+          "talked_elder",
+          "karl_told",
+          "wick_taken"
+        ],
+        "items": {
+          "wick": 1
+        },
+        "quests": {
+          "q_main": {
+            "status": "active",
+            "step": 2
+          }
+        }
+      }
+    }
+  ],
+  "switches": [
+    {
+      "id": "talked_elder",
+      "name": "talked_elder"
+    },
+    {
+      "id": "karl_told",
+      "name": "karl_told"
+    },
+    {
+      "id": "wick_taken",
+      "name": "wick_taken"
+    },
+    {
+      "id": "karl_upset",
+      "name": "karl_upset"
+    },
+    {
+      "id": "comforted_hoa",
+      "name": "comforted_hoa"
+    },
+    {
+      "id": "return_wick",
+      "name": "return_wick"
+    }
+  ],
+  "variables": [],
+  "commonEvents": [
+    {
+      "id": "ce_fog",
+      "name": "霧的低語",
+      "trigger": "call",
+      "commands": [
+        {
+          "code": "text",
+          "text": "霧氣纏上腳踝，冷得刺骨。遠處好像有人在低聲說話。"
+        },
+        {
+          "code": "comment",
+          "text": "森林裡多處調查點共用這段描述"
+        }
+      ]
+    }
+  ],
+  "maps": [
+    {
+      "id": "start",
+      "name": "燈火村",
+      "width": 24,
+      "height": 16,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "terrain": [
+        "TTTTTTTTTTTTTTTTTTTTTTTT",
+        "T......................T",
+        "T..RRR.......GGG.......T",
+        "T..HDH.......SSS.......T",
+        "T...=...............*..T",
+        "T...=.....,............T",
+        "T...=..................T",
+        "T.W.=..........X.......T",
+        "T...====================",
+        "T......................T",
+        "T......................T",
+        "T......................T",
+        "T*.....*...........*.*.T",
+        "T........FFF...........T",
+        "T......................T",
+        "TTTTTTTTTTTTTTTTTTTTTTTT"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "music": "peaceful",
+      "events": [
+        {
+          "id": "opening",
+          "name": "開場",
+          "x": 0,
+          "y": 0,
+          "note": "遊戲開始時執行一次（獨立開關 A）",
+          "pages": [
+            {
+              "trigger": "autorun",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "chapter",
+                  "chapterId": "ch1"
+                },
+                {
+                  "code": "text",
+                  "text": "艾琳，你來得正好。我在燈塔下等你。",
+                  "actorId": "elder"
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "elder",
+          "name": "村長莫倫",
+          "x": 8,
+          "y": 6,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_wizard"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "孩子，燈塔的燈芯燒盡了。沒有光，霧會吞掉整個村子。",
+                  "actorId": "elder"
+                },
+                {
+                  "code": "text",
+                  "text": "森林裡的古樹下，藏著另一顆星光燈芯。守林人卡爾知道在哪裡。",
+                  "actorId": "elder"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "我這就去森林。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "走東邊的大路就到了。路上小心霧。",
+                          "actorId": "elder"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "為什麼燈芯會在森林裡？",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……那是很久以前的事了。先把燈芯帶回來吧，孩子。",
+                          "actorId": "elder"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "talked_elder"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "quest",
+                  "questId": "q_main",
+                  "action": "start"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "talked_elder"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_wizard"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "卡爾住在森林入口附近。東邊的大路走到底就是了。",
+                  "actorId": "elder"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "itemId": "wick"
+              },
+              "graphic": {
+                "assetId": "char_wizard"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "這光……是星光燈芯！你真的帶回來了。",
+                  "actorId": "elder"
+                },
+                {
+                  "code": "text",
+                  "text": "卡爾一定跟你說了吧。燈芯是我父親從古樹裡取走的。森林從那年起就不再原諒我們。",
+                  "actorId": "elder"
+                },
+                {
+                  "code": "text",
+                  "text": "孩子，我沒有資格替你決定。燈芯要點亮燈塔，還是還給森林？",
+                  "actorId": "elder"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "點亮燈塔。村子需要光。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……謝謝你。我們會記得森林付出了什麼。",
+                          "actorId": "elder"
+                        },
+                        {
+                          "code": "item",
+                          "itemId": "wick",
+                          "delta": -1
+                        },
+                        {
+                          "code": "quest",
+                          "questId": "q_main",
+                          "action": "complete"
+                        },
+                        {
+                          "code": "ending",
+                          "endingId": "end_light"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "還給森林。這是當年欠下的。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……我父親若在，也會這麼說吧。去吧，把它放回古樹。",
+                          "actorId": "elder"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "return_wick"
+                          ],
+                          "value": true
+                        },
+                        {
+                          "code": "quest",
+                          "questId": "q_main",
+                          "action": "step",
+                          "step": 3
+                        }
+                      ]
+                    },
+                    {
+                      "text": "讓我再想想。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "不急。霧還要好幾夜才會到。",
+                          "actorId": "elder"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "return_wick"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_wizard"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "森林在等你，孩子。",
+                  "actorId": "elder"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hoa",
+          "name": "小禾",
+          "x": 14,
+          "y": 10,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_youth"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "燈塔熄了以後，晚上好黑……我都不敢睡。",
+                  "actorId": "hoa"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "wick_taken"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_youth"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "哇，那是燈芯嗎？好亮喔！",
+                  "actorId": "hoa"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "comforted_hoa",
+                    "value": false
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "可是……如果燈塔又熄了怎麼辦？",
+                      "actorId": "hoa"
+                    },
+                    {
+                      "code": "choices",
+                      "options": [
+                        {
+                          "text": "就算沒有燈塔，我也會陪著你。",
+                          "commands": [
+                            {
+                              "code": "text",
+                              "text": "……真的嗎？那我不怕了！",
+                              "actorId": "hoa"
+                            },
+                            {
+                              "code": "switch",
+                              "ids": [
+                                "comforted_hoa"
+                              ],
+                              "value": true
+                            }
+                          ]
+                        },
+                        {
+                          "text": "所以要好好守住它。",
+                          "commands": [
+                            {
+                              "code": "text",
+                              "text": "嗯……我會每天數它亮幾下。",
+                              "actorId": "hoa"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "我現在會在心裡唱歌，就不怕黑了。",
+                      "actorId": "hoa"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sign",
+          "name": "告示牌",
+          "x": 15,
+          "y": 7,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "「東：迷霧森林。起霧時請勿單獨進入。」\n下面有人用炭筆補了一行：「卡爾除外。」",
+                  "speaker": "告示牌"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "well",
+          "name": "古井",
+          "x": 2,
+          "y": 7,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "井水映出灰濛濛的天空。霧已經飄到井口了。",
+                  "speaker": "古井"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "itemId": "wick"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "井水裡映著燈芯的微光，像一顆小小的星星沉在水底。",
+                  "speaker": "古井"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "door",
+          "name": "民宅的門",
+          "x": 4,
+          "y": 3,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "門關著。屋裡傳來咳嗽聲：「霧太重了，我不出門……」",
+                  "speaker": "民宅的門"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "to_forest",
+          "name": "往迷霧森林",
+          "x": 23,
+          "y": 8,
+          "pages": [
+            {
+              "trigger": "touch",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "transfer",
+                  "mapId": "forest",
+                  "x": 1,
+                  "y": 7,
+                  "direction": "right"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "forest",
+      "name": "迷霧森林",
+      "parentId": "start",
+      "width": 20,
+      "height": 14,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "terrain": [
+        "TTTTTTTTTTTTTTTTTTTT",
+        "T,,,,,,,,P,,,,,,,,,T",
+        "T,,,,,,P,,,,,,,,,,PT",
+        "T,,M,P,,,,,,,,,,P,,T",
+        "T,,P,,,,,,,,,,P,,,,T",
+        "T,,,,,,,,,,,,,,,,,,T",
+        "T,,,,,,,,,,,,,,,,,,T",
+        "================,,,T",
+        "T,,,,,,,,,,,,,,,,,,T",
+        "T,,,,,,,,,,,,,,Y,,,T",
+        "T,P,,,,,,M,,,P,,,,,T",
+        "T,,,,,,,,,,P,,,,,,,T",
+        "T,,,,,,,,P,,,,,,,,,T",
+        "TTTTTTTTTTTTTTTTTTTT"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "music": "mysterious",
+      "events": [
+        {
+          "id": "to_village",
+          "name": "往燈火村",
+          "x": 0,
+          "y": 7,
+          "pages": [
+            {
+              "trigger": "touch",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "transfer",
+                  "mapId": "start",
+                  "x": 22,
+                  "y": 8,
+                  "direction": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "karl",
+          "name": "守林人卡爾",
+          "x": 6,
+          "y": 5,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_ranger"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "村裡的人？霧這麼濃還敢進來。",
+                  "actorId": "karl"
+                },
+                {
+                  "code": "text",
+                  "text": "……村長叫你來的吧。回去吧，這裡沒有你們要的東西。",
+                  "actorId": "karl"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "talked_elder"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_ranger"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "燈芯？哼。你們拿走過一次了。",
+                  "actorId": "karl"
+                },
+                {
+                  "code": "text",
+                  "text": "那是古樹的心。當年你們村長的父親把它挖走，森林才開始起霧。",
+                  "actorId": "karl"
+                },
+                {
+                  "code": "text",
+                  "text": "鑰匙在那個箱子裡，我不攔你。只是你要想清楚，光是誰的。",
+                  "actorId": "karl"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "我會想清楚再決定。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……至少你願意想。",
+                          "actorId": "karl"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "karl_told"
+                          ],
+                          "value": true
+                        },
+                        {
+                          "code": "quest",
+                          "questId": "q_main",
+                          "action": "step",
+                          "step": 1
+                        }
+                      ]
+                    },
+                    {
+                      "text": "村子快被霧吞掉了，我沒得選。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "每個拿走東西的人都這麼說。",
+                          "actorId": "karl"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "karl_told",
+                            "karl_upset"
+                          ],
+                          "value": true
+                        },
+                        {
+                          "code": "quest",
+                          "questId": "q_main",
+                          "action": "step",
+                          "step": 1
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "karl_told"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_ranger"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "karl_upset",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "你決定了就去吧。別在我面前拿著它。",
+                      "actorId": "karl"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "箱子在東邊，古樹在更裡面。慢慢走，霧會讓人迷路。",
+                      "actorId": "karl"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "return_wick"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_ranger"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "你……要把它還回來？",
+                  "actorId": "karl"
+                },
+                {
+                  "code": "text",
+                  "text": "我守了這片森林二十年，第一次有人這樣做。",
+                  "actorId": "karl"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "chest",
+          "name": "舊木箱",
+          "x": 12,
+          "y": 5,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "icon_chest"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "箱子扣得很緊，蓋子上刻著一片葉子。也許守林人知道怎麼打開。",
+                  "speaker": "舊木箱"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "karl_told"
+                ]
+              },
+              "graphic": {
+                "assetId": "icon_chest"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "葉子的刻痕在你靠近時亮了一下，箱蓋鬆開了。",
+                  "speaker": "舊木箱"
+                },
+                {
+                  "code": "text",
+                  "text": "箱子裡有一把生鏽的鑰匙。"
+                },
+                {
+                  "code": "item",
+                  "itemId": "old_key",
+                  "delta": 1
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "graphic": {
+                "assetId": "icon_chest"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "空箱子。木頭的香味還在。",
+                  "speaker": "舊木箱"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "tree",
+          "name": "古樹",
+          "x": 15,
+          "y": 9,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "巨大的古樹。樹根纏著一扇小小的木門，門上有個鑰匙孔。",
+                  "speaker": "古樹"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "itemId": "old_key"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "鑰匙轉動的聲音像一聲嘆息。木門打開了。",
+                  "speaker": "古樹"
+                },
+                {
+                  "code": "text",
+                  "text": "樹根間躺著一顆發光的燈芯。你把它捧在手心，溫溫的，像在呼吸。"
+                },
+                {
+                  "code": "item",
+                  "itemId": "old_key",
+                  "delta": -1
+                },
+                {
+                  "code": "item",
+                  "itemId": "wick",
+                  "delta": 1
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "wick_taken"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "quest",
+                  "questId": "q_main",
+                  "action": "step",
+                  "step": 2
+                },
+                {
+                  "code": "chapter",
+                  "chapterId": "ch2"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "wick_taken"
+                ]
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "樹根間空了一塊，像在等什麼回來。",
+                  "speaker": "古樹"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "return_wick"
+                ],
+                "itemId": "wick"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "你把燈芯放回樹根之間。",
+                  "speaker": "古樹"
+                },
+                {
+                  "code": "text",
+                  "text": "光從根部一路爬上樹梢，整片森林亮了起來。"
+                },
+                {
+                  "code": "item",
+                  "itemId": "wick",
+                  "delta": -1
+                },
+                {
+                  "code": "quest",
+                  "questId": "q_main",
+                  "action": "complete"
+                },
+                {
+                  "code": "ending",
+                  "endingId": "end_forest"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mushroom",
+          "name": "發光的蘑菇",
+          "x": 9,
+          "y": 10,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "蘑菇發著淡淡的藍光。湊近一看，傘蓋上有細小的字：「借了要還。」",
+                  "speaker": "發光的蘑菇"
+                },
+                {
+                  "code": "common",
+                  "id": "ce_fog"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mushroom2",
+          "name": "蘑菇叢",
+          "x": 3,
+          "y": 3,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "common",
+                  "id": "ce_fog"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "assetManifest": {
+    "assets": [
+      {
+        "id": "tileset_tiny_town",
+        "kind": "tileset",
+        "src": "/assets/kenney/tiny-town/tilemap_packed.png",
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "attribution": "Tiny Town by Kenney (www.kenney.nl), CC0",
+        "sourceUrl": "https://kenney.nl/assets/tiny-town",
+        "author": "Kenney (www.kenney.nl)"
+      },
+      {
+        "id": "char_hero",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 97,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "author": "Kenney (www.kenney.nl)"
+      },
+      {
+        "id": "char_wizard",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 84,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_ranger",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 112,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_youth",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 88,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_key",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-town/tilemap_packed.png",
+        "frame": 117,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-town",
+        "attribution": "Tiny Town by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_potion_blue",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 116,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_chest",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 89,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      }
+    ]
+  },
+  "intro": "燈火村靠著山丘上的守望燈塔，熬過了一百個起霧的冬天。\n\n直到三天前，燈塔熄了。\n\n迷霧一夜比一夜更靠近村子。",
+  "cover": {
+    "tagline": "燈芯該歸誰，由你決定。"
+  }
+}

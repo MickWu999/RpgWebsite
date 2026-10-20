@@ -1,44 +1,158 @@
 "use client";
 
-import type { GameCondition, GameEffect, GameProject } from "@/game/schema";
+import { ASSET_CATALOG } from "@/game/assets";
+import { COMPARE_OPS, QUEST_STATUSES, SELF_SWITCHES, type GameCondition, type GameProject } from "@/game/schema";
 
-/** 條件與效果的視覺化編輯器（RPG Maker 事件頁的「出現條件」與「事件指令」） */
+/**
+ * 共用的選擇器與條件編輯器（RPG Maker 的「條件分支」與事件頁「出現條件」）。
+ * 開關與變數可以直接輸入新的 ID：儲存時會自動加入資料庫（名稱預設為 ID，可在資料庫改名）。
+ */
+
+export const QUEST_STATUS_LABEL: Record<(typeof QUEST_STATUSES)[number], string> = { inactive: "未開始", active: "進行中", completed: "已完成", failed: "失敗" };
+
+const NEW = "__new__";
+const cleanId = (s: string) => s.trim().replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 64);
+
+function askId(label: string) {
+  const id = window.prompt(`新的${label} ID（英數字與底線，例如 met_sergeant）`);
+  return id ? cleanId(id) : null;
+}
+
+/** 開關／變數：可選既有的，也可以新增 */
+function NamedSelect({ list, value, onChange, label }: { list: Array<{ id: string; name: string }>; value: string; onChange: (id: string) => void; label: string }) {
+  const known = list.some((x) => x.id === value);
+  return (
+    <select
+      value={value}
+      onChange={(e) => {
+        if (e.target.value !== NEW) return onChange(e.target.value);
+        const id = askId(label);
+        if (id) onChange(id);
+      }}
+    >
+      {!known && <option value={value}>{value || `（選擇${label}）`}</option>}
+      {list.map((x) => (
+        <option key={x.id} value={x.id}>
+          {x.name}
+          {x.name !== x.id ? `（${x.id}）` : ""}
+        </option>
+      ))}
+      <option value={NEW}>＋ 新增{label}…</option>
+    </select>
+  );
+}
+
+export const SwitchSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <NamedSelect list={project.switches} value={value} onChange={onChange} label="開關" />
+);
+export const VariableSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <NamedSelect list={project.variables} value={value} onChange={onChange} label="變數" />
+);
+
+function RefSelect({ list, value, onChange, empty }: { list: Array<{ id: string; label: string }>; value: string; onChange: (id: string) => void; empty: string }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)}>
+      {!list.some((x) => x.id === value) && <option value={value}>{value || empty}</option>}
+      {list.map((x) => (
+        <option key={x.id} value={x.id}>
+          {x.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+export const ItemSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <RefSelect list={project.items.map((i) => ({ id: i.id, label: i.name }))} value={value} onChange={onChange} empty="（先在資料庫新增物品）" />
+);
+export const QuestSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <RefSelect list={project.quests.map((q) => ({ id: q.id, label: q.title }))} value={value} onChange={onChange} empty="（先在資料庫新增任務）" />
+);
+export const ActorSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <RefSelect list={project.actors.map((a) => ({ id: a.id, label: a.name }))} value={value} onChange={onChange} empty="（選擇角色）" />
+);
+export const MapSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <RefSelect list={project.maps.map((m) => ({ id: m.id, label: m.name }))} value={value} onChange={onChange} empty="（選擇地圖）" />
+);
+export const EndingSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <RefSelect list={project.endings.map((e) => ({ id: e.id, label: e.title }))} value={value} onChange={onChange} empty="（先在資料庫新增結局）" />
+);
+export const ChapterSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <RefSelect list={project.chapters.map((c) => ({ id: c.id, label: c.title }))} value={value} onChange={onChange} empty="（先在資料庫新增章節）" />
+);
+export const CommonEventSelect = ({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) => (
+  <RefSelect list={project.commonEvents.map((c) => ({ id: c.id, label: c.name }))} value={value} onChange={onChange} empty="（先在資料庫新增共用事件）" />
+);
+
+/** 素材挑選：角色圖或圖示，顯示縮圖 */
+export function AssetPicker({ kind, value, onChange, allowNone }: { kind: "character" | "icon" | "any"; value: string | undefined; onChange: (id: string | undefined) => void; allowNone?: boolean }) {
+  const list = ASSET_CATALOG.filter((a) => (kind === "any" ? a.kind !== "tileset" : a.kind === kind));
+  return (
+    <div className="asset-picker">
+      {allowNone && (
+        <button className={`asset-swatch${!value ? " active" : ""}`} onClick={() => onChange(undefined)} title="無（透明）">
+          <span className="asset-none">無</span>
+        </button>
+      )}
+      {list.map((a) => (
+        <button key={a.id} className={`asset-swatch${value === a.id ? " active" : ""}`} onClick={() => onChange(a.id)} title={`${a.name}（${a.id}）`}>
+          <AssetThumb src={a.src} frame={a.frame ?? 0} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function AssetThumb({ src, frame, size = 32 }: { src: string; frame: number; size?: number }) {
+  const cols = 12;
+  return (
+    <span
+      className="asset-thumb"
+      style={{
+        width: size,
+        height: size,
+        backgroundImage: `url(${src})`,
+        backgroundPosition: `-${(frame % cols) * size}px -${Math.floor(frame / cols) * size}px`,
+        backgroundSize: `${cols * size}px auto`,
+      }}
+    />
+  );
+}
+
+// ---------- 條件 ----------
 
 const CONDITION_LABELS: Record<GameCondition["type"], string> = {
-  quest_active: "任務進行中",
-  quest_completed: "任務已完成",
-  has_item: "持有物品",
-  flag_equals: "旗標等於",
-  stat_at_least: "數值至少",
+  switch: "開關",
+  variable: "變數",
+  selfSwitch: "獨立開關",
+  item: "持有物品",
+  quest: "任務狀態",
+  chapter: "目前章節",
   all: "以下全部成立",
   any: "以下任一成立",
   not: "以下不成立",
 };
 
-function defaultCondition(type: GameCondition["type"], p: GameProject): GameCondition {
+export function defaultCondition(type: GameCondition["type"], p: GameProject): GameCondition {
   switch (type) {
-    case "quest_active":
-    case "quest_completed":
-      return { type, questId: p.quests[0]?.id ?? "quest" };
-    case "has_item":
-      return { type, itemId: p.items[0]?.id ?? "item" };
-    case "flag_equals":
-      return { type, flag: "flag", value: true };
-    case "stat_at_least":
-      return { type, stat: "level", value: 2 };
+    case "switch":
+      return { type, id: p.switches[0]?.id ?? "", value: true };
+    case "variable":
+      return { type, id: p.variables[0]?.id ?? "", op: ">=", value: 1 };
+    case "selfSwitch":
+      return { type, key: "A", value: true };
+    case "item":
+      return { type, itemId: p.items[0]?.id ?? "" };
+    case "quest":
+      return { type, questId: p.quests[0]?.id ?? "", status: "active" };
+    case "chapter":
+      return { type, chapterId: p.chapters[0]?.id ?? "" };
     case "all":
     case "any":
-      return { type, conditions: [{ type: "flag_equals", flag: "flag", value: true }] };
+      return { type, conditions: [defaultCondition("switch", p)] };
     case "not":
-      return { type, condition: { type: "flag_equals", flag: "flag", value: true } };
+      return { type, condition: defaultCondition("switch", p) };
   }
-}
-
-function parseFlagValue(text: string): string | number | boolean {
-  if (text === "true") return true;
-  if (text === "false") return false;
-  if (text.trim() !== "" && !Number.isNaN(Number(text))) return Number(text);
-  return text;
 }
 
 export function ConditionEditor({ project, value, onChange }: { project: GameProject; value: GameCondition; onChange: (c: GameCondition) => void }) {
@@ -51,51 +165,90 @@ export function ConditionEditor({ project, value, onChange }: { project: GamePro
       ))}
     </select>
   );
-  const questSelect = (questId: string, set: (id: string) => void) => (
-    <select value={questId} onChange={(e) => set(e.target.value)}>
-      {project.quests.map((q) => (
-        <option key={q.id} value={q.id}>
-          {q.title}
-        </option>
-      ))}
+  const onOff = (v: boolean, set: (v: boolean) => void) => (
+    <select value={v ? "on" : "off"} onChange={(e) => set(e.target.value === "on")}>
+      <option value="on">ON</option>
+      <option value="off">OFF</option>
     </select>
   );
   switch (value.type) {
-    case "quest_active":
-    case "quest_completed":
+    case "switch":
       return (
         <div className="logic-row">
           {select}
-          {questSelect(value.questId, (questId) => onChange({ ...value, questId }))}
+          <SwitchSelect project={project} value={value.id} onChange={(id) => onChange({ ...value, id })} />
+          <span>為</span>
+          {onOff(value.value, (v) => onChange({ ...value, value: v }))}
         </div>
       );
-    case "has_item":
+    case "variable":
+      return (
+        <div className="logic-row">
+          {select}
+          <VariableSelect project={project} value={value.id} onChange={(id) => onChange({ ...value, id })} />
+          <select value={value.op} onChange={(e) => onChange({ ...value, op: e.target.value as (typeof COMPARE_OPS)[number] })}>
+            {COMPARE_OPS.map((op) => (
+              <option key={op} value={op}>
+                {op}
+              </option>
+            ))}
+          </select>
+          <input type="number" value={value.value} onChange={(e) => onChange({ ...value, value: Number(e.target.value) || 0 })} />
+        </div>
+      );
+    case "selfSwitch":
+      return (
+        <div className="logic-row">
+          {select}
+          <select value={value.key} onChange={(e) => onChange({ ...value, key: e.target.value as (typeof SELF_SWITCHES)[number] })}>
+            {SELF_SWITCHES.map((k) => (
+              <option key={k}>{k}</option>
+            ))}
+          </select>
+          <span>為</span>
+          {onOff(value.value, (v) => onChange({ ...value, value: v }))}
+        </div>
+      );
+    case "item":
       return (
         <div className="logic-row">
           {select}
           <ItemSelect project={project} value={value.itemId} onChange={(itemId) => onChange({ ...value, itemId })} />
-          <input type="number" min={1} value={value.count ?? 1} onChange={(e) => onChange({ ...value, count: Number(e.target.value) || 1 })} />
+          <span>×</span>
+          <input type="number" min={1} value={value.count ?? 1} onChange={(e) => onChange({ ...value, count: Math.max(1, Number(e.target.value) || 1) })} />
         </div>
       );
-    case "flag_equals":
+    case "quest": {
+      const quest = project.quests.find((q) => q.id === value.questId);
       return (
         <div className="logic-row">
           {select}
-          <input type="text" value={value.flag} placeholder="旗標名稱" onChange={(e) => onChange({ ...value, flag: e.target.value.replace(/[^A-Za-z0-9_-]/g, "") })} />
-          <span>=</span>
-          <input type="text" value={String(value.value)} placeholder="true / 數字 / 文字" onChange={(e) => onChange({ ...value, value: parseFlagValue(e.target.value) })} />
-        </div>
-      );
-    case "stat_at_least":
-      return (
-        <div className="logic-row">
-          {select}
-          <select value={value.stat} onChange={(e) => onChange({ ...value, stat: e.target.value as "hp" | "level" | "xp" })}>
-            <option value="level">等級</option>
-            <option value="xp">經驗值</option>
-            <option value="hp">HP</option>
+          <QuestSelect project={project} value={value.questId} onChange={(questId) => onChange({ ...value, questId, step: undefined })} />
+          <select value={value.status} onChange={(e) => onChange({ ...value, status: e.target.value as (typeof QUEST_STATUSES)[number] })}>
+            {QUEST_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {QUEST_STATUS_LABEL[s]}
+              </option>
+            ))}
           </select>
-          <input type="number" value={value.value} onChange={(e) => onChange({ ...value, value: Number(e.target.value) || 0 })} />
+          {value.status === "active" && quest && (
+            <select value={value.step ?? ""} onChange={(e) => onChange({ ...value, step: e.target.value === "" ? undefined : Number(e.target.value) })}>
+              <option value="">任何步驟</option>
+              {quest.steps.map((st, i) => (
+                <option key={i} value={i}>
+                  第 {i + 1} 步：{st.text.slice(0, 12)}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      );
+    }
+    case "chapter":
+      return (
+        <div className="logic-row">
+          {select}
+          <ChapterSelect project={project} value={value.chapterId} onChange={(chapterId) => onChange({ ...value, chapterId })} />
         </div>
       );
     case "all":
@@ -111,7 +264,7 @@ export function ConditionEditor({ project, value, onChange }: { project: GamePro
               </button>
             </div>
           ))}
-          <button className="btn small" onClick={() => onChange({ ...value, conditions: [...value.conditions, { type: "flag_equals", flag: "flag", value: true }] })}>
+          <button className="btn small" onClick={() => onChange({ ...value, conditions: [...value.conditions, defaultCondition("switch", project)] })}>
             ＋ 條件
           </button>
         </div>
@@ -126,139 +279,4 @@ export function ConditionEditor({ project, value, onChange }: { project: GamePro
         </div>
       );
   }
-}
-
-const EFFECT_LABELS: Record<GameEffect["type"], string> = {
-  give_item: "給予物品",
-  remove_item: "移除物品",
-  set_flag: "設定旗標",
-  add_xp: "增加經驗值",
-  complete_quest: "完成任務",
-};
-
-function defaultEffect(type: GameEffect["type"], p: GameProject): GameEffect {
-  switch (type) {
-    case "give_item":
-    case "remove_item":
-      return { type, itemId: p.items[0]?.id ?? "item" };
-    case "set_flag":
-      return { type, flag: "flag", value: true };
-    case "add_xp":
-      return { type, amount: 50 };
-    case "complete_quest":
-      return { type, questId: p.quests[0]?.id ?? "quest" };
-  }
-}
-
-function ItemSelect({ project, value, onChange }: { project: GameProject; value: string; onChange: (id: string) => void }) {
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}>
-      {project.items.map((i) => (
-        <option key={i.id} value={i.id}>
-          {i.name}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-export function EffectsEditor({ project, value, onChange }: { project: GameProject; value: GameEffect[]; onChange: (e: GameEffect[]) => void }) {
-  const set = (i: number, e: GameEffect) => onChange(value.map((x, j) => (j === i ? e : x)));
-  return (
-    <div className="logic-group">
-      {value.map((e, i) => (
-        <div key={i} className="logic-row">
-          <select value={e.type} onChange={(ev) => set(i, defaultEffect(ev.target.value as GameEffect["type"], project))}>
-            {Object.entries(EFFECT_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-          {(e.type === "give_item" || e.type === "remove_item") && (
-            <>
-              <ItemSelect project={project} value={e.itemId} onChange={(itemId) => set(i, { ...e, itemId })} />
-              <input type="number" min={1} value={e.count ?? 1} onChange={(ev) => set(i, { ...e, count: Number(ev.target.value) || 1 })} />
-            </>
-          )}
-          {e.type === "set_flag" && (
-            <>
-              <input type="text" value={e.flag} onChange={(ev) => set(i, { ...e, flag: ev.target.value.replace(/[^A-Za-z0-9_-]/g, "") })} />
-              <span>=</span>
-              <input type="text" value={String(e.value)} onChange={(ev) => set(i, { ...e, value: parseFlagValue(ev.target.value) })} />
-            </>
-          )}
-          {e.type === "add_xp" && <input type="number" value={e.amount} onChange={(ev) => set(i, { ...e, amount: Number(ev.target.value) || 0 })} />}
-          {e.type === "complete_quest" && (
-            <select value={e.questId} onChange={(ev) => set(i, { ...e, questId: ev.target.value })}>
-              {project.quests.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.title}
-                </option>
-              ))}
-            </select>
-          )}
-          <button className="btn small" onClick={() => onChange(value.filter((_, j) => j !== i))}>
-            移除
-          </button>
-        </div>
-      ))}
-      <button className="btn small" onClick={() => onChange([...value, { type: "set_flag", flag: "flag", value: true }])}>
-        ＋ 效果
-      </button>
-    </div>
-  );
-}
-
-/** 事件頁（RPG Maker 式）：依條件切換的對話入口，由上往下第一個成立的分頁生效 */
-export function VariantPages({
-  project,
-  base,
-  variants,
-  onChange,
-}: {
-  project: GameProject;
-  base: string;
-  variants: Array<{ condition: GameCondition; dialogueNodeId: string }>;
-  onChange: (base: string, variants: Array<{ condition: GameCondition; dialogueNodeId: string }>) => void;
-}) {
-  const nodeSelect = (value: string, set: (id: string) => void) => (
-    <select value={value} onChange={(e) => set(e.target.value)}>
-      {project.dialogues.map((d) => (
-        <option key={d.id} value={d.id}>
-          {d.id}：{d.text.slice(0, 16)}
-        </option>
-      ))}
-    </select>
-  );
-  return (
-    <div className="stack" style={{ gap: 8 }}>
-      {variants.map((v, i) => (
-        <div key={i} className="event-page">
-          <div className="row small">
-            <strong>分頁 {i + 1}</strong>
-            <span className="muted">（條件成立時優先）</span>
-            <span className="grow" />
-            <button className="btn small" disabled={i === 0} onClick={() => onChange(base, variants.map((x, j) => (j === i - 1 ? variants[i] : j === i ? variants[i - 1] : x)))}>
-              ↑
-            </button>
-            <button className="btn small" onClick={() => onChange(base, variants.filter((_, j) => j !== i))}>
-              刪除
-            </button>
-          </div>
-          <ConditionEditor project={project} value={v.condition} onChange={(condition) => onChange(base, variants.map((x, j) => (j === i ? { ...x, condition } : x)))} />
-          <div className="logic-row small">對話：{nodeSelect(v.dialogueNodeId, (id) => onChange(base, variants.map((x, j) => (j === i ? { ...x, dialogueNodeId: id } : x))))}</div>
-        </div>
-      ))}
-      <div className="event-page">
-        <div className="small">
-          <strong>預設分頁</strong> <span className="muted">（以上都不成立時）</span>
-        </div>
-        <div className="logic-row small">對話：{nodeSelect(base, (id) => onChange(id, variants))}</div>
-      </div>
-      <button className="btn small" onClick={() => onChange(base, [...variants, { condition: { type: "flag_equals", flag: "flag", value: true }, dialogueNodeId: base }])}>
-        ＋ 新增分頁
-      </button>
-    </div>
-  );
 }

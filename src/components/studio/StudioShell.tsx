@@ -32,7 +32,7 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
     ? [
         { href: `/studio/project/?id=${projectId}`, icon: "🏠", label: "總覽", hint: "製作進度清單與專案狀態" },
         { href: `/studio/edit/?id=${projectId}`, icon: "🗺", label: "地圖與事件", hint: "繪製地圖、放置 NPC 與調查點" },
-        { href: `/studio/edit/?id=${projectId}&db=dialogues`, icon: "📚", label: "資料庫", hint: "對話、任務、物品、結局、系統設定" },
+        { href: `/studio/edit/?id=${projectId}&db=actors`, icon: "📚", label: "資料庫", hint: "角色、物品、任務、結局、章節、開關、系統" },
         { href: `/studio/play/?id=${projectId}`, icon: "▶", label: "測試遊玩", hint: "在新分頁從頭玩一次", external: true },
         { href: `/studio/versions/?id=${projectId}`, icon: "🕘", label: "版本紀錄", hint: "每次儲存與 AI 操作的紀錄，可還原" },
         { href: `/studio/publish/?id=${projectId}`, icon: "🚀", label: "發布", hint: "檢查通過後發布到玩家網站" },

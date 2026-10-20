@@ -1,103 +1,130 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import CoverArt from "@/components/game/CoverArt";
+import { SOUNDS } from "@/game/assets";
 import { GENRE_LABELS } from "@/game/schema";
+import { getAudio } from "@/lib/audio";
 import type { CatalogEntry } from "@/lib/packs";
 
 /**
- * 首頁的遊戲選單輪播：可以左右滑動（手機）、按箭頭或點圓點切換。
- * 遊戲數量少時補上「建立新遊戲」與「製作中」卡片，讓玩家一眼看出這裡可以選遊戲。
+ * 玩家首頁的遊戲選單（RPG 遊戲啟動器）：
+ * 背景是選中遊戲的封面場景；左邊是 RPG 視窗的遊戲清單（↑↓ 選擇、Enter 開始，有游標音效）；
+ * 右邊是遊戲資訊視窗：封面、標語、時長、章節、結局數，以及這台裝置上的存檔。
  */
-export default function GameCarousel({ games, onCreate }: { games: CatalogEntry[]; onCreate?: () => void }) {
-  const trackRef = useRef<HTMLDivElement>(null);
+
+type SaveInfo = { savedAt: string; ended: boolean } | null;
+
+/** 只讀取 localStorage 的自動存檔時間，不必先下載整款遊戲 */
+function readSave(id: string): SaveInfo {
+  try {
+    const raw = window.localStorage.getItem(`rpg:save:${id}:auto`);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as { savedAt?: string; state?: { schemaVersion?: string; endingId?: string | null } };
+    if (data.state?.schemaVersion !== "2.0" || !data.savedAt) return null;
+    return { savedAt: data.savedAt, ended: Boolean(data.state.endingId) };
+  } catch {
+    return null;
+  }
+}
+
+const formatTime = (iso: string) => new Date(iso).toLocaleString("zh-TW", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
+  const router = useRouter();
   const [active, setActive] = useState(0);
-  // 玩家版沒有建立遊戲的入口（onCreate 未提供），只顯示「製作中」
-  const placeholders = [...(onCreate ? ["create"] : []), ...(games.length < 3 ? ["soon"] : [])];
-  const total = games.length + placeholders.length;
+  const [saves, setSaves] = useState<Record<string, SaveInfo>>({});
+  const game = games[active];
 
-  const goTo = (index: number) => {
-    const track = trackRef.current;
-    const card = track?.children[Math.max(0, Math.min(total - 1, index))] as HTMLElement | undefined;
-    if (track && card) track.scrollTo({ left: card.offsetLeft - (track.clientWidth - card.clientWidth) / 2, behavior: "smooth" });
-  };
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setSaves(Object.fromEntries(games.map((g) => [g.id, readSave(g.id)]))));
+    return () => cancelAnimationFrame(frame);
+  }, [games]);
 
-  const onScroll = () => {
-    const track = trackRef.current;
-    if (!track) return;
-    const center = track.scrollLeft + track.clientWidth / 2;
-    let best = 0;
-    let bestDist = Infinity;
-    Array.from(track.children).forEach((child, i) => {
-      const el = child as HTMLElement;
-      const dist = Math.abs(el.offsetLeft + el.clientWidth / 2 - center);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = i;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "s" || e.key === "w") {
+        e.preventDefault();
+        getAudio().unlock();
+        getAudio().play(SOUNDS.select, { volume: 0.25 });
+        setActive((i) => (i + (e.key === "ArrowDown" || e.key === "s" ? 1 : -1) + games.length) % games.length);
+      } else if ((e.key === "Enter" || e.key === "z" || e.key === " ") && games[active]) {
+        e.preventDefault();
+        router.push(`/play/?pack=${encodeURIComponent(games[active].id)}`);
       }
-    });
-    setActive(best);
-  };
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [games, active, router]);
+
+  if (!game) {
+    return (
+      <div className="launcher-empty rm-window" data-testid="library">
+        遊戲製作中，敬請期待。
+      </div>
+    );
+  }
+  const save = saves[game.id];
 
   return (
-    <div className="carousel" data-testid="library">
-      <div className="carousel-track" ref={trackRef} onScroll={onScroll}>
+    <div className="launcher" data-testid="library">
+      <div className="launcher-backdrop" aria-hidden>
+        <CoverArt key={game.id} cover={{ ...game.cover, characters: [] }} className="launcher-backdrop-art" />
+      </div>
+
+      <nav className="launcher-list rm-panel" aria-label="遊戲清單">
+        <div className="rm-panel-title">選擇冒險</div>
         {games.map((g, i) => (
-          <Link key={g.id} className={`game-card${i === active ? " active" : ""}`} href={`/play/?pack=${encodeURIComponent(g.id)}`} data-pack={g.id}>
-            <div className="game-card-cover">
-              <CoverArt cover={g.cover} />
-              <div className="game-card-title">{g.title}</div>
-              {g.cover.tagline && <div className="game-card-tagline">{g.cover.tagline}</div>}
-              {g.typicalMinutes && (
-                <div className="game-card-time">
-                  ⏱ 約 {g.typicalMinutes[0]}～{g.typicalMinutes[1]} 分鐘・{g.endings} 種結局
-                </div>
-              )}
-              <div className="game-card-play">▶ 開始遊戲</div>
-            </div>
-            <div className="game-card-body">
-              <div className="row small">
-                <span className="badge">{GENRE_LABELS[g.genre]}</span>
-                {g.typicalMinutes && (
-                  <span className="badge">
-                    約 {g.typicalMinutes[0]}～{g.typicalMinutes[1]} 分鐘
-                  </span>
-                )}
-                <span className="badge">{g.endings} 種結局</span>
-                {g.status === "approved" && <span className="badge ok">AI 生成・審查通過</span>}
-                {g.status === "demo" && <span className="badge">教學短篇</span>}
-              </div>
-              <p className="small muted game-card-desc">{g.description}</p>
-            </div>
-          </Link>
-        ))}
-        {placeholders.includes("create") && (
-          <button className="game-card placeholder" onClick={onCreate} data-testid="carousel-create">
-            <div className="placeholder-icon">＋</div>
-            <div className="placeholder-title">用你的故事建立新遊戲</div>
-            <div className="small muted">貼上故事，AI 會生成可以玩到結局的 RPG</div>
+          <button
+            key={g.id}
+            className={`launcher-item${i === active ? " selected" : ""}`}
+            data-pack={g.id}
+            onMouseEnter={() => setActive(i)}
+            onFocus={() => setActive(i)}
+            onClick={() => (i === active ? router.push(`/play/?pack=${encodeURIComponent(g.id)}`) : setActive(i))}
+          >
+            <span className="launcher-cursor">{i === active ? "▶" : ""}</span>
+            <span className="launcher-item-title">{g.title}</span>
+            <span className="launcher-item-meta">
+              {GENRE_LABELS[g.genre]}
+              {saves[g.id] ? "・💾" : ""}
+            </span>
           </button>
-        )}
-        {placeholders.includes("soon") && (
-          <div className="game-card placeholder soon">
-            <div className="placeholder-icon">⌛</div>
-            <div className="placeholder-title">更多遊戲製作中</div>
-            <div className="small muted">通過自動試玩與 AI 審查的作品會自動上架</div>
-          </div>
-        )}
-      </div>
-      <div className="carousel-dots">
-        <button className="carousel-arrow left" aria-label="上一款" disabled={active === 0} onClick={() => goTo(active - 1)}>
-          ◀
-        </button>
-        {Array.from({ length: total }, (_, i) => (
-          <button key={i} className={`carousel-dot${i === active ? " active" : ""}`} aria-label={`第 ${i + 1} 張`} onClick={() => goTo(i)} />
         ))}
-        <button className="carousel-arrow right" aria-label="下一款" disabled={active >= total - 1} onClick={() => goTo(active + 1)}>
-          ▶
-        </button>
-      </div>
+        <div className="launcher-soon">⌛ 更多冒險製作中</div>
+      </nav>
+
+      <section className="launcher-detail rm-panel" aria-live="polite">
+        <div className="launcher-cover">
+          <CoverArt key={game.id} cover={game.cover} />
+          <div className="launcher-cover-title">{game.title}</div>
+          {game.cover.tagline && <div className="launcher-cover-tagline">{game.cover.tagline}</div>}
+        </div>
+        <div className="launcher-stats">
+          {game.typicalMinutes && (
+            <span>
+              ⏱ 約 {game.typicalMinutes[0]}～{game.typicalMinutes[1]} 分鐘
+            </span>
+          )}
+          {game.chapters ? <span>📖 {game.chapters} 章</span> : null}
+          <span>🏁 {game.endings} 種結局</span>
+          <span>🎭 {GENRE_LABELS[game.genre]}</span>
+          {game.status === "demo" && <span>教學短篇</span>}
+        </div>
+        <p className="launcher-desc">{game.description}</p>
+        <div className="launcher-actions">
+          <Link className="rm-button primary" href={`/play/?pack=${encodeURIComponent(game.id)}`} data-testid="start-game">
+            {save ? "▶ 繼續冒險" : "▶ 開始冒險"}
+          </Link>
+          {save && (
+            <span className="launcher-save">
+              💾 {save.ended ? "已通關" : "上次存檔"}・{formatTime(save.savedAt)}
+            </span>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

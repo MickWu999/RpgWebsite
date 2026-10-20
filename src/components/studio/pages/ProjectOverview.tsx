@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import CoverArt from "@/components/game/CoverArt";
 import IssueList from "@/components/IssueList";
+import { walkProject } from "@/game/commands";
 import { coverDataOf } from "@/game/cover";
 import type { GameProject } from "@/game/schema";
 import { studioApi, type CheckResult, type VersionEntry } from "@/lib/studioApi";
@@ -20,20 +21,27 @@ type Step = { done: boolean; title: string; how: string; href: string; cta: stri
 
 function steps(p: GameProject, id: string, check: CheckResult | null, published: boolean): Step[] {
   const edit = `/studio/edit/?id=${id}`;
-  const terrainKinds = new Set(p.scenes.flatMap((s) => [...(s.terrain ?? []).join("")]));
-  const interactables = p.scenes.reduce((n, s) => n + (s.interactables?.length ?? 0), 0);
+  const terrainKinds = new Set(p.maps.flatMap((m) => [...m.terrain.join("")]));
+  const events = p.maps.flatMap((m) => m.events);
+  const hasTransfer = events.some((e) => e.pages.some((pg) => pg.commands.some((c) => c.code === "transfer")));
+  const people = events.filter((e) => e.pages.some((pg) => pg.graphic?.assetId.startsWith("char_"))).length;
+  const looks = events.filter((e) => e.pages.some((pg) => pg.trigger === "action" && !pg.graphic?.assetId.startsWith("char_"))).length;
+  let texts = 0;
+  walkProject(p, (c) => c.code === "text" && texts++);
   const placeholder = p.endings.some((e) => e.id === "end_placeholder");
   return [
     { done: p.description !== "（待補）" && p.description.length >= 10, title: "1. 寫下遊戲名稱與簡介", how: "在「資料庫 → 系統」設定名稱、簡介、開場訊息與封面。", href: `${edit}&db=system`, cta: "開啟系統設定" },
-    { done: terrainKinds.size >= 4, title: "2. 畫出地圖", how: "在「地圖」模式選圖塊，在畫布上拖曳繪製道路、房屋、樹林。需要更多地圖時按地圖清單的「＋」。", href: edit, cta: "開啟地圖編輯器" },
-    { done: p.scenes.length >= 2 && p.scenes.some((s) => s.exits.length > 0), title: "3. 用出口連接地圖", how: "切到「事件」模式，在地圖邊緣雙擊空格 →「＋ 出口」，設定要通往哪張地圖。雙向通行要兩邊各放一個。", href: edit, cta: "放置出口" },
-    { done: p.npcs.length >= 2, title: "4. 放置 NPC", how: "「事件」模式雙擊空格 →「＋ NPC」，設定名稱、角色圖與聲音。至少 2 位。", href: edit, cta: "放置 NPC" },
-    { done: p.dialogues.length >= 8, title: "5. 撰寫對話", how: "在「資料庫 → 對話」編輯台詞，加上選項、下一句與效果（例如給道具、設定旗標）。", href: `${edit}&db=dialogues`, cta: "開啟對話" },
-    { done: interactables >= 2, title: "6. 加入調查點", how: "「事件」模式雙擊門、告示牌、寶箱 →「＋ 調查點」。玩家按確認時會看到回應，避免迷路。至少 2 個。", href: edit, cta: "放置調查點" },
-    { done: p.quests.some((q) => q.objectives.length >= 3), title: "7. 建立任務", how: "在「資料庫 → 任務」設定目標（和誰說話、收集什麼、去哪裡），目標會依序完成。", href: `${edit}&db=quests`, cta: "開啟任務" },
-    { done: p.endings.length >= 2 && !placeholder, title: "8. 設定結局", how: "在「資料庫 → 結局」設定 2～4 個結局與達成條件，並用「尾聲」回應玩家的選擇。", href: `${edit}&db=endings`, cta: "開啟結局" },
-    { done: Boolean(check?.playtest?.ok && check.validation.errors.length === 0), title: "9. 通過檢查與自動試玩", how: "系統會驗證所有引用，並自動把每個結局玩過一遍。錯誤會列在下方。", href: `/studio/publish/?id=${id}`, cta: "查看檢查結果" },
-    { done: published, title: "10. 發布到玩家網站", how: "通過檢查後在「發布」頁按下發布，玩家網站會立即出現這款遊戲。", href: `/studio/publish/?id=${id}`, cta: "前往發布" },
+    { done: p.actors.length >= 3, title: "2. 建立角色", how: "在「資料庫 → 角色」建立主角與主要人物：名稱、角色圖、講話聲，以及動機與秘密（角色設定）。", href: `${edit}&db=actors`, cta: "開啟角色" },
+    { done: terrainKinds.size >= 4, title: "3. 畫出地圖", how: "在「地圖」模式選圖塊，在畫布上拖曳繪製道路、房屋、樹林。用地圖樹的「＋」新增地圖，「＋子」新增子地圖（例如民宅內部）。", href: edit, cta: "開啟地圖編輯器" },
+    { done: p.maps.length >= 2 && hasTransfer, title: "4. 用場所移動連接地圖", how: "切到「事件」模式，在地圖邊緣選一格 →「快速事件建立 → 場所移動」，設定要通往哪張地圖。雙向通行要兩邊各放一個。", href: edit, cta: "放置場所移動" },
+    { done: people >= 2, title: "5. 放置人物", how: "「事件」模式選一格 →「快速事件建立 → 人物」，選角色圖，在執行內容寫對話。用多個事件頁讓人物依劇情進度說不同的話。", href: edit, cta: "放置人物" },
+    { done: texts >= 12, title: "6. 撰寫劇情", how: "在事件的執行內容加入「顯示文字」「顯示選項」「條件分支」，並用「開關操作」記下玩家的選擇。", href: edit, cta: "開啟事件" },
+    { done: looks >= 2, title: "7. 加入調查點", how: "門、告示、寶箱、古井都是事件：「快速事件建立 → 調查點／寶箱」。玩家按確定鍵時一定要有回應，避免迷路。", href: edit, cta: "放置調查點" },
+    { done: p.quests.some((q) => q.steps.length >= 3), title: "8. 建立任務日誌", how: "在「資料庫 → 任務」寫下步驟（找誰／去哪／做什麼），在事件中用「任務」指令開始與推進。", href: `${edit}&db=quests`, cta: "開啟任務" },
+    { done: p.chapters.length >= 2 && p.chapters.every((c) => c.testStart), title: "9. 分章節", how: "在「資料庫 → 章節」建立章節並設定測試起點；在劇情轉折處用「章節」指令進入下一章。之後可以直接從某一章開始測試。", href: `${edit}&db=chapters`, cta: "開啟章節" },
+    { done: p.endings.length >= 2 && !placeholder, title: "10. 設定結局", how: "在「資料庫 → 結局」設定 2～4 個結局與尾聲，在事件中依玩家累積的選擇用「結局」指令觸發。", href: `${edit}&db=endings`, cta: "開啟結局" },
+    { done: Boolean(check?.playtest?.ok && check.validation.errors.length === 0), title: "11. 通過檢查與自動試玩", how: "系統會驗證所有引用，並自動把每個結局玩過一遍。錯誤會列在下方。", href: `/studio/publish/?id=${id}`, cta: "查看檢查結果" },
+    { done: published, title: "12. 發布到玩家網站", how: "通過檢查後在「發布」頁按下發布，玩家網站會立即出現這款遊戲。", href: `/studio/publish/?id=${id}`, cta: "前往發布" },
   ];
 }
 
@@ -151,11 +159,11 @@ export default function ProjectOverview() {
             <section className="card">
               <h2>規模</h2>
               <div className="stat-grid">
-                <div><b>{p.scenes.length}</b><span>地圖</span></div>
-                <div><b>{p.npcs.length}</b><span>NPC</span></div>
-                <div><b>{p.dialogues.length}</b><span>對話</span></div>
+                <div><b>{p.maps.length}</b><span>地圖</span></div>
+                <div><b>{p.maps.reduce((n, m) => n + m.events.length, 0)}</b><span>事件</span></div>
+                <div><b>{p.actors.length}</b><span>角色</span></div>
+                <div><b>{p.chapters.length}</b><span>章節</span></div>
                 <div><b>{p.quests.length}</b><span>任務</span></div>
-                <div><b>{p.items.length}</b><span>物品</span></div>
                 <div><b>{p.endings.length}</b><span>結局</span></div>
               </div>
               <div className="small muted" style={{ marginTop: 8 }}>

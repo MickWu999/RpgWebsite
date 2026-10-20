@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { TERRAIN, TERRAIN_BASE_FRAME } from "@/game/assets";
-import type { GameProject, SceneDefinition } from "@/game/schema";
+import type { GameProject, MapDefinition } from "@/game/schema";
 
 /**
  * Studio 地圖畫布（RPG Maker 式）：
- * - 地圖模式：按住拖曳繪製地形（放開時才送出一筆 scene.paint 操作，方便復原）
- * - 事件模式：點格子選取、雙擊空格新增事件
- * 畫面上同時顯示 NPC、調查點、撿取物、出口、地點與玩家起點。
+ * - 地圖模式：按住拖曳繪製地形（放開時才送出一筆 map.paint 操作，方便復原）
+ * - 事件模式：點格子選取、雙擊開啟事件編輯（空格就新增事件）、拖曳事件可以移動位置
+ * 事件以第 1 頁的圖像顯示（與 RPG Maker 相同），透明事件畫成方框，場所移動畫成 ⇄，玩家起點畫成 S。
  */
 
 const SHEET_COLUMNS = 12;
@@ -40,9 +40,10 @@ export default function MapCanvas({
   onPaintEnd,
   onSelect,
   onCreate,
+  onMoveEvent,
 }: {
   project: GameProject;
-  scene: SceneDefinition;
+  scene: MapDefinition;
   mode: MapMode;
   zoom: number;
   selected: { x: number; y: number } | null;
@@ -52,7 +53,9 @@ export default function MapCanvas({
   onPaintEnd: () => void;
   onSelect: (x: number, y: number) => void;
   onCreate: (x: number, y: number) => void;
+  onMoveEvent: (eventId: string, x: number, y: number) => void;
 }) {
+  const dragEvent = useRef<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const painting = useRef(false);
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
@@ -76,7 +79,7 @@ export default function MapCanvas({
 
       // 地形
       for (let y = 0; y < scene.height; y++) {
-        const row = [...(scene.terrain?.[y] ?? "")];
+        const row = [...(scene.terrain[y] ?? "")];
         for (let x = 0; x < scene.width; x++) {
           const ch = preview.get(`${x},${y}`) ?? row[x];
           const def = ch ? TERRAIN[ch] : undefined;
@@ -108,21 +111,6 @@ export default function MapCanvas({
 
       const dim = mode === "map" ? 0.55 : 1;
       ctx.globalAlpha = dim;
-      for (const loc of scene.locations ?? []) {
-        ctx.fillStyle = "rgba(242,184,75,0.22)";
-        ctx.fillRect(loc.x * ts, loc.y * ts, (loc.width ?? 1) * ts, (loc.height ?? 1) * ts);
-        ctx.strokeStyle = "#f2b84b";
-        ctx.strokeRect(loc.x * ts + 1, loc.y * ts + 1, (loc.width ?? 1) * ts - 2, (loc.height ?? 1) * ts - 2);
-      }
-      for (const exit of scene.exits) {
-        ctx.fillStyle = "rgba(111,195,164,0.45)";
-        ctx.fillRect(exit.x * ts, exit.y * ts, ts, ts);
-        ctx.fillStyle = "#fff";
-        ctx.font = `${Math.round(ts * 0.5)}px sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText("⇄", exit.x * ts + ts / 2, exit.y * ts + ts / 2);
-      }
       const sprite = async (assetId: string | undefined, x: number, y: number) => {
         const a = project.assetManifest.assets.find((x) => x.id === assetId);
         if (!a || a.frame === undefined) return false;
@@ -131,34 +119,40 @@ export default function MapCanvas({
         frame(img, a.frame, a.frameSize ?? 16, x * ts, y * ts);
         return true;
       };
-      for (const pk of scene.pickups ?? []) {
-        const item = project.items.find((i) => i.id === pk.itemId);
-        if (!(await sprite(item?.iconAssetId, pk.x, pk.y))) {
-          ctx.fillStyle = "#f2e05b";
-          ctx.fillRect(pk.x * ts + ts / 4, pk.y * ts + ts / 4, ts / 2, ts / 2);
-        }
-      }
-      for (const o of scene.interactables ?? []) {
-        ctx.strokeStyle = "#ff7ad9";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(o.x * ts + 2, o.y * ts + 2, ts - 4, ts - 4);
-        ctx.fillStyle = "#ff7ad9";
+      const glyph = (text: string, x: number, y: number, color: string) => {
+        ctx.fillStyle = color;
         ctx.font = `bold ${Math.round(ts * 0.45)}px sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("！", o.x * ts + ts / 2, o.y * ts + ts / 2);
-      }
-      for (const npc of project.npcs.filter((n) => n.sceneId === scene.id)) {
-        if (!(await sprite(npc.spriteAssetId, npc.position.x, npc.position.y))) {
-          ctx.fillStyle = "#d98c5f";
-          ctx.beginPath();
-          ctx.arc(npc.position.x * ts + ts / 2, npc.position.y * ts + ts / 2, ts * 0.35, 0, Math.PI * 2);
-          ctx.fill();
+        ctx.fillText(text, x * ts + ts / 2, y * ts + ts / 2);
+      };
+      for (const ev of scene.events) {
+        const page = ev.pages[0];
+        const isTransfer = page.trigger === "touch" && page.commands.some((c) => c.code === "transfer");
+        if (isTransfer && !page.graphic) {
+          ctx.fillStyle = "rgba(111,195,164,0.45)";
+          ctx.fillRect(ev.x * ts, ev.y * ts, ts, ts);
+          glyph("⇄", ev.x, ev.y, "#fff");
+        } else if (!(page.graphic && (await sprite(page.graphic.assetId, ev.x, ev.y)))) {
+          glyph(page.trigger === "autorun" ? "▶" : page.trigger === "touch" ? "◇" : "！", ev.x, ev.y, "#ff7ad9");
+        }
+        if (mode === "event") {
+          // RPG Maker 式事件框
+          ctx.strokeStyle = "rgba(255,255,255,0.85)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(ev.x * ts + 2.5, ev.y * ts + 2.5, ts - 5, ts - 5);
+          if (ev.pages.length > 1) {
+            ctx.fillStyle = "#000a";
+            ctx.fillRect(ev.x * ts + ts - 12, ev.y * ts + 2, 10, 10);
+            ctx.fillStyle = "#fff";
+            ctx.font = "9px sans-serif";
+            ctx.fillText(String(ev.pages.length), ev.x * ts + ts - 7, ev.y * ts + 7);
+          }
         }
       }
-      const start = project.player.startPosition;
-      if (start.sceneId === scene.id) {
-        await sprite(project.player.spriteAssetId, start.x, start.y);
+      const start = project.system.start;
+      if (start.mapId === scene.id) {
+        await sprite(project.actors.find((a) => a.id === project.system.playerActorId)?.spriteAssetId, start.x, start.y);
         ctx.fillStyle = "#4b8bf2";
         ctx.fillRect(start.x * ts, start.y * ts, ts * 0.4, ts * 0.4);
         ctx.fillStyle = "#fff";
@@ -202,19 +196,34 @@ export default function MapCanvas({
         if (!c) return;
         if (mode === "map") {
           painting.current = true;
-          e.currentTarget.setPointerCapture(e.pointerId);
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            // 部分瀏覽器不支援時仍可繪製
+          }
           onPaint(c.x, c.y);
-        } else onSelect(c.x, c.y);
+        } else {
+          onSelect(c.x, c.y);
+          dragEvent.current = scene.events.find((ev) => ev.x === c.x && ev.y === c.y)?.id ?? null;
+        }
       }}
       onPointerMove={(e) => {
         const c = cellOf(e);
         setHover(c);
         if (painting.current && c) onPaint(c.x, c.y);
       }}
-      onPointerUp={() => {
+      onPointerUp={(e) => {
         if (painting.current) {
           painting.current = false;
           onPaintEnd();
+        }
+        const id = dragEvent.current;
+        dragEvent.current = null;
+        const c = cellOf(e);
+        const ev = scene.events.find((x) => x.id === id);
+        if (ev && c && (c.x !== ev.x || c.y !== ev.y) && !scene.events.some((x) => x.x === c.x && x.y === c.y)) {
+          onMoveEvent(ev.id, c.x, c.y);
+          onSelect(c.x, c.y);
         }
       }}
       onPointerLeave={() => setHover(null)}

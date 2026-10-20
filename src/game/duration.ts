@@ -1,9 +1,9 @@
-import { createInitialState, currentDialogueNode } from "./engine";
+import { createInitialState, type PlayerState } from "./engine";
 import { applyAction, type PlaytestReport } from "./playtest";
 import type { GameProject } from "./schema";
 
 /**
- * 預估遊玩時長：沿自動試玩找到的最短通關路線，累計移動步數、閱讀字數與選擇次數。
+ * 預估遊玩時長：沿自動試玩找到的最短路線，累計移動步數、閱讀字數與選擇次數。
  * 一般玩家會探索、閒聊、想選項，實際時長約為最短路線的 2.5～3 倍（經驗估計，非實測）。
  */
 
@@ -15,28 +15,34 @@ export const PLAYER_FACTOR: [number, number] = [2.5, 3];
 
 export type DurationEstimate = { shortestMinutes: number; typicalMinutes: [number, number] };
 
-export function estimateDuration(project: GameProject, playtest: PlaytestReport): DurationEstimate | null {
-  const routes = playtest.endings.filter((e) => e.reachable && e.actions);
-  if (routes.length === 0) return null;
-  const intro = [...(project.intro ?? project.description)].length;
-  const seconds = routes.map((e) => {
-    let state = createInitialState(project);
-    let steps = 0;
-    let chars = intro;
-    let choices = 0;
-    for (const action of e.actions!) {
-      if ("moves" in action) steps += action.moves.length;
-      if (action.kind === "choose") choices++;
-      state = applyAction(project, state, action);
-      const node = currentDialogueNode(project, state);
-      if (node) chars += [...node.text].length;
-    }
-    chars += [...(project.endings.find((x) => x.id === e.endingId)?.text ?? "")].length;
-    return steps * SECONDS_PER_STEP + chars / CHARS_PER_SECOND + choices * SECONDS_PER_CHOICE + e.actions!.length * SECONDS_PER_ACTION;
-  });
+export function routeSeconds(project: GameProject, playtest: PlaytestReport, start?: PlayerState): number[] {
+  return playtest.goals
+    .filter((g) => g.reachable && g.actions)
+    .map((g) => {
+      let state = start ?? createInitialState(project);
+      let steps = 0;
+      let chars = start ? 0 : [...(project.intro ?? "")].length;
+      let choices = 0;
+      for (const action of g.actions!) {
+        if (action.kind === "event") steps += action.moves.length;
+        if (action.kind === "choose") choices++;
+        state = applyAction(project, state, action);
+        if (state.message?.kind === "text") chars += [...state.message.text].length;
+      }
+      chars += [...(project.endings.find((x) => x.id === state.endingId)?.text ?? "")].length;
+      return steps * SECONDS_PER_STEP + chars / CHARS_PER_SECOND + choices * SECONDS_PER_CHOICE + g.actions!.length * SECONDS_PER_ACTION;
+    });
+}
+
+export function toEstimate(seconds: number[]): DurationEstimate | null {
+  if (seconds.length === 0) return null;
   const shortest = Math.min(...seconds) / 60;
   return {
     shortestMinutes: Math.round(shortest * 10) / 10,
     typicalMinutes: [Math.max(1, Math.round(shortest * PLAYER_FACTOR[0])), Math.max(1, Math.round(shortest * PLAYER_FACTOR[1]))],
   };
+}
+
+export function estimateDuration(project: GameProject, playtest: PlaytestReport, start?: PlayerState): DurationEstimate | null {
+  return toEstimate(routeSeconds(project, playtest, start));
 }

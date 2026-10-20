@@ -1,168 +1,187 @@
+import { findCatalogAsset } from "./assets";
+import { allConditions, allSources, conditionAtoms, walkCommands, walkCondition } from "./commands";
 import { estimateDuration, type DurationEstimate } from "./duration";
-import type { PlaytestReport } from "./playtest";
-import type { GameCondition, GameProject } from "./schema";
+import { createInitialState } from "./engine";
+import { applyAction, type PlaytestReport } from "./playtest";
+import type { EventCommand, GameProject } from "./schema";
 import type { ValidationIssue } from "./validate";
 
 /**
- * 量化品質指標（自動 review 第一層，不使用 AI）。
+ * 量化品質指標（自動審查的第一層，不使用 AI）。
  * validate 保證「能玩、不壞」；這裡檢查「像一款完整的 RPG」所需的最低份量與分支。
- * blocking 會退回 AI 修改；suggestions 只供 AI 審查與報告參考。
+ * blocking 會退回修改；suggestions 只供 AI 審查與報告參考。
  */
 
 export const QUALITY_THRESHOLDS = {
-  minNpcs: 2,
+  minPeople: 3,
   minQuests: 1,
-  minObjectives: 3,
+  minQuestSteps: 3,
   minItems: 1,
   minEndings: 2,
-  minDialogueNodes: 8,
-  minMeaningfulChoices: 3,
-  minStepsToEnding: 6,
-  minAvgDialogueChars: 15,
-  // 規模上限：結局太多時，結局文字與旗標組合容易互相矛盾（實測 8 個結局的版本審查一直不過），所以結局維持最多 4 個；
-  // 其餘放寬到能做出 15～30 分鐘的遊戲
   maxEndings: 4,
-  maxNpcs: 10,
-  maxDialogueNodes: 140,
-  /** 一般玩家預估時長（分鐘）的目標範圍 */
-  targetMinutes: [25, 40] as [number, number],
-  // E3／互動回饋：至少 2 個可調查物件，讓環境分擔說明、降低迷失感
+  minTexts: 12,
+  minMeaningfulChoices: 3,
+  minActionsToEnding: 6,
+  minAvgTextChars: 15,
   minInteractables: 2,
+  maxPeople: 40,
+  maxTexts: 1500,
+  /** 一般玩家預估時長（分鐘）的目標範圍 */
+  targetMinutes: [60, 120] as [number, number],
 };
 
 export type QualityMetrics = {
-  npcs: number;
+  maps: number;
+  /** 有角色圖、按確定鍵觸發的事件（NPC） */
+  people: number;
+  /** 沒有角色圖、按確定鍵觸發的事件（門、告示、寶箱…） */
+  interactables: number;
   quests: number;
-  objectives: number;
+  questSteps: number;
   items: number;
   endings: number;
-  dialogueNodes: number;
-  /** 有 effect 或會導向不同節點的選項數 */
+  chapters: number;
+  texts: number;
+  avgTextChars: number;
+  /** 會改變狀態或接到不同內容的選項數 */
   meaningfulChoices: number;
-  avgDialogueChars: number;
   /** 各結局的最短通關行動數 */
-  stepsToEnding: Record<string, number>;
-  /** 各結局路線之間，至少有一個不同的對話選擇 */
+  actionsToEnding: Record<string, number>;
+  /** 各結局路線之間，至少有一個不同的選擇 */
   endingsHaveDistinctChoices: boolean;
-  /** 至少在一條結局路線上被對話過的 NPC 比例 */
-  npcCoverage: number;
-  /** 可調查物件數 */
-  interactables: number;
-  /** 預估遊玩時長（分鐘） */
+  /** 至少在一條結局路線上互動過的 NPC 比例 */
+  peopleCoverage: number;
   duration: DurationEstimate | null;
 };
 
 export type QualityReport = { metrics: QualityMetrics; blocking: ValidationIssue[]; suggestions: ValidationIssue[] };
 
 const PLACEHOLDER = /\b(todo|tbd|lorem|placeholder)\b|待補|範例文字|xxx/i;
+const STATE_CODES = new Set<EventCommand["code"]>(["switch", "selfSwitch", "variable", "item", "quest", "ending", "transfer", "jump", "text", "if", "common", "chapter"]);
+
+function isCharacter(project: GameProject, assetId: string | undefined) {
+  if (!assetId) return false;
+  const kind = project.assetManifest.assets.find((a) => a.id === assetId)?.kind ?? findCatalogAsset(assetId)?.kind;
+  return kind === "character";
+}
 
 /** checkDuration=false：手寫的教學短篇（demo）不套用時長目標 */
 export function assessQuality(project: GameProject, playtest: PlaytestReport, options: { checkDuration?: boolean } = {}): QualityReport {
   const t = QUALITY_THRESHOLDS;
   const blocking: ValidationIssue[] = [];
   const suggestions: ValidationIssue[] = [];
-  const choices = project.dialogues.flatMap((d) => d.choices ?? []);
-  const meaningfulChoices = choices.filter((c) => (c.effects?.length ?? 0) > 0 || c.nextNodeId).length;
-  const texts = project.dialogues.map((d) => d.text);
-  const avgDialogueChars = texts.length ? Math.round(texts.reduce((n, s) => n + [...s].length, 0) / texts.length) : 0;
 
-  const routes = playtest.endings.filter((e) => e.reachable && e.actions);
-  const stepsToEnding = Object.fromEntries(routes.map((e) => [e.endingId, e.actions!.length]));
-  const choiceSets = routes.map((e) => new Set(e.actions!.flatMap((a) => (a.kind === "choose" ? [a.choiceId] : []))));
+  const peopleIds = new Set<string>();
+  let interactables = 0;
+  for (const m of project.maps)
+    for (const e of m.events) {
+      const action = e.pages.filter((p) => p.trigger === "action" && p.commands.length > 0);
+      if (action.some((p) => isCharacter(project, p.graphic?.assetId))) peopleIds.add(`${m.id}/${e.id}`);
+      else if (action.length > 0) interactables++;
+    }
+
+  const texts: string[] = [];
+  let meaningfulChoices = 0;
+  for (const s of allSources(project))
+    walkCommands(s.commands, (c) => {
+      if (c.code === "text") texts.push(c.text);
+      if (c.code === "choices") meaningfulChoices += c.options.filter((o) => o.commands.some((x) => STATE_CODES.has(x.code))).length;
+    });
+  const avgTextChars = texts.length ? Math.round(texts.reduce((n, x) => n + [...x].length, 0) / texts.length) : 0;
+
+  // 重播每條結局路線：記錄做過的選擇與互動過的 NPC
+  const routes = playtest.goals.filter((g) => g.reachable && g.actions);
+  const actionsToEnding = Object.fromEntries(routes.map((g) => [g.id, g.actions!.length]));
+  const choiceSets: Array<Set<string>> = [];
+  const talked = new Set<string>();
+  for (const g of routes) {
+    let s = createInitialState(project);
+    for (const a of g.actions!) {
+      if (a.kind === "event") talked.add(`${s.mapId}/${a.eventId}`);
+      s = applyAction(project, s, a);
+    }
+    choiceSets.push(new Set(s.choiceLog));
+  }
   const endingsHaveDistinctChoices = choiceSets.every((set, i) => choiceSets.every((other, j) => i === j || [...set].some((c) => !other.has(c))));
-  const talked = new Set(routes.flatMap((e) => e.actions!.flatMap((a) => (a.kind === "talk" ? [a.npcId] : []))));
-  const npcCoverage = project.npcs.length ? talked.size / project.npcs.length : 0;
+  const peopleCoverage = peopleIds.size ? [...peopleIds].filter((id) => talked.has(id)).length / peopleIds.size : 0;
 
   const metrics: QualityMetrics = {
-    npcs: project.npcs.length,
+    maps: project.maps.length,
+    people: peopleIds.size,
+    interactables,
     quests: project.quests.length,
-    objectives: project.quests.reduce((n, q) => n + q.objectives.length, 0),
+    questSteps: project.quests.reduce((n, q) => n + q.steps.length, 0),
     items: project.items.length,
     endings: project.endings.length,
-    dialogueNodes: project.dialogues.length,
+    chapters: project.chapters.length,
+    texts: texts.length,
+    avgTextChars,
     meaningfulChoices,
-    avgDialogueChars,
-    stepsToEnding,
+    actionsToEnding,
     endingsHaveDistinctChoices,
-    npcCoverage: Math.round(npcCoverage * 100) / 100,
-    interactables: project.scenes.reduce((n, s) => n + (s.interactables?.length ?? 0), 0),
+    peopleCoverage: Math.round(peopleCoverage * 100) / 100,
     duration: estimateDuration(project, playtest),
   };
 
   const need = (ok: boolean, path: string, message: string) => ok || blocking.push({ path, message });
-  need(metrics.npcs >= t.minNpcs, "npcs", `NPC 至少需要 ${t.minNpcs} 位（目前 ${metrics.npcs}）`);
+  need(metrics.people >= t.minPeople, "maps.events", `NPC（有角色圖的對話事件）至少需要 ${t.minPeople} 位（目前 ${metrics.people}）`);
+  need(metrics.people <= t.maxPeople, "maps.events", `NPC 最多 ${t.maxPeople} 位（目前 ${metrics.people}），請合併次要角色`);
   need(metrics.quests >= t.minQuests, "quests", `至少需要 ${t.minQuests} 條任務`);
-  need(metrics.objectives >= t.minObjectives, "quests", `任務目標合計至少 ${t.minObjectives} 個（目前 ${metrics.objectives}），主線太短`);
-  need(metrics.items >= t.minItems, "items", `至少需要 ${t.minItems} 個可取得的物品`);
+  need(metrics.questSteps >= t.minQuestSteps, "quests", `任務步驟合計至少 ${t.minQuestSteps} 個（目前 ${metrics.questSteps}），主線太短`);
+  need(metrics.items >= t.minItems, "items", `至少需要 ${t.minItems} 個物品`);
   need(metrics.endings >= t.minEndings, "endings", `至少需要 ${t.minEndings} 種結局（目前 ${metrics.endings}）`);
-  need(metrics.dialogueNodes >= t.minDialogueNodes, "dialogues", `對話節點至少 ${t.minDialogueNodes} 個（目前 ${metrics.dialogueNodes}）`);
-  need(metrics.meaningfulChoices >= t.minMeaningfulChoices, "dialogues", `有效果或會分支的對話選項至少 ${t.minMeaningfulChoices} 個（目前 ${meaningfulChoices}）`);
-  need(avgDialogueChars >= t.minAvgDialogueChars, "dialogues", `對話平均只有 ${avgDialogueChars} 字，內容過於單薄（至少 ${t.minAvgDialogueChars} 字）`);
+  need(metrics.endings <= t.maxEndings, "endings", `結局最多 ${t.maxEndings} 種（目前 ${metrics.endings}），太多容易讓結局文字與玩家路線矛盾`);
+  need(metrics.texts >= t.minTexts, "texts", `顯示文字至少 ${t.minTexts} 則（目前 ${metrics.texts}）`);
+  need(metrics.texts <= t.maxTexts, "texts", `顯示文字最多 ${t.maxTexts} 則（目前 ${metrics.texts}）`);
+  need(meaningfulChoices >= t.minMeaningfulChoices, "choices", `有後果的選項至少 ${t.minMeaningfulChoices} 個（目前 ${meaningfulChoices}）`);
+  need(avgTextChars >= t.minAvgTextChars, "texts", `文字平均只有 ${avgTextChars} 字，內容過於單薄（至少 ${t.minAvgTextChars} 字）`);
+  need(interactables >= t.minInteractables, "maps.events", `可調查的事件至少 ${t.minInteractables} 個（目前 ${interactables}），例如門、告示、寶箱，讓玩家按確定鍵時有回應`);
+  need(endingsHaveDistinctChoices, "endings", "不同結局的通關路線沒有任何不同的選擇，結局分支沒有意義");
+  for (const [id, n] of Object.entries(actionsToEnding)) need(n >= t.minActionsToEnding, "endings", `結局「${id}」只要 ${n} 個行動就能達成，流程太短（至少 ${t.minActionsToEnding}）`);
   const typical = metrics.duration?.typicalMinutes;
   if (options.checkDuration !== false && typical) {
-    need(typical[1] >= t.targetMinutes[0], "duration", `預估遊玩時間只有 ${typical[0]}～${typical[1]} 分鐘，目標是 ${t.targetMinutes[0]}～${t.targetMinutes[1]} 分鐘：請增加章節、支線、場景與調查內容`);
+    need(typical[1] >= t.targetMinutes[0], "duration", `預估遊玩時間只有 ${typical[0]}～${typical[1]} 分鐘，目標是 ${t.targetMinutes[0]}～${t.targetMinutes[1]} 分鐘：請增加章節、支線與調查內容`);
     need(typical[0] <= t.targetMinutes[1], "duration", `預估遊玩時間 ${typical[0]}～${typical[1]} 分鐘超過 ${t.targetMinutes[1]} 分鐘上限，請精簡`);
   }
-  need(metrics.endings <= t.maxEndings, "endings", `結局最多 ${t.maxEndings} 種（目前 ${metrics.endings}），規模太大容易讓結局文字與玩家路線矛盾`);
-  need(metrics.npcs <= t.maxNpcs, "npcs", `NPC 最多 ${t.maxNpcs} 位（目前 ${metrics.npcs}），請合併或刪減次要角色`);
-  need(metrics.dialogueNodes <= t.maxDialogueNodes, "dialogues", `對話節點最多 ${t.maxDialogueNodes} 個（目前 ${metrics.dialogueNodes}），超出 10 分鐘的遊玩預算`);
-  need(metrics.interactables >= t.minInteractables, "scenes.interactables", `可調查物件至少 ${t.minInteractables} 個（目前 ${metrics.interactables}），例如門、告示、寶箱，讓玩家按確認鍵時有回應`);
-  need(endingsHaveDistinctChoices, "endings", "不同結局的通關路線沒有任何不同的選擇，結局分支沒有意義");
-  for (const [id, steps] of Object.entries(stepsToEnding)) {
-    need(steps >= t.minStepsToEnding, "endings", `結局「${id}」只要 ${steps} 個行動就能達成，流程太短（至少 ${t.minStepsToEnding}）`);
+
+  for (const s of allSources(project))
+    walkCommands(s.commands, (c) => {
+      const text = c.code === "text" ? c.text : c.code === "choices" ? c.options.map((o) => o.text).join(" ") : "";
+      if (text && PLACEHOLDER.test(text)) blocking.push({ path: s.label, message: `含有佔位文字：「${text.slice(0, 30)}」` });
+    });
+  project.endings.forEach((e) => PLACEHOLDER.test(e.text) && blocking.push({ path: "endings", message: `結局「${e.title}」含有佔位文字` }));
+
+  // 死開關：被打開卻從來沒有被讀取（選擇沒有後果）
+  const read = new Set<string>();
+  const readVars = new Set<string>();
+  allConditions(project).forEach((c) =>
+    walkCondition(c, (a) => {
+      if (a.type === "switch") read.add(a.id);
+      if (a.type === "variable") readVars.add(a.id);
+    }),
+  );
+  project.commonEvents.forEach((c) => c.switchId && read.add(c.switchId));
+  const setOn = new Set<string>();
+  const setVars = new Set<string>();
+  for (const s of allSources(project))
+    walkCommands(s.commands, (c) => {
+      if (c.code === "switch" && c.value) c.ids.forEach((id) => setOn.add(id));
+      if (c.code === "variable") setVars.add(c.id);
+    });
+  for (const id of setOn) if (!read.has(id)) blocking.push({ path: "switches", message: `開關「${project.switches.find((s) => s.id === id)?.name ?? id}」被打開卻從未被任何條件讀取（死開關，選擇沒有後果）` });
+  for (const id of setVars) if (!readVars.has(id)) suggestions.push({ path: "variables", message: `變數「${project.variables.find((v) => v.id === id)?.name ?? id}」被設定卻從未被讀取` });
+
+  // 結局至少由 2 個條件組合決定（外層的事件頁條件＋條件分支＋選項）
+  for (const s of allSources(project)) {
+    const pageAtoms = s.page?.conditions ? Object.values(s.page.conditions).filter(Boolean).length : 0;
+    walkCommands(s.commands, (c, ctx) => {
+      if (c.code !== "ending") return;
+      const atoms = pageAtoms + ctx.ancestors.reduce((n, a) => n + (a.cmd.code === "if" ? conditionAtoms(a.cmd.condition) : 1), 0);
+      if (atoms < 2) blocking.push({ path: s.label, message: `結局「${project.endings.find((e) => e.id === c.endingId)?.title ?? c.endingId}」只由不到 2 個條件或選擇決定，應由玩家累積的多個選擇組合決定` });
+    });
   }
 
-  const texty = [
-    ...project.dialogues.map((d, i) => [`dialogues[${i}].text`, d.text] as const),
-    ...project.npcs.map((n, i) => [`npcs[${i}].description`, n.description] as const),
-    ...project.endings.map((e, i) => [`endings[${i}].text`, e.text] as const),
-  ];
-  for (const [path, text] of texty) if (PLACEHOLDER.test(text)) blocking.push({ path, message: `含有 placeholder 文字：「${text.slice(0, 30)}」` });
-
-  // A3：死旗標（被設定但從未被任何條件讀取）
-  const readFlags = new Set<string>();
-  const collectReads = (c: GameCondition | undefined): void => {
-    if (!c) return;
-    if (c.type === "flag_equals") readFlags.add(c.flag);
-    if (c.type === "all" || c.type === "any") c.conditions.forEach(collectReads);
-    if (c.type === "not") collectReads(c.condition);
-  };
-  project.npcs.forEach((n) => n.dialogueVariants?.forEach((v) => collectReads(v.condition)));
-  project.dialogues.forEach((d) => d.choices?.forEach((c) => collectReads(c.condition)));
-  project.quests.forEach((q) => collectReads(q.startCondition));
-  project.endings.forEach((e) => {
-    collectReads(e.condition);
-    e.epilogues?.forEach((x) => collectReads(x.condition));
-  });
-  project.scenes.forEach((sc) => sc.pickups?.forEach((pk) => collectReads(pk.condition)));
-  project.scenes.forEach((sc) => sc.interactables?.forEach((o) => o.dialogueVariants?.forEach((v) => collectReads(v.condition))));
-  const effects = [...choices.flatMap((c) => c.effects ?? []), ...project.quests.flatMap((q) => q.rewards ?? [])];
-  const setFlags = new Set(effects.flatMap((e) => (e.type === "set_flag" ? [e.flag] : [])));
-  for (const flag of setFlags) if (!readFlags.has(flag)) blocking.push({ path: "flags", message: `旗標「${flag}」被設定但從未被任何條件讀取（死旗標，選擇沒有後果）` });
-
-  // F1：結局至少由 2 個條件組合決定
-  const atoms = (c: GameCondition): number => (c.type === "all" || c.type === "any" ? c.conditions.reduce((n, x) => n + atoms(x), 0) : c.type === "not" ? atoms(c.condition) : 1);
-  project.endings.forEach((e, i) => {
-    if (atoms(e.condition) < 2) blocking.push({ path: `endings[${i}]`, message: `結局「${e.title}」只由單一條件決定，應由至少 2 個旗標或狀態組合決定` });
-  });
-
-  // C3：物品要有用途
-  const usedItems = new Set<string>();
-  const collectItems = (c: GameCondition | undefined): void => {
-    if (!c) return;
-    if (c.type === "has_item") usedItems.add(c.itemId);
-    if (c.type === "all" || c.type === "any") c.conditions.forEach(collectItems);
-    if (c.type === "not") collectItems(c.condition);
-  };
-  project.npcs.forEach((n) => n.dialogueVariants?.forEach((v) => collectItems(v.condition)));
-  project.scenes.forEach((sc) => sc.interactables?.forEach((o) => o.dialogueVariants?.forEach((v) => collectItems(v.condition))));
-  project.dialogues.forEach((d) => d.choices?.forEach((c) => collectItems(c.condition)));
-  project.endings.forEach((e) => collectItems(e.condition));
-  project.quests.forEach((q) => q.objectives.forEach((o) => o.type === "collect_item" && usedItems.add(o.targetId)));
-  effects.forEach((e) => e.type === "remove_item" && usedItems.add(e.itemId));
-  for (const item of project.items) if (!usedItems.has(item.id)) suggestions.push({ path: "items", message: `物品「${item.name}」取得後沒有任何用途（C3）` });
-
-  if (npcCoverage < 1) suggestions.push({ path: "npcs", message: `有 ${project.npcs.length - talked.size} 位 NPC 不在任何結局路線上，考慮讓他們參與主線` });
-  if (project.scenes.length === 1) suggestions.push({ path: "scenes", message: "只有一個場景，可考慮增加第二個場景讓探索更有層次" });
+  if (peopleCoverage < 1 && peopleIds.size > 0) suggestions.push({ path: "maps.events", message: `有 ${peopleIds.size - [...peopleIds].filter((id) => talked.has(id)).length} 位 NPC 不在任何結局路線上，考慮讓他們參與主線` });
+  if (project.maps.length === 1) suggestions.push({ path: "maps", message: "只有一張地圖，可以增加地圖讓探索更有層次" });
   return { metrics, blocking, suggestions };
 }

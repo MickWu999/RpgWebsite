@@ -16,46 +16,43 @@
 ## 常用指令（都可以直接執行，輸出也都能被機器讀取）
 
 ```bash
-npm run validate -- <project.json|demo> --json   # 結束碼 0 表示全部通過
-npm run generate -- <story.txt> --json           # 結束碼 0=approved, 3=needs_human_review, 2=失敗
-npm run review -- <project.json> --story <story.txt> --json
-npm run generate -- <story.txt> --publish        # 只有 approved 才會自動寫入 public/games/ 並重建目錄
-npm run generate -- <story.txt> --from <project.json> --publish   # 從既有遊戲改進（規則更新後補齊內容）
-npm run catalog                                  # 重建遊戲目錄
-npm run check                                    # 修改程式後必須跑：lint、typecheck、build
+npm run game -- schema                       # 操作 API 的 JSON Schema
+npm run game -- inspect <id>                 # 以 RPG Maker 事件清單的形式輸出遊戲內容
+npm run game -- check <id>                   # 驗證＋自動試玩＋品質指標；結束碼 0 表示通過
+npm run game -- remote <list|pull|apply|check|publish> …   # 操作線上 Studio（需要 STUDIO_TOKEN）
+npm run validate -- <project.json> --json    # 檢查任意 project.json
+npm run catalog                              # 重建遊戲目錄
+npm run check                                # 修改程式後必須跑：lint、typecheck、build
 ```
 
-這個專案依使用者要求**不寫單元測試**。要確認功能正常，請用 `validate`（包含自動試玩），或實際開瀏覽器驗證。
+這個專案依使用者要求**不寫單元測試**。要確認功能正常，請用 `check`（包含自動試玩），或實際開瀏覽器驗證。
 
 ## 目錄結構
 
 | 路徑 | 內容 |
 |---|---|
-| `src/game/schema.ts` | GameProject 的 Zod schema（相對 SPEC 的擴充寫在檔案開頭的註解） |
-| `src/game/engine.ts` | 確定性的遊戲邏輯，全部是純函式：移動、對話、任務、物品、結局 |
-| `src/game/validate.ts` | 引用、地圖、對話、任務依賴、結局可達性的驗證 |
-| `src/game/playtest.ts` | 自動試玩：窮舉行動，找出每個結局的路線和卡死狀態 |
-| `src/game/quality.ts` | 量化品質指標，包括規模上限、死旗標、結局條件 |
-| `src/game/assets.ts` | 素材庫，包括地形字元、角色、圖示、音效、背景音樂，以及授權紀錄 |
-| `src/ai/` | 生成流程：分層 prompt、Claude Code provider、正規化、審查、設計準則 |
-| `src/components/game/` | RPG Maker 式的遊戲畫面：標題、訊息、選單、手機操作 |
-| `src/components/GameCanvas.tsx` | Phaser 3 渲染層，只負責繪製，不處理遊戲邏輯 |
-| `scripts/` | 本機 CLI：validate、generate、review，以及 AI bridge |
-| `docs/narrative-design-guide.md` | 敘事設計準則與參考來源 |
-| `public/games/<id>/` | 遊戲模組包（`project.json` 加上 `meta.json`）。`index.json` 是自動產生的，不要手動修改 |
-| `src/game/cover.ts`、`src/components/game/CoverArt.tsx` | 用素材組合出封面圖（不使用 AI 生圖） |
-| `src/game/duration.ts` | 依自動試玩的最短路線估算遊玩時長 |
-| `public/sw.js`、`public/manifest.webmanifest` | PWA 設定。快取策略改變時，要遞增 `CACHE` 版本號 |
+| `src/game/schema.ts` | GameProject 2.0（RPG Maker 式：資料庫、地圖、事件頁、事件指令） |
+| `src/game/engine.ts` | 事件直譯器，全部是純函式：移動、觸發、指令執行、存檔對齊 |
+| `src/game/commands.ts` | 指令樹的走訪與定位工具 |
+| `src/game/validate.ts` | 引用、地形、事件頁、標籤、自動執行迴圈、共用事件遞迴、可達性 |
+| `src/game/playtest.ts` | 自動試玩：窮舉「觸發事件／選擇／繼續」，找出每個結局的路線與卡死狀態；也能從章節起點試玩 |
+| `src/game/quality.ts` | 量化品質指標：規模、時長、死開關、結局條件 |
+| `src/game/assets.ts` | 素材庫（地形字元、角色、圖示、音效、背景音樂）與授權紀錄 |
+| `src/studio/ops.ts` | 操作 API：人在 Studio 的編輯與 AI 的修改共用 |
+| `src/ai/` | 獨立 AI 審查、設計準則、Claude Code provider |
+| `src/components/game/` | 遊戲畫面：標題、訊息、選單、章節標題卡、F9 除錯、手機操作 |
+| `src/components/studio/` | RPG Maker 式編輯器：地圖、事件編輯、指令清單、資料庫 |
+| `src/components/GameCanvas.tsx` | Phaser 3 渲染層，只負責繪製 |
+| `content/<id>/` | 本機模式的遊戲原始檔（story.md、treatment.md、project.json） |
+| `public/games/<id>/` | 遊戲模組包；`index.json` 是自動產生的，不要手動修改 |
+| `worker/` | Cloudflare Worker：前台（player.ts）與後台 API（studio.ts） |
 
 ## 撰寫或修改 GameProject 的規則
 
-- 地圖使用 `terrain` 字元，可用字元見 `TERRAIN`。`walkable` 由地形推導出來。
-- 任務目標會**依序**完成。與 NPC 互動時，會先推進 `talk_to_npc` 目標，然後才挑選對話分支。
-- `dialogueVariants` 由上往下取第一個條件成立的分支，所以條件越嚴格的要放越前面。
-- 每位 NPC 都要設定 `voice`，每個場景都要設定 `music`，每個結局都要設定 `mood`，專案要設定 `cover`。
-- 用 `ending.epilogues`（結局尾聲）回應其他主要選擇，不要為了回應選擇而增加結局數量。
-- 每款遊戲至少要有 2 個 `scene.interactables`（調查點）。被鎖住的東西一定要給回饋並提示解法（例如「門鎖著，需要鑰匙」）。沒有設計調查點的地形，runtime 會用 `TERRAIN[].examine` 給預設回應。
-- 規模上限：結局最多 4 個、NPC 最多 6 位、對話節點最多 50 個。超過上限會被品質指標擋下。
+- 一律透過操作 API 修改；資料模型與 RPG Maker 的常見寫法見 `docs/ai-development-spec.md` 第 6 節。
+- 自動執行頁最後一定要關閉自己（獨立開關或開關），否則驗證會擋下。
+- 每個角色都要設定 `voice`，每張地圖都要設定 `music`，每個結局都要設定 `mood`，專案要設定 `cover`。
+- 被鎖住的東西一定要給回饋並提示解法；沒有事件的地形，runtime 會用 `TERRAIN[].examine` 給預設回應。
 - 敘事規則見 `src/ai/designGuide.ts`，其中可以由程式判斷的部分已經寫進 `quality.ts`。
 
 ## 程式風格
@@ -63,4 +60,4 @@ npm run check                                    # 修改程式後必須跑：li
 - TypeScript strict 模式；註解與使用者可見文字一律用繁體中文（台灣用語）。
 - React 19 的 lint 規則很嚴格：render 階段不能讀寫 ref，effect 裡不能直接呼叫 setState。
 - 網站採靜態輸出（`output: "export"`），所以不能使用 Next.js 的 API routes。需要伺服器的功能請放在 `scripts/`，在本機執行。
-- 玩家版（`NEXT_PUBLIC_SITE_MODE=player`）不能出現任何開發者工具或用語。開發者頁面要用 `CreatorOnly` 包起來；`npm run deploy` 一律用玩家版 build。
+- 前台（`npm run deploy`）與後台（`npm run deploy:studio`）分開部署，互相不連結；前台不能出現任何開發者工具或用語。

@@ -1,9 +1,8 @@
 import demoProject from "../public/games/demo-lantern/project.json";
-import { manifestEntry, walkableFromTerrain } from "../src/game/assets";
 import { coverDataOf } from "../src/game/cover";
 import { projectRevision } from "../src/game/engine";
-import { gameProjectSchema, SCHEMA_VERSION, type GameProject } from "../src/game/schema";
-import { applyOps, opSchema } from "../src/studio/ops";
+import { gameProjectSchema, type GameProject } from "../src/game/schema";
+import { applyOps, blankProject, opSchema } from "../src/studio/ops";
 import { z } from "zod";
 import { error, getCookie, hashPassword, HttpError, json, nowIso, randomId, randomToken, readJson, safeEqual, sha256hex, type Env } from "./lib";
 
@@ -25,7 +24,7 @@ const MIN_PASSWORD = 6;
 const LOCK_FAILURES = 5;
 const LOCK_MINUTES = 15;
 const VERSION_KEEP = 60;
-export const PASSWORD_ITERATIONS = 100_000;
+const PASSWORD_ITERATIONS = 100_000;
 
 type Actor = { userId: string; username: string; kind: "user" | "token"; tokenName?: string; label: string };
 type ProjectRow = { id: string; owner_id: string; title: string; data: string; version: number; is_valid: number; created_at: string; updated_at: string; archived_at: string | null };
@@ -280,26 +279,6 @@ async function getProject(env: Env, id: string, actor: Actor): Promise<ProjectRo
   return row;
 }
 
-function blankProject(id: string, title: string): GameProject {
-  const terrain = Array.from({ length: 16 }, (_, y) => Array.from({ length: 24 }, (_, x) => (x === 0 || y === 0 || x === 23 || y === 15 ? "T" : ".")).join(""));
-  return {
-    schemaVersion: SCHEMA_VERSION,
-    id,
-    title,
-    description: "（待補）",
-    genre: "fantasy",
-    startSceneId: "start",
-    player: { name: "主角", spriteAssetId: "char_hero", startPosition: { sceneId: "start", x: 2, y: 2 }, baseStats: { hp: 100, level: 1, xp: 0 }, inventoryItemIds: [] },
-    scenes: [{ id: "start", name: "起點", width: 24, height: 16, tileSize: 40, tilesetId: "tileset_tiny_town", terrain, walkable: walkableFromTerrain(terrain), exits: [], npcIds: [], locations: [], pickups: [], interactables: [], music: "peaceful" }],
-    npcs: [],
-    dialogues: [],
-    quests: [],
-    items: [],
-    endings: [{ id: "end_placeholder", title: "（佔位結局）", text: "請以 ending.upsert 取代這個佔位結局。", condition: { type: "flag_equals", flag: "placeholder_end", value: true } }],
-    assetManifest: { assets: ["tileset_tiny_town", "char_hero"].map(manifestEntry) },
-  };
-}
-
 async function createProject(req: Request, env: Env, actor: Actor) {
   const body = await readJson<{ title?: string; template?: string; project?: unknown }>(req);
   const title = String(body.title ?? "").trim().slice(0, 200) || "未命名專案";
@@ -359,7 +338,8 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
     genre: project.genre,
     status: "approved",
     endings: project.endings.length,
-    npcs: project.npcs.length,
+    npcs: project.actors.length - 1,
+    chapters: project.chapters.length,
     typicalMinutes: check.typicalMinutes ?? null,
     cover: coverDataOf(project),
     path: `/games/${row.id}/project.json`,

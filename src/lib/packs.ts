@@ -16,6 +16,8 @@ export type CatalogEntry = {
   status: "demo" | "approved";
   endings: number;
   npcs: number;
+  /** 章節數（舊目錄沒有這個欄位） */
+  chapters?: number;
   typicalMinutes: [number, number] | null;
   cover: CoverData;
   path: string;

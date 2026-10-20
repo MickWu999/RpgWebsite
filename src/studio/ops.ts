@@ -1,35 +1,32 @@
 import { z } from "zod";
 import { findCatalogAsset, manifestEntry, TERRAIN, walkableFromTerrain } from "@/game/assets";
+import { allConditions, walkCondition, walkProject } from "@/game/commands";
 import {
-  conditionSchema,
-  dialogueNodeSchema,
+  actorSchema,
+  chapterSchema,
+  commonEventSchema,
+  DIRECTIONS,
   endingSchema,
   idSchema,
   itemSchema,
-  npcSchema,
+  mapEventSchema,
+  MUSIC_MOOD_IDS,
   questSchema,
   type GameProject,
-  type SceneDefinition,
+  type MapDefinition,
 } from "@/game/schema";
 import { validateProject, type ValidationReport } from "@/game/validate";
 
 /**
  * Studio 操作 API：Studio 的每一個編輯動作都是一筆「操作」。
  * - 人在 Studio 裡點按 → 產生操作 → applyOps
- * - AI 透過本機 AI bridge（POST /api/studio/ops）或 CLI（npm run studio）送出同樣的操作
- * 每筆操作都會先檢查格式，套用後回傳整份專案的驗證報告；衍生資料（walkable、npcIds、素材清單）自動維護。
+ * - AI（VS Code 的 Claude Code）透過 `npm run game -- remote apply` 送出同樣的操作
+ * 每筆操作都會先檢查格式；衍生資料自動維護：walkable、素材清單、被引用但尚未定義的開關／變數（以 ID 當名稱）。
  */
 
-const pos = z.strictObject({ x: z.number().int().min(0).max(255), y: z.number().int().min(0).max(255) });
-
-const interactableSchema = z.strictObject({
-  id: idSchema,
-  name: z.string().min(1).max(200),
-  x: z.number().int().min(0),
-  y: z.number().int().min(0),
-  dialogueNodeId: idSchema,
-  dialogueVariants: z.array(z.strictObject({ condition: conditionSchema, dialogueNodeId: idSchema })).optional(),
-});
+const coord = z.number().int().min(0).max(255);
+const terrainChar = z.string().length(1);
+const named = z.strictObject({ id: idSchema, name: z.string().min(1).max(200) });
 
 export const opSchema = z.discriminatedUnion("op", [
   z.strictObject({
@@ -38,136 +35,131 @@ export const opSchema = z.discriminatedUnion("op", [
     description: z.string().max(4000).optional(),
     intro: z.string().max(4000).optional(),
     genre: z.enum(["fantasy", "modern", "sci-fi", "mystery"]).optional(),
-    cover: z.any().optional(),
+    cover: z
+      .strictObject({ mapId: idSchema.optional(), characterAssetIds: z.array(idSchema).max(3).optional(), tagline: z.string().max(60).optional() })
+      .optional(),
   }),
   z.strictObject({
-    op: z.literal("player.update"),
-    name: z.string().min(1).max(200).optional(),
-    description: z.string().max(4000).optional(),
-    spriteAssetId: idSchema.optional(),
-    start: z.strictObject({ sceneId: idSchema, x: z.number().int().min(0), y: z.number().int().min(0) }).optional(),
+    op: z.literal("system.update"),
+    start: z.strictObject({ mapId: idSchema, x: coord, y: coord, direction: z.enum(DIRECTIONS).optional() }).optional(),
+    playerActorId: idSchema.optional(),
+    initialItems: z.array(z.strictObject({ itemId: idSchema, count: z.number().int().min(1).max(999) })).max(50).optional(),
   }),
   z.strictObject({
-    op: z.literal("scene.add"),
+    op: z.literal("map.add"),
     id: idSchema,
     name: z.string().min(1).max(200),
     width: z.number().int().min(3).max(64),
     height: z.number().int().min(3).max(64),
-    fill: z.string().length(1).optional(),
-    music: z.string().optional(),
+    fill: terrainChar.optional(),
+    music: z.enum(MUSIC_MOOD_IDS).optional(),
+    parentId: idSchema.optional(),
   }),
   z.strictObject({
-    op: z.literal("scene.update"),
+    op: z.literal("map.update"),
     id: idSchema,
     name: z.string().min(1).max(200).optional(),
-    music: z.enum(["peaceful", "lively", "adventure", "mysterious", "tense", "melancholy"]).optional(),
+    music: z.enum(MUSIC_MOOD_IDS).nullable().optional(),
+    parentId: idSchema.nullable().optional(),
   }),
-  z.strictObject({ op: z.literal("scene.resize"), id: idSchema, width: z.number().int().min(3).max(64), height: z.number().int().min(3).max(64), fill: z.string().length(1).optional() }),
-  z.strictObject({ op: z.literal("scene.remove"), id: idSchema }),
-  z.strictObject({
-    op: z.literal("scene.paint"),
-    sceneId: idSchema,
-    cells: z.array(pos.extend({ ch: z.string().length(1) })).min(1).max(4096),
-  }),
-  z.strictObject({ op: z.literal("scene.fill"), sceneId: idSchema, x: z.number().int(), y: z.number().int(), ch: z.string().length(1) }),
-  z.strictObject({ op: z.literal("npc.upsert"), npc: npcSchema }),
-  z.strictObject({ op: z.literal("npc.remove"), id: idSchema }),
-  z.strictObject({ op: z.literal("interactable.upsert"), sceneId: idSchema, object: interactableSchema }),
-  z.strictObject({ op: z.literal("interactable.remove"), sceneId: idSchema, id: idSchema }),
-  z.strictObject({
-    op: z.literal("pickup.upsert"),
-    sceneId: idSchema,
-    pickup: z.strictObject({ id: idSchema, itemId: idSchema, x: z.number().int(), y: z.number().int(), count: z.number().int().min(1).optional(), condition: conditionSchema.optional() }),
-  }),
-  z.strictObject({ op: z.literal("pickup.remove"), sceneId: idSchema, id: idSchema }),
-  z.strictObject({
-    op: z.literal("exit.upsert"),
-    sceneId: idSchema,
-    exit: z.strictObject({ x: z.number().int(), y: z.number().int(), targetSceneId: idSchema, targetX: z.number().int(), targetY: z.number().int(), label: z.string().max(60).optional() }),
-  }),
-  z.strictObject({ op: z.literal("exit.remove"), sceneId: idSchema, x: z.number().int(), y: z.number().int() }),
-  z.strictObject({
-    op: z.literal("location.upsert"),
-    sceneId: idSchema,
-    location: z.strictObject({ id: idSchema, name: z.string().min(1), x: z.number().int(), y: z.number().int(), width: z.number().int().min(1).optional(), height: z.number().int().min(1).optional() }),
-  }),
-  z.strictObject({ op: z.literal("location.remove"), sceneId: idSchema, id: idSchema }),
-  z.strictObject({ op: z.literal("dialogue.upsert"), node: dialogueNodeSchema }),
-  z.strictObject({ op: z.literal("dialogue.remove"), id: idSchema }),
-  z.strictObject({ op: z.literal("quest.upsert"), quest: questSchema }),
-  z.strictObject({ op: z.literal("quest.remove"), id: idSchema }),
+  z.strictObject({ op: z.literal("map.resize"), id: idSchema, width: z.number().int().min(3).max(64), height: z.number().int().min(3).max(64), fill: terrainChar.optional() }),
+  z.strictObject({ op: z.literal("map.remove"), id: idSchema }),
+  /** 整張地圖的地形（每列一個字串），最適合 AI 一次畫好 */
+  z.strictObject({ op: z.literal("map.terrain"), mapId: idSchema, rows: z.array(z.string().min(3).max(64)).min(3).max(64) }),
+  z.strictObject({ op: z.literal("map.paint"), mapId: idSchema, cells: z.array(z.strictObject({ x: coord, y: coord, ch: terrainChar })).min(1).max(4096) }),
+  z.strictObject({ op: z.literal("map.fill"), mapId: idSchema, x: coord, y: coord, ch: terrainChar }),
+  z.strictObject({ op: z.literal("event.upsert"), mapId: idSchema, event: mapEventSchema }),
+  z.strictObject({ op: z.literal("event.move"), mapId: idSchema, id: idSchema, x: coord, y: coord }),
+  z.strictObject({ op: z.literal("event.remove"), mapId: idSchema, id: idSchema }),
+  z.strictObject({ op: z.literal("actor.upsert"), actor: actorSchema }),
+  z.strictObject({ op: z.literal("actor.remove"), id: idSchema }),
   z.strictObject({ op: z.literal("item.upsert"), item: itemSchema }),
   z.strictObject({ op: z.literal("item.remove"), id: idSchema }),
+  z.strictObject({ op: z.literal("quest.upsert"), quest: questSchema }),
+  z.strictObject({ op: z.literal("quest.remove"), id: idSchema }),
   z.strictObject({ op: z.literal("ending.upsert"), ending: endingSchema }),
   z.strictObject({ op: z.literal("ending.remove"), id: idSchema }),
+  /** 新章節加在最後；before 可指定插在哪一章之前 */
+  z.strictObject({ op: z.literal("chapter.upsert"), chapter: chapterSchema, before: idSchema.optional() }),
+  z.strictObject({ op: z.literal("chapter.remove"), id: idSchema }),
+  z.strictObject({ op: z.literal("commonEvent.upsert"), commonEvent: commonEventSchema }),
+  z.strictObject({ op: z.literal("commonEvent.remove"), id: idSchema }),
+  z.strictObject({ op: z.literal("switch.upsert"), switch: named }),
+  z.strictObject({ op: z.literal("switch.remove"), id: idSchema }),
+  z.strictObject({ op: z.literal("variable.upsert"), variable: named }),
+  z.strictObject({ op: z.literal("variable.remove"), id: idSchema }),
 ]);
 export type StudioOp = z.infer<typeof opSchema>;
 
 export type OpResult = { ok: boolean; message: string };
 export type ApplyResult = { project: GameProject; results: OpResult[]; report: ValidationReport | null };
 
-/** 操作的人類可讀描述（顯示在 Studio 的歷史紀錄） */
+/** 操作的人類可讀描述（顯示在版本紀錄） */
 export function describeOp(op: StudioOp): string {
   switch (op.op) {
     case "project.update":
-      return "修改專案資訊";
-    case "player.update":
-      return "修改玩家設定";
-    case "scene.add":
+      return "修改遊戲資訊";
+    case "system.update":
+      return "修改系統設定";
+    case "map.add":
       return `新增地圖「${op.name}」`;
-    case "scene.update":
-      return "修改地圖屬性";
-    case "scene.resize":
+    case "map.update":
+      return `修改地圖屬性 ${op.id}`;
+    case "map.resize":
       return `調整地圖大小為 ${op.width}×${op.height}`;
-    case "scene.remove":
+    case "map.remove":
       return `刪除地圖 ${op.id}`;
-    case "scene.paint":
+    case "map.terrain":
+      return `繪製整張地圖 ${op.mapId}`;
+    case "map.paint":
       return `繪製地形 ${op.cells.length} 格`;
-    case "scene.fill":
+    case "map.fill":
       return `油漆桶填滿「${TERRAIN[op.ch]?.name ?? op.ch}」`;
-    case "npc.upsert":
-      return `設定 NPC「${op.npc.name}」`;
-    case "npc.remove":
-      return `刪除 NPC ${op.id}`;
-    case "interactable.upsert":
-      return `設定調查點「${op.object.name}」`;
-    case "interactable.remove":
-      return `刪除調查點 ${op.id}`;
-    case "pickup.upsert":
-      return `設定撿取物 ${op.pickup.id}`;
-    case "pickup.remove":
-      return `刪除撿取物 ${op.id}`;
-    case "exit.upsert":
-      return `設定出口 (${op.exit.x},${op.exit.y})`;
-    case "exit.remove":
-      return `刪除出口 (${op.x},${op.y})`;
-    case "location.upsert":
-      return `設定地點「${op.location.name}」`;
-    case "location.remove":
-      return `刪除地點 ${op.id}`;
-    case "dialogue.upsert":
-      return `設定對話 ${op.node.id}`;
-    case "dialogue.remove":
-      return `刪除對話 ${op.id}`;
-    case "quest.upsert":
-      return `設定任務「${op.quest.title}」`;
-    case "quest.remove":
-      return `刪除任務 ${op.id}`;
+    case "event.upsert":
+      return `設定事件「${op.event.name}」`;
+    case "event.move":
+      return `移動事件 ${op.id} 到 (${op.x},${op.y})`;
+    case "event.remove":
+      return `刪除事件 ${op.id}`;
+    case "actor.upsert":
+      return `設定角色「${op.actor.name}」`;
+    case "actor.remove":
+      return `刪除角色 ${op.id}`;
     case "item.upsert":
       return `設定物品「${op.item.name}」`;
     case "item.remove":
       return `刪除物品 ${op.id}`;
+    case "quest.upsert":
+      return `設定任務「${op.quest.title}」`;
+    case "quest.remove":
+      return `刪除任務 ${op.id}`;
     case "ending.upsert":
       return `設定結局「${op.ending.title}」`;
     case "ending.remove":
       return `刪除結局 ${op.id}`;
+    case "chapter.upsert":
+      return `設定章節「${op.chapter.title}」`;
+    case "chapter.remove":
+      return `刪除章節 ${op.id}`;
+    case "commonEvent.upsert":
+      return `設定共用事件「${op.commonEvent.name}」`;
+    case "commonEvent.remove":
+      return `刪除共用事件 ${op.id}`;
+    case "switch.upsert":
+      return `設定開關「${op.switch.name}」`;
+    case "switch.remove":
+      return `刪除開關 ${op.id}`;
+    case "variable.upsert":
+      return `設定變數「${op.variable.name}」`;
+    case "variable.remove":
+      return `刪除變數 ${op.id}`;
   }
 }
 
-function sceneOf(p: GameProject, id: string): SceneDefinition {
-  const scene = p.scenes.find((s) => s.id === id);
-  if (!scene) throw new Error(`找不到地圖「${id}」`);
-  return scene;
+function mapOf(p: GameProject, id: string): MapDefinition {
+  const map = p.maps.find((m) => m.id === id);
+  if (!map) throw new Error(`找不到地圖「${id}」`);
+  return map;
 }
 
 function upsert<T extends { id: string }>(list: T[], value: T) {
@@ -176,39 +168,64 @@ function upsert<T extends { id: string }>(list: T[], value: T) {
   else list.push(value);
 }
 
-function ensureTerrain(scene: SceneDefinition) {
-  if (!scene.terrain) scene.terrain = scene.walkable.map((row) => row.map((w) => (w ? "." : "T")).join(""));
-  return scene.terrain;
+function remove<T extends { id: string }>(list: T[], id: string): T[] {
+  if (!list.some((x) => x.id === id)) throw new Error(`找不到「${id}」`);
+  return list.filter((x) => x.id !== id);
 }
 
-function setCell(scene: SceneDefinition, x: number, y: number, ch: string) {
-  if (!TERRAIN[ch]) throw new Error(`未知的地形字元「${ch}」`);
-  if (x < 0 || y < 0 || x >= scene.width || y >= scene.height) return;
-  const rows = ensureTerrain(scene);
-  const row = [...rows[y]];
+function checkChar(ch: string) {
+  if (!TERRAIN[ch]) throw new Error(`未知的地形字元「${ch}」（可用：${Object.keys(TERRAIN).join("")}）`);
+}
+
+function setCell(map: MapDefinition, x: number, y: number, ch: string) {
+  checkChar(ch);
+  if (x >= map.width || y >= map.height) return;
+  const row = [...map.terrain[y]];
   row[x] = ch;
-  rows[y] = row.join("");
+  map.terrain[y] = row.join("");
 }
 
-/** 維護衍生資料：walkable、scene.npcIds、素材清單（只加入內建素材庫的素材） */
+/** 新地圖：外圍用樹圍起來 */
+export function borderedTerrain(width: number, height: number, fill = ".") {
+  return Array.from({ length: height }, (_, y) => Array.from({ length: width }, (_, x) => (x === 0 || y === 0 || x === width - 1 || y === height - 1 ? "T" : fill)).join(""));
+}
+
+/** 維護衍生資料：walkable、尺寸、素材清單、未定義的開關與變數 */
 function normalize(p: GameProject) {
-  for (const scene of p.scenes) {
-    if (scene.terrain) {
-      scene.height = scene.terrain.length;
-      scene.width = Math.max(...scene.terrain.map((r) => [...r].length));
-      scene.walkable = walkableFromTerrain(scene.terrain);
-    }
-    scene.npcIds = p.npcs.filter((n) => n.sceneId === scene.id).map((n) => n.id);
+  for (const map of p.maps) {
+    map.height = map.terrain.length;
+    map.width = Math.max(...map.terrain.map((r) => [...r].length));
+    map.walkable = walkableFromTerrain(map.terrain);
   }
   const used = new Set<string>();
-  p.scenes.forEach((s) => s.tilesetId && used.add(s.tilesetId));
-  if (p.player.spriteAssetId) used.add(p.player.spriteAssetId);
-  p.npcs.forEach((n) => n.spriteAssetId && used.add(n.spriteAssetId));
+  p.maps.forEach((m) => {
+    if (m.tilesetId) used.add(m.tilesetId);
+    m.events.forEach((e) => e.pages.forEach((pg) => pg.graphic && used.add(pg.graphic.assetId)));
+  });
+  p.actors.forEach((a) => a.spriteAssetId && used.add(a.spriteAssetId));
   p.items.forEach((i) => i.iconAssetId && used.add(i.iconAssetId));
   p.cover?.characterAssetIds?.forEach((id) => used.add(id));
-  for (const id of used) {
-    if (findCatalogAsset(id) && !p.assetManifest.assets.some((a) => a.id === id)) p.assetManifest.assets.push(manifestEntry(id));
-  }
+  for (const id of used) if (findCatalogAsset(id) && !p.assetManifest.assets.some((a) => a.id === id)) p.assetManifest.assets.push(manifestEntry(id));
+
+  const switches = new Set<string>();
+  const variables = new Set<string>();
+  walkProject(p, (c) => {
+    if (c.code === "switch") c.ids.forEach((id) => switches.add(id));
+    if (c.code === "variable") variables.add(c.id);
+  });
+  allConditions(p).forEach((c) =>
+    walkCondition(c, (a) => {
+      if (a.type === "switch") switches.add(a.id);
+      if (a.type === "variable") variables.add(a.id);
+    }),
+  );
+  p.commonEvents.forEach((c) => c.switchId && switches.add(c.switchId));
+  p.chapters.forEach((ch) => {
+    ch.testStart?.switches?.forEach((id) => switches.add(id));
+    Object.keys(ch.testStart?.variables ?? {}).forEach((id) => variables.add(id));
+  });
+  for (const id of switches) if (!p.switches.some((s) => s.id === id)) p.switches.push({ id, name: id });
+  for (const id of variables) if (!p.variables.some((v) => v.id === id)) p.variables.push({ id, name: id });
 }
 
 function applyOne(p: GameProject, op: StudioOp) {
@@ -219,69 +236,84 @@ function applyOne(p: GameProject, op: StudioOp) {
       Object.assign(p, Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined)));
       return;
     }
-    case "player.update":
-      if (op.name !== undefined) p.player.name = op.name;
-      if (op.description !== undefined) p.player.description = op.description;
-      if (op.spriteAssetId !== undefined) p.player.spriteAssetId = op.spriteAssetId;
+    case "system.update":
       if (op.start) {
-        p.player.startPosition = op.start;
-        p.startSceneId = op.start.sceneId;
+        const m = mapOf(p, op.start.mapId);
+        if (!m.walkable[op.start.y]?.[op.start.x]) throw new Error(`起點 (${op.start.x},${op.start.y}) 不可通行`);
+        p.system.start = op.start;
       }
+      if (op.playerActorId) p.system.playerActorId = op.playerActorId;
+      if (op.initialItems) p.system.initialItems = op.initialItems;
       return;
-    case "scene.add": {
-      if (p.scenes.some((s) => s.id === op.id)) throw new Error(`地圖 ID「${op.id}」已存在`);
-      const fill = op.fill ?? ".";
-      const terrain = Array.from({ length: op.height }, (_, y) =>
-        Array.from({ length: op.width }, (_, x) => (x === 0 || y === 0 || x === op.width - 1 || y === op.height - 1 ? "T" : fill)).join(""),
-      );
-      p.scenes.push({
+    case "map.add": {
+      if (p.maps.some((m) => m.id === op.id)) throw new Error(`地圖 ID「${op.id}」已存在`);
+      if (op.fill) checkChar(op.fill);
+      if (op.parentId) mapOf(p, op.parentId);
+      const terrain = borderedTerrain(op.width, op.height, op.fill);
+      p.maps.push({
         id: op.id,
         name: op.name,
+        ...(op.parentId ? { parentId: op.parentId } : {}),
         width: op.width,
         height: op.height,
         tileSize: 40,
         tilesetId: "tileset_tiny_town",
         terrain,
         walkable: walkableFromTerrain(terrain),
-        exits: [],
-        npcIds: [],
-        locations: [],
-        pickups: [],
-        interactables: [],
-        ...(op.music ? { music: op.music as SceneDefinition["music"] } : {}),
+        ...(op.music ? { music: op.music } : {}),
+        events: [],
       });
       return;
     }
-    case "scene.update": {
-      const s = sceneOf(p, op.id);
-      if (op.name !== undefined) s.name = op.name;
-      if (op.music !== undefined) s.music = op.music;
+    case "map.update": {
+      const m = mapOf(p, op.id);
+      if (op.name !== undefined) m.name = op.name;
+      if (op.music === null) delete m.music;
+      else if (op.music !== undefined) m.music = op.music;
+      if (op.parentId === null) delete m.parentId;
+      else if (op.parentId !== undefined) {
+        if (op.parentId === m.id) throw new Error("地圖不能是自己的上層");
+        mapOf(p, op.parentId);
+        m.parentId = op.parentId;
+      }
       return;
     }
-    case "scene.resize": {
-      const s = sceneOf(p, op.id);
-      const rows = ensureTerrain(s);
+    case "map.resize": {
+      const m = mapOf(p, op.id);
       const fill = op.fill ?? ".";
-      s.terrain = Array.from({ length: op.height }, (_, y) => Array.from({ length: op.width }, (_, x) => [...(rows[y] ?? "")][x] ?? fill).join(""));
+      checkChar(fill);
+      m.terrain = Array.from({ length: op.height }, (_, y) => Array.from({ length: op.width }, (_, x) => [...(m.terrain[y] ?? "")][x] ?? fill).join(""));
+      m.events = m.events.filter((e) => e.x < op.width && e.y < op.height);
       return;
     }
-    case "scene.remove":
-      if (p.scenes.length <= 1) throw new Error("至少要保留一張地圖");
-      p.scenes = p.scenes.filter((s) => s.id !== op.id);
-      p.npcs = p.npcs.filter((n) => n.sceneId !== op.id);
-      p.scenes.forEach((s) => (s.exits = s.exits.filter((e) => e.targetSceneId !== op.id)));
+    case "map.remove":
+      if (p.maps.length <= 1) throw new Error("至少要保留一張地圖");
+      if (p.system.start.mapId === op.id) throw new Error("這是玩家的起始地圖，請先把起點移到其他地圖");
+      p.maps = remove(p.maps, op.id);
+      p.maps.forEach((m) => m.parentId === op.id && delete m.parentId);
       return;
-    case "scene.paint": {
-      const s = sceneOf(p, op.sceneId);
-      op.cells.forEach((c) => setCell(s, c.x, c.y, c.ch));
+    case "map.terrain": {
+      const m = mapOf(p, op.mapId);
+      const width = [...op.rows[0]].length;
+      op.rows.forEach((row, y) => {
+        if ([...row].length !== width) throw new Error(`第 ${y} 列有 ${[...row].length} 格，第 0 列有 ${width} 格；每列長度要相同`);
+        [...row].forEach(checkChar);
+      });
+      m.terrain = [...op.rows];
+      m.events = m.events.filter((e) => e.x < width && e.y < op.rows.length);
       return;
     }
-    case "scene.fill": {
-      const s = sceneOf(p, op.sceneId);
-      const rows = ensureTerrain(s);
-      const target = [...rows[op.y] ?? ""][op.x];
+    case "map.paint": {
+      const m = mapOf(p, op.mapId);
+      op.cells.forEach((c) => setCell(m, c.x, c.y, c.ch));
+      return;
+    }
+    case "map.fill": {
+      const m = mapOf(p, op.mapId);
+      checkChar(op.ch);
+      const grid = m.terrain.map((r) => [...r]);
+      const target = grid[op.y]?.[op.x];
       if (target === undefined || target === op.ch) return;
-      const grid = rows.map((r) => [...r]);
       const stack: Array<[number, number]> = [[op.x, op.y]];
       while (stack.length) {
         const [x, y] = stack.pop()!;
@@ -289,93 +321,101 @@ function applyOne(p: GameProject, op: StudioOp) {
         grid[y][x] = op.ch;
         stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
       }
-      if (!TERRAIN[op.ch]) throw new Error(`未知的地形字元「${op.ch}」`);
-      s.terrain = grid.map((r) => r.join(""));
+      m.terrain = grid.map((r) => r.join(""));
       return;
     }
-    case "npc.upsert":
-      sceneOf(p, op.npc.sceneId);
-      upsert(p.npcs, op.npc);
-      return;
-    case "npc.remove":
-      p.npcs = p.npcs.filter((n) => n.id !== op.id);
-      return;
-    case "interactable.upsert": {
-      const s = sceneOf(p, op.sceneId);
-      p.scenes.forEach((sc) => sc.id !== s.id && (sc.interactables = sc.interactables?.filter((o) => o.id !== op.object.id)));
-      upsert((s.interactables ??= []), op.object as NonNullable<SceneDefinition["interactables"]>[number]);
+    case "event.upsert": {
+      const m = mapOf(p, op.mapId);
+      if (op.event.x >= m.width || op.event.y >= m.height) throw new Error(`事件位置 (${op.event.x},${op.event.y}) 超出地圖範圍`);
+      upsert(m.events, op.event);
       return;
     }
-    case "interactable.remove": {
-      const s = sceneOf(p, op.sceneId);
-      s.interactables = (s.interactables ?? []).filter((o) => o.id !== op.id);
+    case "event.move": {
+      const m = mapOf(p, op.mapId);
+      const e = m.events.find((x) => x.id === op.id);
+      if (!e) throw new Error(`找不到事件「${op.id}」`);
+      if (op.x >= m.width || op.y >= m.height) throw new Error("超出地圖範圍");
+      Object.assign(e, { x: op.x, y: op.y });
       return;
     }
-    case "pickup.upsert":
-      upsert((sceneOf(p, op.sceneId).pickups ??= []), op.pickup as NonNullable<SceneDefinition["pickups"]>[number]);
-      return;
-    case "pickup.remove": {
-      const s = sceneOf(p, op.sceneId);
-      s.pickups = (s.pickups ?? []).filter((x) => x.id !== op.id);
+    case "event.remove": {
+      const m = mapOf(p, op.mapId);
+      m.events = remove(m.events, op.id);
       return;
     }
-    case "exit.upsert": {
-      const s = sceneOf(p, op.sceneId);
-      s.exits = [...s.exits.filter((e) => !(e.x === op.exit.x && e.y === op.exit.y)), op.exit];
+    case "actor.upsert":
+      upsert(p.actors, op.actor);
       return;
-    }
-    case "exit.remove": {
-      const s = sceneOf(p, op.sceneId);
-      s.exits = s.exits.filter((e) => !(e.x === op.x && e.y === op.y));
-      return;
-    }
-    case "location.upsert":
-      upsert((sceneOf(p, op.sceneId).locations ??= []), op.location);
-      return;
-    case "location.remove": {
-      const s = sceneOf(p, op.sceneId);
-      s.locations = (s.locations ?? []).filter((x) => x.id !== op.id);
-      return;
-    }
-    case "dialogue.upsert":
-      upsert(p.dialogues, op.node);
-      return;
-    case "dialogue.remove":
-      p.dialogues = p.dialogues.filter((d) => d.id !== op.id);
-      return;
-    case "quest.upsert":
-      upsert(p.quests, op.quest);
-      return;
-    case "quest.remove":
-      p.quests = p.quests.filter((q) => q.id !== op.id);
+    case "actor.remove":
+      if (op.id === p.system.playerActorId) throw new Error("不能刪除主角");
+      p.actors = remove(p.actors, op.id);
       return;
     case "item.upsert":
       upsert(p.items, op.item);
       return;
     case "item.remove":
-      p.items = p.items.filter((i) => i.id !== op.id);
+      p.items = remove(p.items, op.id);
+      return;
+    case "quest.upsert":
+      upsert(p.quests, op.quest);
+      return;
+    case "quest.remove":
+      p.quests = remove(p.quests, op.id);
       return;
     case "ending.upsert":
       upsert(p.endings, op.ending);
       return;
     case "ending.remove":
-      p.endings = p.endings.filter((e) => e.id !== op.id);
+      if (p.endings.length <= 1) throw new Error("至少要保留一個結局");
+      p.endings = remove(p.endings, op.id);
+      return;
+    case "chapter.upsert": {
+      const i = p.chapters.findIndex((c) => c.id === op.chapter.id);
+      if (i >= 0) p.chapters[i] = op.chapter;
+      else {
+        const at = op.before ? p.chapters.findIndex((c) => c.id === op.before) : -1;
+        if (at >= 0) p.chapters.splice(at, 0, op.chapter);
+        else p.chapters.push(op.chapter);
+      }
+      return;
+    }
+    case "chapter.remove":
+      p.chapters = remove(p.chapters, op.id);
+      return;
+    case "commonEvent.upsert":
+      upsert(p.commonEvents, op.commonEvent);
+      return;
+    case "commonEvent.remove":
+      p.commonEvents = remove(p.commonEvents, op.id);
+      return;
+    case "switch.upsert":
+      upsert(p.switches, op.switch);
+      return;
+    case "switch.remove":
+      p.switches = remove(p.switches, op.id);
+      return;
+    case "variable.upsert":
+      upsert(p.variables, op.variable);
+      return;
+    case "variable.remove":
+      p.variables = remove(p.variables, op.id);
       return;
   }
 }
 
 /**
- * 依序套用操作。單筆操作失敗不會影響其他操作（結果逐筆回報）；
- * 套用後重新驗證整份專案。中途狀態允許暫時不合法（例如先放 NPC 再補對話），由驗證報告提示。
+ * 依序套用操作。單筆操作失敗不會影響其他操作（結果逐筆回報）；套用後重新驗證整份專案。
+ * 中途狀態允許暫時不合法（例如先放事件再補對應的結局），由驗證報告提示。
+ * options.validate=false：不做整份驗證（伺服器端使用，避免超過 CPU 限制；驗證由瀏覽器或 CLI 執行）
  */
-/** options.validate=false：不做整份驗證（伺服器端使用，避免超過 CPU 限制；驗證由瀏覽器或 CLI 執行） */
 export function applyOps(project: GameProject, rawOps: unknown[], options: { validate?: boolean } = {}): ApplyResult {
   const p = structuredClone(project);
   const results: OpResult[] = [];
   for (const raw of rawOps) {
     const parsed = opSchema.safeParse(raw);
     if (!parsed.success) {
-      results.push({ ok: false, message: `操作格式錯誤：${parsed.error.issues[0]?.path.join(".")} ${parsed.error.issues[0]?.message}` });
+      const issue = parsed.error.issues[0];
+      results.push({ ok: false, message: `操作格式錯誤：${issue?.path.join(".")} ${issue?.message}` });
       continue;
     }
     const snapshot = structuredClone(p);
@@ -391,4 +431,27 @@ export function applyOps(project: GameProject, rawOps: unknown[], options: { val
   if (options.validate === false) return { project: p, results, report: null };
   const v = validateProject(p);
   return { project: p, results, report: { isValid: v.isValid, errors: v.errors, warnings: v.warnings } };
+}
+
+/** 空白專案：一張起始地圖、主角、一個佔位結局（Studio「新增專案」與 CLI 共用） */
+export function blankProject(id: string, title: string, genre: GameProject["genre"] = "fantasy"): GameProject {
+  const terrain = borderedTerrain(24, 16);
+  return {
+    schemaVersion: "2.0",
+    id,
+    title,
+    description: "（待補）",
+    genre,
+    system: { start: { mapId: "start", x: 3, y: 3 }, playerActorId: "player", initialItems: [] },
+    actors: [{ id: "player", name: "主角", spriteAssetId: "char_hero" }],
+    items: [],
+    quests: [],
+    endings: [{ id: "end_placeholder", title: "（佔位結局）", text: "請以 ending.upsert 取代這個佔位結局，並用「結局」指令觸發。" }],
+    chapters: [],
+    switches: [],
+    variables: [],
+    commonEvents: [],
+    maps: [{ id: "start", name: "起點", width: 24, height: 16, tileSize: 40, tilesetId: "tileset_tiny_town", terrain, walkable: walkableFromTerrain(terrain), music: "peaceful", events: [] }],
+    assetManifest: { assets: ["tileset_tiny_town", "char_hero"].map(manifestEntry) },
+  };
 }

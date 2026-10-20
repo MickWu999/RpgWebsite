@@ -405,3 +405,160 @@ kbd { background: #23273a; border: 1px solid var(--border); border-bottom-width:
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); }
 .tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted); padding: 8px 14px; cursor: pointer; font: inherit; }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+/* ---------- 章節標題卡 ---------- */
+.rm-chapter { position: absolute; inset: 0; z-index: 11; background: radial-gradient(ellipse at center, #000000cc, #000000f2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; animation: rm-ending-in 1.2s ease; cursor: pointer; text-align: center; padding: 0 40px; }
+.rm-chapter-title { color: #ffd76a; font-size: 26px; letter-spacing: 4px; text-shadow: 0 2px 0 #000; }
+.rm-chapter-summary { color: #e6e8f5; font-size: 15px; }
+
+/* ---------- 後台測試：F9 除錯 ---------- */
+.rm-debug-toggle { position: fixed; top: 10px; right: 10px; z-index: 40; background: #1d2238ee; color: #e6e8f5; border: 1px solid #4b5585; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+.rm-debug { position: fixed; top: 48px; right: 10px; z-index: 41; width: min(360px, calc(100vw - 20px)); max-height: calc(100vh - 60px); display: flex; flex-direction: column; background: #151a2ef5; color: #e6e8f5; border: 1px solid #4b5585; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 24px #0008; }
+.rm-debug-head { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid #2f3758; }
+.rm-debug-head input { flex: 1; min-width: 0; background: #0d1020; color: inherit; border: 1px solid #3a4268; border-radius: 4px; padding: 3px 6px; }
+.rm-debug-head button, .rm-debug-tabs button { background: none; color: inherit; border: 1px solid transparent; border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+.rm-debug-tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px 8px; border-bottom: 1px solid #2f3758; }
+.rm-debug-tabs button.active { border-color: #ffd76a; color: #ffd76a; }
+.rm-debug-body { overflow: auto; padding: 6px 10px; flex: 1; }
+.rm-debug-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; width: 100%; text-align: left; }
+.rm-debug-row code { margin-left: auto; color: #8a91b0; font-size: 11px; }
+.rm-debug-row input[type=number] { width: 64px; background: #0d1020; color: inherit; border: 1px solid #3a4268; border-radius: 4px; padding: 2px 4px; }
+.rm-debug-row select { background: #0d1020; color: inherit; border: 1px solid #3a4268; border-radius: 4px; max-width: 120px; }
+.rm-debug-btn { background: #222944; color: inherit; border: 1px solid #3a4268; border-radius: 4px; padding: 5px 8px; margin: 3px 0; cursor: pointer; }
+.rm-debug-btn:disabled { opacity: 0.5; cursor: default; }
+.rm-debug-note { color: #8a91b0; font-size: 12px; margin: 4px 0; }
+.rm-debug-foot { padding: 6px 10px; border-top: 1px solid #2f3758; color: #8a91b0; font-size: 12px; }
+
+/* ---------- Studio：事件編輯（RPG Maker 式） ---------- */
+.event-window { width: min(1200px, 100%); height: min(820px, 100%); }
+.event-head { display: flex; gap: 12px; align-items: flex-end; padding: 10px 12px; border-bottom: 1px solid var(--border); background: #1d2131; }
+.event-head .field { min-width: 140px; }
+.event-body { flex: 1; display: grid; grid-template-columns: 360px minmax(0, 1fr); min-height: 0; }
+.event-side { overflow: auto; padding: 10px; border-right: 1px solid var(--border); gap: 10px; }
+.event-commands { display: flex; flex-direction: column; min-height: 0; padding: 10px; }
+.event-foot { padding: 10px 12px; border-top: 1px solid var(--border); background: #1d2131; }
+.cmd-editor { display: flex; flex-direction: column; flex: 1; min-height: 240px; }
+.cmd-toolbar { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.cmd-list { flex: 1; overflow: auto; background: #fbfaf5; color: #222; border: 1px solid #000; border-radius: 4px; font-family: "Noto Sans TC", "PingFang TC", monospace; font-size: 13px; padding: 4px 0; outline: none; min-height: 200px; }
+.cmd-list:focus { box-shadow: 0 0 0 2px #4b8bf2; }
+.cmd-row { padding: 2px 8px; cursor: default; white-space: pre-wrap; word-break: break-all; line-height: 1.5; user-select: none; }
+.cmd-row.selected { background: #3d6fd6; color: #fff !important; }
+.cmd-row.insert { color: #888; }
+.cmd-row.label { color: #2a5a9e; }
+.cmd-row.cmd-text { color: #222; }
+.cmd-row.cmd-flow { color: #2a5a9e; }
+.cmd-row.cmd-state { color: #b2242a; }
+.cmd-row.cmd-party { color: #7a3fa0; }
+.cmd-row.cmd-move { color: #b3611a; }
+.cmd-row.cmd-end { color: #8a1a6a; font-weight: 600; }
+.cmd-row.cmd-comment { color: #2b8a3e; }
+.cmd-overlay { z-index: 60; }
+.cmd-dialog { width: min(760px, 100%); max-height: min(720px, 100%); display: flex; flex-direction: column; background: #181b29; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.cmd-dialog-title { padding: 10px 14px; font-weight: 700; background: #1d2131; border-bottom: 1px solid var(--border); }
+.cmd-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; padding: 14px; overflow: auto; }
+.cmd-cat { display: flex; flex-direction: column; gap: 4px; }
+.cmd-pick { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; background: #222944; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; cursor: pointer; font: inherit; font-size: 14px; }
+.cmd-pick:hover { border-color: #ffd76a; }
+.cmd-form { padding: 14px; overflow: auto; }
+.cmd-dialog-foot { padding: 10px 14px; border-top: 1px solid var(--border); }
+.asset-picker { display: flex; flex-wrap: wrap; gap: 4px; }
+.asset-swatch { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #10121a; border: 2px solid transparent; border-radius: 4px; cursor: pointer; padding: 0; }
+.asset-swatch.active { border-color: #ffd76a; }
+.asset-thumb { display: block; image-rendering: pixelated; background-repeat: no-repeat; }
+.asset-none { color: var(--muted); font-size: 12px; }
+.quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.quick-grid .btn { justify-content: flex-start; }
+.studio-toolbar .btn, .studio-toolbar .badge { white-space: nowrap; }
+.studio-toolbar select.btn { width: auto; padding: 4px 8px; }
+.logic-row input[type=checkbox], .logic-row input[type=radio] { width: auto; flex: none; }
+
+/* ---------- 前台：RPG 遊戲啟動器 ---------- */
+.portal-stage { position: fixed; inset: 0; display: flex; flex-direction: column; background: #05060d; color: #fff; overflow: hidden; font-size: 16px; }
+.portal-stage .portal-header { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 28px 6px; margin: 0; border: none; background: none; }
+.portal-logo { display: flex; align-items: center; gap: 12px; }
+.portal-logo-mark { font-size: 30px; color: #ffd76a; text-shadow: 0 0 18px rgba(255, 200, 90, 0.8); animation: portal-pulse 3s ease-in-out infinite; }
+.portal-logo h1 { margin: 0; font-size: 30px; letter-spacing: 0.18em; color: #fff3cf; text-shadow: 0 0 16px rgba(255, 200, 90, 0.55), 2px 2px 0 #000; line-height: 1.1; }
+.portal-logo-sub { font-size: 12px; letter-spacing: 0.45em; color: #c9cde6; text-transform: uppercase; text-shadow: 1px 1px 0 #000; }
+@keyframes portal-pulse { 50% { opacity: 0.6; transform: scale(0.92); } }
+.portal-main { position: relative; z-index: 1; flex: 1; min-height: 0; display: flex; padding: 10px 28px; }
+.portal-message { margin: auto; padding: 16px 24px; }
+.portal-stage .portal-footer { position: relative; z-index: 2; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 18px; padding: 8px 28px 14px; margin: 0; color: #aeb3cf; font-size: 12px; text-shadow: 1px 1px 0 #000; border: none; }
+.portal-keys kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 1px; border: 1px solid #8c93b8; border-bottom-width: 2px; border-radius: 3px; background: #1a1f3a; color: #fff; font: inherit; font-size: 11px; text-align: center; }
+
+/* RPG 視窗（文件流版本，給前台頁面使用） */
+.rm-panel { position: relative; background: linear-gradient(180deg, rgba(30, 44, 98, 0.9), rgba(10, 16, 46, 0.92)); border: 2px solid #e9ecf7; border-radius: 6px; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6), inset 0 0 14px rgba(0, 0, 0, 0.4), 0 12px 40px rgba(0, 0, 0, 0.5); padding: 12px 16px; text-shadow: 1px 1px 0 #000; }
+.rm-panel-title { font-size: 13px; letter-spacing: 0.3em; color: #ffd76a; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.25); }
+.rm-button { display: inline-flex; align-items: center; gap: 8px; padding: 9px 22px; border-radius: 4px; border: 2px solid #e9ecf7; background: linear-gradient(180deg, #3550a8, #1a2560); color: #fff; font-weight: 700; letter-spacing: 0.08em; text-decoration: none; text-shadow: 1px 1px 0 #000; box-shadow: 0 0 0 2px #000a; cursor: pointer; }
+.rm-button.primary { background: linear-gradient(180deg, #ffd76a, #d49a2a); color: #2a1a00; text-shadow: none; animation: rm-glow 1.6s ease-in-out infinite; }
+.rm-button:hover { filter: brightness(1.12); }
+@keyframes rm-glow { 50% { box-shadow: 0 0 0 2px #000a, 0 0 18px rgba(255, 215, 106, 0.7); } }
+
+.launcher { position: relative; flex: 1; display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 22px; align-items: stretch; min-height: 0; }
+.launcher-backdrop { position: fixed; inset: -6%; z-index: -1; pointer-events: none; animation: launcher-drift 40s ease-in-out infinite alternate; }
+.launcher-backdrop-art { width: 100%; height: 100%; display: block; filter: blur(2px) brightness(0.55) saturate(1.1); animation: rm-fade-in 0.9s ease; }
+.launcher-backdrop::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 60% 40%, rgba(5, 6, 13, 0) 30%, rgba(5, 6, 13, 0.85) 100%); }
+@keyframes launcher-drift { from { transform: translate(0, 0) scale(1.02); } to { transform: translate(-3%, -2%) scale(1.08); } }
+.launcher-list { display: flex; flex-direction: column; gap: 2px; overflow: auto; align-self: start; max-height: 100%; }
+.launcher-item { display: grid; grid-template-columns: 18px 1fr; grid-template-rows: auto auto; column-gap: 4px; text-align: left; background: none; border: 1px solid transparent; border-radius: 4px; color: #fff; padding: 6px 8px; cursor: pointer; font: inherit; text-shadow: inherit; }
+.launcher-item.selected { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.55); animation: rm-blink 1.2s ease-in-out infinite; }
+.launcher-cursor { grid-row: 1 / 3; color: #ffd76a; font-size: 12px; align-self: center; animation: launcher-cursor 0.8s steps(2) infinite; }
+@keyframes launcher-cursor { 50% { transform: translateX(3px); } }
+.launcher-item-title { font-weight: 700; }
+.launcher-item-meta { font-size: 12px; color: #b8bfdc; }
+.launcher-soon { margin-top: 10px; font-size: 13px; color: #8a91b0; padding: 4px 8px; }
+.launcher-detail { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: auto; }
+.launcher-cover { position: relative; aspect-ratio: 16 / 9; max-height: 52vh; border: 2px solid #000; border-radius: 4px; overflow: hidden; background: #000; }
+.launcher-cover .cover-art { width: 100%; height: 100%; display: block; }
+.launcher-cover-title { position: absolute; left: 0; right: 0; top: 7%; text-align: center; font-size: clamp(24px, 3.6vw, 44px); font-weight: 800; letter-spacing: 0.08em; color: #fff3cf; text-shadow: 0 0 18px rgba(255, 200, 90, 0.6), 3px 3px 0 #000; padding: 0 16px; animation: rm-fade-in 0.7s ease; }
+.launcher-cover-tagline { position: absolute; left: 0; right: 0; top: calc(7% + clamp(36px, 5vw, 60px)); text-align: center; font-size: clamp(13px, 1.4vw, 17px); color: #ffe9b0; text-shadow: 1px 1px 0 #000; }
+.launcher-stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.launcher-stats span { background: rgba(10, 16, 46, 0.75); border: 1px solid rgba(255, 255, 255, 0.45); border-radius: 3px; padding: 2px 10px; font-size: 13px; }
+.launcher-desc { margin: 0; color: #e6e8f5; line-height: 1.7; }
+.launcher-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-top: auto; }
+.launcher-save { font-size: 13px; color: #8ff0c4; }
+.launcher-empty { position: relative; margin: auto; padding: 18px 26px; }
+
+.launcher-detail { align-self: start; max-height: 100%; }
+/* 手機橫向（矮螢幕）：維持左右兩欄，壓縮標題與封面 */
+@media (max-height: 520px) {
+  .portal-stage .portal-header { padding: 8px 16px 0; }
+  .portal-stage .portal-header > :not(.portal-logo) { display: none; }
+  .portal-logo h1 { font-size: 18px; }
+  .portal-logo-mark { font-size: 18px; }
+  .portal-logo-sub { display: none; }
+  .portal-main { padding: 6px 16px 10px; }
+  .launcher { grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); gap: 12px; }
+  .rm-panel { padding: 8px 10px; }
+  .launcher-detail { gap: 8px; }
+  .launcher-cover { aspect-ratio: auto; height: 44vh; max-height: none; }
+  .launcher-desc { font-size: 13px; line-height: 1.5; }
+  .launcher-stats span { font-size: 12px; }
+  .rm-button { padding: 6px 16px; }
+  .portal-stage .portal-footer { display: none; }
+}
+/* 手機直向：單欄 */
+@media (max-width: 760px) and (min-height: 521px) {
+  .portal-stage { position: static; min-height: 100vh; overflow: auto; }
+  .portal-stage .portal-header { padding: 12px 16px 4px; }
+  .portal-logo h1 { font-size: 22px; }
+  .portal-main { padding: 8px 16px; }
+  .launcher { grid-template-columns: 1fr; gap: 12px; }
+  .launcher-list { flex-direction: row; overflow-x: auto; align-self: stretch; }
+  .launcher-list .rm-panel-title, .launcher-soon { display: none; }
+  .launcher-item { flex: none; }
+  .launcher-cover { max-height: none; }
+  .portal-stage .portal-footer { padding: 8px 16px 14px; }
+  .portal-keys { display: none; }
+}
+
+/* ---------- 沉浸感：暗角、章節標題卡演出、桌機全螢幕、鍵盤遊玩時隱藏滑鼠 ---------- */
+.rm-vignette { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 58%, rgba(0, 0, 0, 0.42) 100%); }
+.rm-chapter { animation: rm-chapter-in 1.6s ease both; }
+.rm-chapter-title { animation: rm-chapter-title 2.2s ease both; }
+.rm-chapter-summary { animation: rm-chapter-title 2.2s 0.5s ease both; }
+.rm-chapter::before, .rm-chapter::after { content: ""; width: 260px; height: 1px; background: linear-gradient(90deg, transparent, #ffd76a, transparent); animation: rm-chapter-title 2s 0.2s ease both; }
+@keyframes rm-chapter-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rm-chapter-title { from { opacity: 0; letter-spacing: 12px; filter: blur(4px); } to { opacity: 1; filter: blur(0); } }
+.rm-fullscreen.desktop { top: auto; bottom: 14px; right: 14px; opacity: 0.35; transition: opacity 0.2s; cursor: pointer; }
+.rm-fullscreen.desktop:hover { opacity: 1; }
+body.rm-hide-cursor .rm-stage, body.rm-hide-cursor .rm-stage * { cursor: none !important; }

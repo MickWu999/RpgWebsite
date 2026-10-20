@@ -98,28 +98,50 @@
 - 標題｜條件（至少 2 個旗標或狀態）｜意義｜尾聲：哪些選擇會追加哪些描述
 ```
 
-## 6. 操作 API 速查
+## 6. 資料模型與操作 API（RPG Maker 式）
 
-完整的 JSON Schema 可以用 `npm run studio -- --schema` 取得。常用操作如下：
+遊戲資料以 RPG Maker（MZ）的模型為基底，定義在 `src/game/schema.ts`：
+
+- **資料庫**：`actors`（角色：名稱、角色圖、講話聲、角色設定）、`items`、`quests`（任務日誌：步驟清單）、`endings`（結局＋尾聲）、`chapters`（章節＋測試起點）、`commonEvents`、`switches`、`variables`、`system`（起點、主角、初始物品）。
+- **地圖**：`maps[]`，地形是字元陣列（見 `TERRAIN`），`parentId` 形成地圖樹，地圖上放 **事件**。
+- **事件**：`{id,name,x,y,pages[]}`。系統使用「條件成立、編號最大」的那一頁。每頁有：
+  - `conditions`：`switches`（最多 2 個，皆 ON）、`variable {id,min}`、`selfSwitch`、`itemId`、`quest {questId,status}`、`custom`（任意條件）
+  - `graphic {assetId}`（沒有＝透明事件）、`trigger`（`action` 確定鍵／`touch` 接觸／`autorun` 自動執行）、`priority`（`below`／`same`／`above`）
+  - `commands`：事件指令列
+- **事件指令**（`code`）：`text`、`choices`、`if`、`switch`、`selfSwitch`、`variable`、`item`、`quest`、`transfer`、`ending`、`chapter`、`common`、`erase`、`exit`、`label`、`jump`、`wait`、`music`、`comment`。
+
+完整格式用 `npm run game -- schema` 或 `<STUDIO_URL>/api/ops-schema` 取得；`npm run game -- inspect <id>` 會把專案印成 RPG Maker 式的事件清單（◆ 指令）。
 
 | 操作 | 用途 |
 |---|---|
-| `scene.add` `{id,name,width,height,fill?}` | 新增地圖（外圍會自動用樹圍起來） |
-| `scene.paint` `{sceneId,cells:[{x,y,ch}]}` | 繪製地形（字元見 `TERRAIN`）；`walkable` 會自動推導 |
-| `scene.update` `{id,music}` | 設定背景音樂 |
-| `exit.upsert` `{sceneId,exit:{x,y,targetSceneId,targetX,targetY,label}}` | 出口；雙向通行要在兩張地圖各放一個 |
-| `npc.upsert` `{npc}` | 新增或修改 NPC；`scene.npcIds` 會自動維護 |
-| `interactable.upsert` `{sceneId,object}` | 調查點（門、告示、寶箱）；用 `dialogueVariants` 依條件改變回應 |
-| `dialogue.upsert` `{node}` | 對話節點（choices、effects、condition） |
-| `quest.upsert`／`item.upsert`／`ending.upsert` | 任務、物品、結局 |
-| `player.update` `{start,name,spriteAssetId}` | 主角與起點 |
-| `project.update` `{title,description,intro,cover}` | 遊戲資訊與封面 |
+| `map.add` `{id,name,width,height,fill?,music?,parentId?}` | 新增地圖（外圍自動用樹圍起來） |
+| `map.terrain` `{mapId,rows}` | 一次畫好整張地圖（每列一個字串，長度相同） |
+| `map.paint`／`map.fill`／`map.resize`／`map.update`／`map.remove` | 局部繪製、填滿、調整大小、改名稱與音樂 |
+| `event.upsert` `{mapId,event}` | 新增或整個取代事件（含所有事件頁） |
+| `event.move`／`event.remove` | 移動、刪除事件 |
+| `actor.upsert`／`item.upsert`／`quest.upsert`／`ending.upsert`／`chapter.upsert`／`commonEvent.upsert` | 資料庫（對應的 `.remove` 刪除） |
+| `switch.upsert`／`variable.upsert` | 幫開關、變數取中文名稱（指令裡用到的 ID 會自動建立） |
+| `system.update` `{start,playerActorId,initialItems}` | 起點、主角、初始物品 |
+| `project.update` `{title,description,intro,genre,cover}` | 遊戲資訊與封面 |
 
-**新增時的順序**：先新增會被引用的東西，再新增引用它的東西。例如先 `dialogue.upsert`，再 `npc.upsert`。
+### RPG Maker 的常見寫法
+
+| 需求 | 做法 |
+|---|---|
+| 人物依劇情說不同的話 | 同一個事件放多頁：第 1 頁無條件，第 2 頁條件「開關 met_x ON」，以此類推（編號越大越優先） |
+| 寶箱只能開一次 | 第 1 頁：文字＋`item`＋`selfSwitch A ON`；第 2 頁條件 `selfSwitch A`：「空的」 |
+| 門／地圖出入口 | 透明事件、`touch`＋`below`，指令 `transfer`；雙向要兩邊各放一個 |
+| 過場劇情 | `autorun` 頁，最後一定要 `selfSwitch A ON`（或關掉觸發它的開關），第 2 頁條件 `selfSwitch A` 留空 |
+| 玩家的抉擇 | `choices` 的每個選項裡用 `switch` 記錄，之後用頁條件或 `if` 讀取（每個打開的開關都必須被讀取） |
+| 任務日誌 | `quest start` → `quest step {step}` → `quest complete`；步驟文字寫「找誰／去哪／做什麼」 |
+| 章節 | 劇情轉折處用 `chapter` 指令（顯示標題卡）；在資料庫為每章設定 `testStart`，可以直接從那一章開始測試 |
+| 結局 | 在條件分支或事件頁條件裡用 `ending` 指令；結局至少由 2 個條件或選擇決定，用 `epilogues` 回應其他選擇 |
+
+**新增時的順序**：先建立資料庫項目（角色、物品、任務、結局、章節），再放引用它們的事件。
 
 ## 7. 常見錯誤（審查最常退件的原因）
 
-1. **台詞與道具狀態不一致**：台詞說「給你」，卻沒有 `give_item`。
+1. **台詞與道具狀態不一致**：台詞說「給你」，卻沒有 `item` 指令。
 2. **互斥的抉擇可以重複做**：選了 A 之後還能回頭選 B。解法是用條件隱藏另一個選項。
 3. **主要選擇在結局完全沒被提到**：用 `ending.epilogues` 回應這個選擇。
 4. **結局文字描述了玩家不一定經歷過的事**：結局文字只能寫該結局條件保證會成立的事。

@@ -3,34 +3,52 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MUSIC_MOODS, TERRAIN } from "@/game/assets";
-import type { GameProject } from "@/game/schema";
-import { downloadJson, exportProjectJson } from "@/game/storage";
+import { describePageConditions, TRIGGER_LABEL } from "@/game/describe";
+import type { GameProject, MapDefinition, MapEvent } from "@/game/schema";
+import { downloadJson } from "@/game/storage";
 import { ApiError, studioApi } from "@/lib/studioApi";
+import { broadcastProject } from "@/lib/studioChannel";
 import { applyOps, describeOp, type StudioOp } from "@/studio/ops";
 import Database, { type DbTab } from "./Database";
-import EventEditor from "./EventEditor";
+import EventEditor, { emptyPage, QUICK_EVENTS, quickEvent, uniqueEventId } from "./EventEditor";
 import MapCanvas, { TilePalette, type MapMode } from "./MapCanvas";
 
 /**
  * RPG Maker 式 Studio 編輯器。
- * 版面：上方工具列｜左側圖塊調色盤＋地圖清單｜中間地圖畫布｜右側事件編輯器；資料庫另開視窗。
+ * 版面：上方工具列｜左側圖塊＋地圖樹｜中間地圖畫布｜右側選取格的事件；事件編輯與資料庫另開視窗。
  * 所有編輯都轉成 Studio 操作 API（src/studio/ops.ts），與 AI 使用同一套操作。
- * 快捷鍵：Ctrl/⌘+Z 復原、Ctrl/⌘+Shift+Z 重做、Ctrl/⌘+S 儲存、F9 資料庫、F5 測試遊玩、Esc 關閉資料庫。
- * 專案存在雲端（後台 API）：有修改時每 20 秒自動儲存；每 8 秒檢查雲端版本，AI 透過 API Token 的修改會即時出現。
+ * 快捷鍵：Ctrl/⌘+Z 復原、Ctrl/⌘+Shift+Z 重做、Ctrl/⌘+S 儲存、F9 資料庫、F5 測試遊玩、Esc 關閉視窗。
+ * 專案存在雲端：有修改時每 20 秒自動儲存；每 8 秒檢查雲端版本，AI 透過 API Token 的修改會即時出現。
+ * 每次修改都會廣播給已開啟的測試遊玩視窗：測試視窗保留玩家進度、直接套用修改，不必重玩。
  */
 
 const AUTOSAVE_MS = 20_000;
 const POLL_MS = 8_000;
-const TOUR_KEY = "rpg:studio-tour-done";
+const TOUR_KEY = "rpg:studio-tour-v2";
 const TOUR = [
-  { title: "歡迎使用 Studio", text: "這裡是 RPG 的編輯器。上方工具列可以切換「🖌 地圖」與「❗ 事件」兩種模式，也能開啟「📚 資料庫」與「▶ 測試遊玩」。" },
-  { title: "🖌 地圖模式", text: "從左側「圖塊」選一種地形（草地、道路、樹、房屋…），在中間的畫布上按住拖曳就能繪製。✕ 代表不可通行。" },
-  { title: "❗ 事件模式", text: "點選格子會在右側顯示上面的事件；雙擊空格可以新增 NPC、調查點、撿取物、出口、地點，或設為玩家起點。" },
-  { title: "📚 資料庫與儲存", text: "對話、任務、物品、結局都在資料庫（F9）。修改會每 20 秒自動存到雲端，也可以按 Ctrl/⌘+S；每次儲存都會留下版本，可以隨時還原。" },
+  { title: "歡迎使用 Studio", text: "這是照 RPG Maker 設計的編輯器：地圖、事件、資料庫三個部分。工具列可以切換「🖌 地圖」與「❗ 事件」模式，也能開啟「📚 資料庫」與「▶ 測試遊玩」。" },
+  { title: "🖌 地圖模式", text: "從左側「圖塊」選一種地形，在畫布上按住拖曳繪製；✕ 代表不可通行。左下是地圖樹，可以建立上下層的地圖（例如村莊 → 民宅）。" },
+  { title: "❗ 事件模式", text: "遊戲裡的一切都是事件：人物、門、寶箱、劇情。雙擊格子開啟「事件編輯」，或在右側用「快速事件建立」。每個事件可以有多頁，依開關等條件切換內容。" },
+  { title: "📚 資料庫", text: "角色、物品、任務、結局、章節、共用事件、開關與變數都在資料庫（F9）。章節可以設定「測試起點」，直接從那一章開始測試。" },
+  { title: "▶ 測試遊玩", text: "可以從頭、從某一章或從選取的位置開始測試。測試時按 F9 能直接改開關與變數；編輯器的修改會即時套用到測試視窗，不用重玩。" },
 ];
 
 const HISTORY_LIMIT = 100;
 const MUSIC_LABELS: Record<string, string> = { peaceful: "平和", lively: "熱鬧", adventure: "冒險", mysterious: "神秘", tense: "緊張", melancholy: "感傷" };
+
+/** 地圖樹：依 parentId 排成縮排清單 */
+function mapTree(maps: MapDefinition[]) {
+  const out: Array<{ map: MapDefinition; depth: number }> = [];
+  const visit = (parent: string | undefined, depth: number) => {
+    for (const m of maps.filter((x) => (x.parentId ?? undefined) === parent || (!parent && x.parentId && !maps.some((p) => p.id === x.parentId)))) {
+      if (out.some((o) => o.map.id === m.id)) continue;
+      out.push({ map: m, depth });
+      visit(m.id, depth + 1);
+    }
+  };
+  visit(undefined, 0);
+  return out;
+}
 
 export default function StudioApp({ projectId, initialDb }: { projectId: string; initialDb?: DbTab | null }) {
   const [project, setProject] = useState<GameProject | null>(null);
@@ -39,7 +57,7 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
   const historyRef = useRef<{ past: Array<{ project: GameProject; label: string }>; future: Array<{ project: GameProject; label: string }> }>({ past: [], future: [] });
   const [counts, setCounts] = useState({ past: 0, future: 0 });
   const [dirty, setDirty] = useState(false);
-  const [sceneId, setSceneId] = useState<string>("");
+  const [mapId, setMapId] = useState<string>("");
   const [mode, setMode] = useState<MapMode>("map");
   const [tool, setTool] = useState<"pen" | "fill">("pen");
   const [brush, setBrush] = useState(".");
@@ -47,6 +65,7 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
   const [selected, setSelected] = useState<{ x: number; y: number } | null>(null);
   const [preview, setPreview] = useState<Map<string, string>>(new Map());
   const [db, setDb] = useState<{ tab: DbTab; focusId: string | null } | null>(null);
+  const [editing, setEditing] = useState<{ event: MapEvent; isNew: boolean } | null>(null);
   const [log, setLog] = useState<Array<{ ok: boolean; text: string }>>([]);
   const projectRef = useRef<GameProject | null>(null);
   const baseVersionRef = useRef<number | undefined>(undefined);
@@ -63,23 +82,26 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
     setDirty(v);
   };
 
-  const loadRemote = useCallback(async (message?: string) => {
-    try {
-      const r = await studioApi.getProject(projectId);
-      projectRef.current = r.project;
-      baseVersionRef.current = r.version;
-      setBaseVersion(r.version);
-      setProject(r.project);
-      setSceneId((s) => (r.project.scenes.some((x) => x.id === s) ? s : r.project.startSceneId));
-      historyRef.current = { past: [], future: [] };
-      setCounts({ past: 0, future: 0 });
-      markDirty(false);
-      setConflict(null);
-      if (message) setToast(message);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 404) setNotFound(true);
-    }
-  }, [projectId]);
+  const loadRemote = useCallback(
+    async (message?: string) => {
+      try {
+        const r = await studioApi.getProject(projectId);
+        projectRef.current = r.project;
+        baseVersionRef.current = r.version;
+        setBaseVersion(r.version);
+        setProject(r.project);
+        setMapId((s) => (r.project.maps.some((x) => x.id === s) ? s : r.project.system.start.mapId));
+        historyRef.current = { past: [], future: [] };
+        setCounts({ past: 0, future: 0 });
+        markDirty(false);
+        setConflict(null);
+        if (message) setToast(message);
+      } catch (e) {
+        if (e instanceof ApiError && e.status === 404) setNotFound(true);
+      }
+    },
+    [projectId],
+  );
 
   useEffect(() => {
     void loadRemote();
@@ -90,6 +112,13 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
       // 無法記住導覽狀態時略過
     }
   }, [loadRemote, initialDb]);
+
+  // 每次修改都廣播給測試遊玩視窗（不用等儲存）
+  useEffect(() => {
+    if (!project) return;
+    const t = window.setTimeout(() => broadcastProject(projectId, project), 400);
+    return () => window.clearTimeout(t);
+  }, [project, projectId]);
 
   const report = useMemo(() => (project ? applyOps(project, []).report : null), [project]);
 
@@ -191,9 +220,13 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const playtest = useCallback(async () => {
-    if (await save()) window.open(`/studio/play/?id=${encodeURIComponent(projectId)}`, "_blank");
-  }, [save, projectId]);
+  /** 測試遊玩：先存檔，再開新分頁；query 可指定章節或位置 */
+  const playtest = useCallback(
+    async (query = "") => {
+      if (await save()) window.open(`/studio/play/?id=${encodeURIComponent(projectId)}${query}`, "rpg-studio-play");
+    },
+    [save, projectId],
+  );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -203,21 +236,21 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
       if (mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
         void save();
-      } else if (!typing && mod && e.key.toLowerCase() === "z") {
+      } else if (!typing && mod && e.key.toLowerCase() === "z" && !editing) {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
       } else if (e.key === "F9") {
         e.preventDefault();
-        setDb((d) => (d ? null : { tab: "dialogues", focusId: null }));
+        setDb((d) => (d ? null : { tab: "actors", focusId: null }));
       } else if (e.key === "F5") {
         e.preventDefault();
         void playtest();
-      } else if (e.key === "Escape") setDb(null);
+      } else if (e.key === "Escape" && !editing) setDb(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [save, undo, redo, playtest]);
+  }, [save, undo, redo, playtest, editing]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -237,12 +270,13 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
     );
   }
   if (!project || !report) return <div className="container muted">載入中…</div>;
-  const scene = project.scenes.find((s) => s.id === sceneId) ?? project.scenes[0];
-  const tileset = project.assetManifest.assets.find((a) => a.id === scene.tilesetId);
+  const map = project.maps.find((m) => m.id === mapId) ?? project.maps[0];
+  const tileset = project.assetManifest.assets.find((a) => a.id === map.tilesetId);
+  const cellEvents = selected ? map.events.filter((e) => e.x === selected.x && e.y === selected.y) : [];
 
   const paint = (x: number, y: number) => {
     if (tool === "fill") {
-      dispatch([{ op: "scene.fill", sceneId: scene.id, x, y, ch: brush }]);
+      dispatch([{ op: "map.fill", mapId: map.id, x, y, ch: brush }]);
       return;
     }
     setPreview((m) => {
@@ -254,21 +288,52 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
   };
   const paintEnd = () => {
     if (preview.size > 0) {
-      dispatch([{ op: "scene.paint", sceneId: scene.id, cells: [...preview].map(([k, ch]) => ({ x: Number(k.split(",")[0]), y: Number(k.split(",")[1]), ch })) }]);
+      dispatch([{ op: "map.paint", mapId: map.id, cells: [...preview].map(([k, ch]) => ({ x: Number(k.split(",")[0]), y: Number(k.split(",")[1]), ch })) }]);
     }
     setPreview(new Map());
   };
 
-  const addScene = () => {
-    const name = window.prompt("新地圖名稱", "新地圖");
+  const addMap = (parentId?: string) => {
+    const name = window.prompt(parentId ? "子地圖名稱（例如：民宅內部）" : "新地圖名稱", "新地圖");
     if (!name) return;
     const size = window.prompt("寬×高（例如 20x15）", "20x15") ?? "20x15";
     const [w, h] = size.split(/[x×*]/).map((n) => Number.parseInt(n, 10));
     let i = 1;
-    while (project.scenes.some((s) => s.id === `map_${i}`)) i++;
-    dispatch([{ op: "scene.add", id: `map_${i}`, name, width: Math.min(64, Math.max(5, w || 20)), height: Math.min(64, Math.max(5, h || 15)) }]);
-    setSceneId(`map_${i}`);
+    while (project.maps.some((s) => s.id === `map_${i}`)) i++;
+    dispatch([{ op: "map.add", id: `map_${i}`, name, width: Math.min(64, Math.max(5, w || 20)), height: Math.min(64, Math.max(5, h || 15)), ...(parentId ? { parentId } : {}) }]);
+    setMapId(`map_${i}`);
   };
+
+  const openEvent = (x: number, y: number) => {
+    const existing = map.events.find((e) => e.x === x && e.y === y);
+    setSelected({ x, y });
+    setEditing(existing ? { event: existing, isNew: false } : { event: { id: uniqueEventId(map), name: `事件 ${map.events.length + 1}`, x, y, pages: [emptyPage()] }, isNew: true });
+  };
+
+  const testMenu = (
+    <select
+      className="btn small"
+      value=""
+      onChange={(e) => {
+        const v = e.target.value;
+        if (v === "here" && selected) void playtest(`&map=${map.id}&x=${selected.x}&y=${selected.y}`);
+        else if (v.startsWith("ch:")) void playtest(`&chapter=${encodeURIComponent(v.slice(3))}`);
+        e.target.value = "";
+      }}
+      title="從某一章或選取的位置開始測試"
+      data-testid="play-from"
+    >
+      <option value="">從…開始 ▾</option>
+      {project.chapters.map((c) => (
+        <option key={c.id} value={`ch:${c.id}`} disabled={!c.testStart}>
+          {c.title}
+        </option>
+      ))}
+      <option value="here" disabled={!selected}>
+        從選取的位置（{selected ? `${selected.x},${selected.y}` : "先點地圖"}）
+      </option>
+    </select>
+  );
 
   return (
     <div className="studio-app">
@@ -318,22 +383,25 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
             ＋
           </button>
         </div>
-        <button className="btn small" onClick={() => setDb({ tab: "dialogues", focusId: null })} title="資料庫（F9）" data-testid="open-database">
+        <button className="btn small" onClick={() => setDb({ tab: "actors", focusId: null })} title="資料庫（F9）" data-testid="open-database">
           📚 資料庫
         </button>
         <span className="grow" />
         <button className={`badge ${report.isValid ? "ok" : "err"}`} onClick={() => setDb({ tab: "validation", focusId: null })} data-testid="validation-badge">
           {report.isValid ? `✓ 驗證通過${report.warnings.length ? `（${report.warnings.length} 警告）` : ""}` : `✗ ${report.errors.length} 個錯誤`}
         </button>
-        <button className="btn small" onClick={() => downloadJson(`${project.id}.json`, exportProjectJson(project))}>
+        <button className="btn small" onClick={() => downloadJson(`${project.id}.json`, JSON.stringify(project, null, 2))}>
           匯出
         </button>
         <button className="btn small" onClick={() => setTour(0)} title="重新顯示導覽">
           ？導覽
         </button>
-        <button className="btn small primary" onClick={() => void playtest()} title="測試遊玩（F5）" data-testid="studio-play">
-          ▶ 測試遊玩
-        </button>
+        <div className="tool-group">
+          <button className="btn small primary" onClick={() => void playtest()} title="從頭測試遊玩（F5）" data-testid="studio-play">
+            ▶ 測試遊玩
+          </button>
+          {testMenu}
+        </div>
       </div>
 
       <div className="studio-main">
@@ -348,26 +416,27 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
             </div>
           ) : (
             <div className="panel-section small muted">
-              事件模式：點格子選取事件，雙擊空格新增 NPC、調查點、撿取物、出口或地點。
-              <div style={{ marginTop: 8 }}>
-                圖例：👤 NPC・<span style={{ color: "#ff7ad9" }}>！</span>調查點・⇄ 出口・<span style={{ color: "#f2b84b" }}>■</span>地點・S 玩家起點
-              </div>
+              事件模式：點格子選取，雙擊開啟「事件編輯」（空格會新增事件）；按住事件拖曳可以移動位置。
+              <div style={{ marginTop: 8 }}>圖例：角色圖＝人物・<span style={{ color: "#ff7ad9" }}>！</span>確定鍵事件・◇ 接觸事件・▶ 自動執行・⇄ 場所移動・S 玩家起點；右上角數字＝事件頁數</div>
             </div>
           )}
           <div className="panel-section">
             <div className="row">
               <div className="section-title grow">地圖</div>
-              <button className="btn small" onClick={addScene} data-testid="add-scene">
+              <button className="btn small" onClick={() => addMap()} data-testid="add-map" title="新增地圖">
                 ＋
+              </button>
+              <button className="btn small" onClick={() => addMap(map.id)} title="在目前地圖底下新增子地圖">
+                ＋子
               </button>
             </div>
             <div className="map-tree">
-              {project.scenes.map((s) => (
-                <button key={s.id} className={`map-node${s.id === scene.id ? " active" : ""}`} onClick={() => setSceneId(s.id)}>
-                  🗺 {s.name}
+              {mapTree(project.maps).map(({ map: m, depth }) => (
+                <button key={m.id} className={`map-node${m.id === map.id ? " active" : ""}`} style={{ paddingLeft: 6 + depth * 14 }} onClick={() => setMapId(m.id)}>
+                  {depth > 0 ? "└ " : ""}🗺 {m.name}
                   <span className="muted small">
                     {" "}
-                    {s.width}×{s.height}
+                    {m.width}×{m.height}・{m.events.length} 事件
                   </span>
                 </button>
               ))}
@@ -375,11 +444,11 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
             <div className="stack" style={{ gap: 6, marginTop: 8 }}>
               <label className="field">
                 名稱
-                <input key={`n-${scene.id}-${scene.name}`} type="text" defaultValue={scene.name} onBlur={(e) => e.target.value && e.target.value !== scene.name && dispatch([{ op: "scene.update", id: scene.id, name: e.target.value }])} />
+                <input key={`n-${map.id}-${map.name}`} type="text" defaultValue={map.name} onBlur={(e) => e.target.value && e.target.value !== map.name && dispatch([{ op: "map.update", id: map.id, name: e.target.value }])} />
               </label>
               <label className="field">
                 背景音樂
-                <select value={scene.music ?? "adventure"} onChange={(e) => dispatch([{ op: "scene.update", id: scene.id, music: e.target.value as (typeof MUSIC_MOODS)[number] }])}>
+                <select value={map.music ?? "adventure"} onChange={(e) => dispatch([{ op: "map.update", id: map.id, music: e.target.value as (typeof MUSIC_MOODS)[number] }])}>
                   {MUSIC_MOODS.map((m) => (
                     <option key={m} value={m}>
                       {MUSIC_LABELS[m]}
@@ -391,14 +460,14 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
                 <button
                   className="btn small"
                   onClick={() => {
-                    const size = window.prompt("新的寬×高", `${scene.width}x${scene.height}`);
+                    const size = window.prompt("新的寬×高", `${map.width}x${map.height}`);
                     const [w, h] = (size ?? "").split(/[x×*]/).map((n) => Number.parseInt(n, 10));
-                    if (w && h) dispatch([{ op: "scene.resize", id: scene.id, width: Math.min(64, Math.max(3, w)), height: Math.min(64, Math.max(3, h)) }]);
+                    if (w && h) dispatch([{ op: "map.resize", id: map.id, width: Math.min(64, Math.max(3, w)), height: Math.min(64, Math.max(3, h)) }]);
                   }}
                 >
                   調整大小
                 </button>
-                <button className="btn small danger" disabled={project.scenes.length <= 1} onClick={() => window.confirm(`刪除地圖「${scene.name}」？`) && dispatch([{ op: "scene.remove", id: scene.id }])}>
+                <button className="btn small danger" disabled={project.maps.length <= 1} onClick={() => window.confirm(`刪除地圖「${map.name}」與上面的所有事件？`) && dispatch([{ op: "map.remove", id: map.id }])}>
                   刪除
                 </button>
               </div>
@@ -409,7 +478,7 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
         <main className="studio-center">
           <MapCanvas
             project={project}
-            scene={scene}
+            scene={map}
             mode={mode}
             zoom={zoom}
             selected={selected}
@@ -417,15 +486,75 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
             onPaint={paint}
             onPaintEnd={paintEnd}
             onSelect={(x, y) => setSelected({ x, y })}
-            onCreate={(x, y) => setSelected({ x, y })}
+            onCreate={openEvent}
+            onMoveEvent={(id, x, y) => dispatch([{ op: "event.move", mapId: map.id, id, x, y }])}
           />
         </main>
 
         <aside className="studio-right">
           {mode === "event" && selected ? (
-            <EventEditor project={project} scene={scene} cell={selected} dispatch={dispatch} openDialogue={(id) => setDb({ tab: "dialogues", focusId: id })} />
+            <div className="stack" style={{ gap: 10 }} data-testid="cell-panel">
+              <div className="section-title">
+                {map.name} ({selected.x},{selected.y})・{TERRAIN[[...map.terrain[selected.y]][selected.x]]?.name}
+              </div>
+              {cellEvents.map((ev) => (
+                <div key={ev.id} className="panel-section stack" style={{ gap: 6 }}>
+                  <div className="row">
+                    <strong className="grow">{ev.name}</strong>
+                    <span className="mono small muted">{ev.id}</span>
+                  </div>
+                  {ev.pages.map((pg, i) => (
+                    <div key={i} className="small muted">
+                      第 {i + 1} 頁：{describePageConditions(project, pg)}｜{TRIGGER_LABEL[pg.trigger]}｜{pg.commands.length} 個指令
+                    </div>
+                  ))}
+                  {ev.note && <div className="small">📝 {ev.note}</div>}
+                  <div className="row">
+                    <button className="btn small primary" onClick={() => setEditing({ event: ev, isNew: false })} data-testid="edit-event">
+                      編輯事件
+                    </button>
+                    <button className="btn small danger" onClick={() => window.confirm(`刪除事件「${ev.name}」？`) && dispatch([{ op: "event.remove", mapId: map.id, id: ev.id }])}>
+                      刪除
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {cellEvents.length === 0 && (
+                <>
+                  <button className="btn small primary" onClick={() => openEvent(selected.x, selected.y)} data-testid="new-event">
+                    ＋ 新增事件（空白）
+                  </button>
+                  <div className="section-title">快速事件建立</div>
+                  <div className="quick-grid">
+                    {QUICK_EVENTS.map(([kind, label, hint]) => (
+                      <button
+                        key={kind}
+                        className="btn small"
+                        title={hint}
+                        data-testid={`quick-${kind}`}
+                        onClick={() => setEditing({ event: quickEvent(kind, project, map, selected.x, selected.y), isNew: true })}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="row">
+                <button
+                  className="btn small"
+                  disabled={!map.walkable[selected.y]?.[selected.x]}
+                  onClick={() => dispatch([{ op: "system.update", start: { mapId: map.id, x: selected.x, y: selected.y } }])}
+                >
+                  設為玩家起點
+                </button>
+                <button className="btn small" disabled={!map.walkable[selected.y]?.[selected.x]} onClick={() => void playtest(`&map=${map.id}&x=${selected.x}&y=${selected.y}`)} data-testid="play-here">
+                  ▶ 從這裡測試
+                </button>
+              </div>
+            </div>
           ) : (
-            <div className="small muted">{mode === "event" ? "點選地圖上的格子來編輯事件。" : "選擇圖塊後在地圖上拖曳繪製；切到「事件」模式來放置 NPC 與調查點。"}</div>
+            <div className="small muted">{mode === "event" ? "點選地圖上的格子來查看或新增事件。" : "選擇圖塊後在地圖上拖曳繪製；切到「事件」模式來放置人物、門、寶箱與劇情。"}</div>
           )}
           <div className="op-log" data-testid="op-log">
             <div className="section-title">操作紀錄</div>
@@ -502,6 +631,23 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
           </div>
         </div>
       )}
+      {editing && (
+        <EventEditor
+          key={`${editing.event.id}:${editing.isNew}`}
+          project={project}
+          event={editing.event}
+          isNew={editing.isNew}
+          onCancel={() => setEditing(null)}
+          onDelete={() => {
+            dispatch([{ op: "event.remove", mapId: map.id, id: editing.event.id }]);
+            setEditing(null);
+          }}
+          onOk={(event, close) => {
+            dispatch([{ op: "event.upsert", mapId: map.id, event }]);
+            setEditing(close ? null : { event, isNew: false });
+          }}
+        />
+      )}
       {db && (
         <Database
           project={project}
@@ -511,6 +657,7 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
           dispatch={dispatch}
           onTab={(tab, focusId) => setDb({ tab, focusId: focusId ?? null })}
           onClose={() => setDb(null)}
+          onTestChapter={(id) => void playtest(`&chapter=${encodeURIComponent(id)}`)}
         />
       )}
     </div>

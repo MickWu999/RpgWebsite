@@ -1,59 +1,34 @@
 import { findCatalogAsset, TERRAIN } from "./assets";
-import {
-  SCHEMA_VERSION,
-  gameProjectSchema,
-  type GameCondition,
-  type GameEffect,
-  type GameProject,
-  type SceneDefinition,
-} from "./schema";
+import { allConditions, allSources, walkCommands, walkCondition, walkProject } from "./commands";
+import { SCHEMA_VERSION, gameProjectSchema, type EventCommand, type GameCondition, type GameProject, type MapDefinition } from "./schema";
 
 /**
- * GameProject 驗證：先做 schema 驗證，再做引用、地圖、任務依賴、對話圖與結局可達性等邏輯驗證（SPEC §6.1、§8.1）。
- * 驗證結果由程式產生，AI 修復流程也只使用這裡回傳的錯誤。
+ * GameProject 驗證：先做 schema 驗證，再做邏輯驗證（引用、地形、事件頁、指令、標籤、自動執行、共用事件遞迴、地圖可達性、物品取得方式）。
+ * 驗證結果由程式產生；人和 AI 都依這裡回傳的錯誤修正。
  */
 
 export type ValidationIssue = { path: string; message: string };
-export type ValidationReport = {
-  isValid: boolean;
-  errors: ValidationIssue[];
-  warnings: ValidationIssue[];
-};
+export type ValidationReport = { isValid: boolean; errors: ValidationIssue[]; warnings: ValidationIssue[] };
 export type ValidationResult = ValidationReport & { project?: GameProject };
 
-export const MAX_PROJECT_BYTES = 512 * 1024;
+export const MAX_PROJECT_BYTES = 2 * 1024 * 1024;
 
 export function validateProject(input: unknown): ValidationResult {
-  const errors: ValidationIssue[] = [];
-
   if (typeof input !== "object" || input === null || Array.isArray(input)) {
     return { isValid: false, errors: [{ path: "", message: "GameProject 必須是 JSON 物件" }], warnings: [] };
   }
   const version = (input as Record<string, unknown>).schemaVersion;
   if (version !== SCHEMA_VERSION) {
-    return {
-      isValid: false,
-      errors: [
-        {
-          path: "schemaVersion",
-          message: `不支援的 schemaVersion「${String(version)}」，目前只接受 ${SCHEMA_VERSION}（尚無 migration 流程）`,
-        },
-      ],
-      warnings: [],
-    };
+    return { isValid: false, errors: [{ path: "schemaVersion", message: `不支援的 schemaVersion「${String(version)}」，目前只接受 ${SCHEMA_VERSION}` }], warnings: [] };
   }
   if (JSON.stringify(input).length > MAX_PROJECT_BYTES) {
-    return { isValid: false, errors: [{ path: "", message: `專案資料超過 ${MAX_PROJECT_BYTES / 1024} KB 上限` }], warnings: [] };
+    return { isValid: false, errors: [{ path: "", message: `專案資料超過 ${MAX_PROJECT_BYTES / 1024 / 1024} MB 上限` }], warnings: [] };
   }
-
   const parsed = gameProjectSchema.safeParse(input);
   if (!parsed.success) {
-    for (const issue of parsed.error.issues) {
-      errors.push({ path: issue.path.join("."), message: translateZodMessage(issue.message, issue.code) });
-    }
+    const errors = parsed.error.issues.map((i) => ({ path: i.path.join("."), message: translateZodMessage(i.message, i.code) }));
     return { isValid: false, errors: errors.slice(0, 50), warnings: [] };
   }
-
   const report = validateLogic(parsed.data);
   return { ...report, project: report.isValid ? parsed.data : undefined };
 }
@@ -61,18 +36,12 @@ export function validateProject(input: unknown): ValidationResult {
 function translateZodMessage(message: string, code: string) {
   if (code === "invalid_type") return `型別錯誤：${message}`;
   if (code === "unrecognized_keys") return `不允許的欄位：${message}`;
-  if (code === "invalid_union") return `不支援的 effect／condition 或格式錯誤：${message}`;
+  if (code === "invalid_union") return `不支援的指令／條件或格式錯誤：${message}`;
   return message;
 }
 
-// ---------- 邏輯驗證 ----------
-
-function walkConditions(condition: GameCondition | undefined, visit: (c: GameCondition, negated: boolean) => void, negated = false) {
-  if (!condition) return;
-  visit(condition, negated);
-  if (condition.type === "all" || condition.type === "any") condition.conditions.forEach((c) => walkConditions(c, visit, negated));
-  if (condition.type === "not") walkConditions(condition.condition, visit, !negated);
-}
+/** 會讓自動執行事件停下來的指令（沒有這些指令的自動執行頁會無限重複） */
+const CLOSING_CODES = new Set<EventCommand["code"]>(["selfSwitch", "switch", "variable", "transfer", "erase", "ending", "quest", "item", "chapter"]);
 
 export function validateLogic(project: GameProject): ValidationReport {
   const errors: ValidationIssue[] = [];
@@ -80,365 +49,262 @@ export function validateLogic(project: GameProject): ValidationReport {
   const err = (path: string, message: string) => errors.push({ path, message });
   const warn = (path: string, message: string) => warnings.push({ path, message });
 
-  // --- ID 唯一性 ---
-  const uniq = (label: string, path: string, ids: string[]) => {
+  const ids = (name: string, list: Array<{ id: string }>) => {
     const seen = new Set<string>();
-    ids.forEach((id, i) => {
-      if (seen.has(id)) err(`${path}[${i}]`, `${label} ID「${id}」重複`);
-      seen.add(id);
-    });
+    for (const x of list) {
+      if (seen.has(x.id)) err(name, `ID「${x.id}」重複`);
+      seen.add(x.id);
+    }
     return seen;
   };
-  const sceneIds = uniq("場景", "scenes", project.scenes.map((s) => s.id));
-  const npcIds = uniq("NPC", "npcs", project.npcs.map((n) => n.id));
-  const nodeIds = uniq("對話節點", "dialogues", project.dialogues.map((d) => d.id));
-  const questIds = uniq("任務", "quests", project.quests.map((q) => q.id));
-  const itemIds = uniq("物品", "items", project.items.map((i) => i.id));
-  uniq("結局", "endings", project.endings.map((e) => e.id));
-  uniq("素材", "assetManifest.assets", project.assetManifest.assets.map((a) => a.id));
-  const choiceIds = uniq("對話選項", "dialogues.choices", project.dialogues.flatMap((d) => (d.choices ?? []).map((c) => c.id)));
-  const locationIds = uniq("地點", "scenes.locations", project.scenes.flatMap((s) => (s.locations ?? []).map((l) => l.id)));
-  uniq("撿取物", "scenes.pickups", project.scenes.flatMap((s) => (s.pickups ?? []).map((p) => p.id)));
-  const interactableIds = uniq("調查點", "scenes.interactables", project.scenes.flatMap((s) => (s.interactables ?? []).map((o) => o.id)));
-  project.quests.forEach((q, qi) => uniq("任務目標", `quests[${qi}].objectives`, q.objectives.map((o) => o.id)));
+  const actors = ids("actors", project.actors);
+  const items = ids("items", project.items);
+  const quests = new Map(project.quests.map((q) => [q.id, q]));
+  ids("quests", project.quests);
+  const endings = ids("endings", project.endings);
+  const chapters = ids("chapters", project.chapters);
+  const switches = ids("switches", project.switches);
+  const variables = ids("variables", project.variables);
+  const commons = ids("commonEvents", project.commonEvents);
+  const maps = new Map(project.maps.map((m) => [m.id, m]));
+  ids("maps", project.maps);
 
-  const sceneById = new Map(project.scenes.map((s) => [s.id, s]));
-  const inBounds = (scene: SceneDefinition, x: number, y: number) => x >= 0 && y >= 0 && x < scene.width && y < scene.height;
-  const walkableAt = (scene: SceneDefinition, x: number, y: number) => inBounds(scene, x, y) && scene.walkable[y]?.[x] === true;
+  const assetOk = (id: string | undefined) => !id || project.assetManifest.assets.some((a) => a.id === id) || Boolean(findCatalogAsset(id));
+  const asset = (path: string, id: string | undefined) => assetOk(id) || err(path, `素材「${id}」不在素材庫中`);
 
-  // --- 條件與效果的引用 ---
-  const checkCondition = (path: string, condition: GameCondition | undefined) =>
-    walkConditions(condition, (c) => {
-      if ((c.type === "quest_completed" || c.type === "quest_active") && !questIds.has(c.questId)) err(path, `條件引用了不存在的任務「${c.questId}」`);
-      if (c.type === "has_item" && !itemIds.has(c.itemId)) err(path, `條件引用了不存在的物品「${c.itemId}」`);
+  // ---------- 系統 ----------
+  const start = project.system.start;
+  const startMap = maps.get(start.mapId);
+  if (!startMap) err("system.start", `起始地圖「${start.mapId}」不存在`);
+  else if (!startMap.walkable[start.y]?.[start.x]) err("system.start", `起始位置 (${start.x},${start.y}) 不可通行`);
+  if (!actors.has(project.system.playerActorId)) err("system.playerActorId", `主角「${project.system.playerActorId}」不在角色資料庫中`);
+  project.system.initialItems.forEach((it, i) => items.has(it.itemId) || err(`system.initialItems[${i}]`, `物品「${it.itemId}」不存在`));
+  project.actors.forEach((a, i) => asset(`actors[${i}].spriteAssetId`, a.spriteAssetId));
+  project.items.forEach((it, i) => asset(`items[${i}].iconAssetId`, it.iconAssetId));
+  project.cover?.characterAssetIds?.forEach((id, i) => asset(`cover.characterAssetIds[${i}]`, id));
+  if (project.cover?.mapId && !maps.has(project.cover.mapId)) err("cover.mapId", `封面地圖「${project.cover.mapId}」不存在`);
+
+  // ---------- 地圖 ----------
+  for (const m of project.maps) {
+    const at = `maps.${m.id}`;
+    if (m.terrain.length !== m.height) err(at, `地形列數 ${m.terrain.length} 與地圖高度 ${m.height} 不一致`);
+    m.terrain.forEach((row, y) => {
+      const chars = [...row];
+      if (chars.length !== m.width) err(`${at}.terrain[${y}]`, `第 ${y} 列有 ${chars.length} 格，地圖寬度是 ${m.width}`);
+      const unknown = [...new Set(chars.filter((c) => !TERRAIN[c]))];
+      if (unknown.length) err(`${at}.terrain[${y}]`, `未知的地形字元「${unknown.join("")}」`);
     });
-  const checkEffects = (path: string, effects: GameEffect[] | undefined) =>
-    (effects ?? []).forEach((e, i) => {
-      if ((e.type === "give_item" || e.type === "remove_item") && !itemIds.has(e.itemId)) err(`${path}[${i}]`, `效果引用了不存在的物品「${e.itemId}」`);
-      if (e.type === "complete_quest" && !questIds.has(e.questId)) err(`${path}[${i}]`, `效果引用了不存在的任務「${e.questId}」`);
-    });
-  const checkAsset = (path: string, id: string | undefined, kind?: string) => {
-    if (!id) return;
-    const asset = project.assetManifest.assets.find((a) => a.id === id);
-    if (!asset) err(path, `引用了素材清單中不存在的素材「${id}」`);
-    else if (kind && asset.kind !== kind) err(path, `素材「${id}」的類型是 ${asset.kind}，此處需要 ${kind}`);
-  };
-
-  // --- 素材：必須來自內建素材庫，避免虛構素材或授權 ---
-  project.assetManifest.assets.forEach((asset, i) => {
-    const known = findCatalogAsset(asset.id);
-    if (!known) err(`assetManifest.assets[${i}]`, `素材「${asset.id}」不在內建素材庫中（不可引用未登錄或未確認授權的素材）`);
-    else if (known.src !== asset.src || known.frame !== asset.frame) err(`assetManifest.assets[${i}]`, `素材「${asset.id}」的路徑或圖塊編號與素材庫不一致`);
-  });
-
-  // --- 玩家 ---
-  if (!sceneIds.has(project.startSceneId)) err("startSceneId", `起始場景「${project.startSceneId}」不存在`);
-  const start = project.player.startPosition;
-  const startScene = sceneById.get(start.sceneId);
-  if (!startScene) err("player.startPosition.sceneId", `玩家起始場景「${start.sceneId}」不存在`);
-  else if (!walkableAt(startScene, start.x, start.y)) err("player.startPosition", "玩家起始位置超出地圖或位於不可行走區域");
-  if (start.sceneId !== project.startSceneId) warn("player.startPosition.sceneId", "玩家起始場景與 startSceneId 不同，將以玩家起始場景為準");
-  project.player.inventoryItemIds.forEach((id, i) => {
-    if (!itemIds.has(id)) err(`player.inventoryItemIds[${i}]`, `初始物品「${id}」不存在`);
-  });
-  checkAsset("player.spriteAssetId", project.player.spriteAssetId, "character");
-
-  // --- 封面 ---
-  if (project.cover?.sceneId && !sceneIds.has(project.cover.sceneId)) err("cover.sceneId", `封面場景「${project.cover.sceneId}」不存在`);
-  project.cover?.characterAssetIds?.forEach((id, i) => checkAsset(`cover.characterAssetIds[${i}]`, id, "character"));
-
-  // --- 場景 ---
-  project.scenes.forEach((scene, si) => {
-    const p = `scenes[${si}]`;
-    if (scene.walkable.length !== scene.height || scene.walkable.some((row) => row.length !== scene.width)) {
-      err(`${p}.walkable`, `walkable 陣列尺寸必須是 ${scene.height} 列 × ${scene.width} 欄`);
-    }
-    if (scene.terrain) {
-      if (scene.terrain.length !== scene.height || scene.terrain.some((row) => [...row].length !== scene.width)) {
-        err(`${p}.terrain`, `terrain 尺寸必須是 ${scene.height} 列 × ${scene.width} 字元`);
-      } else {
-        scene.terrain.forEach((row, y) =>
-          [...row].forEach((ch, x) => {
-            const def = TERRAIN[ch];
-            if (!def) err(`${p}.terrain[${y}]`, `未知的地形字元「${ch}」（位置 ${x},${y}）`);
-            else if (def.walkable !== scene.walkable[y]?.[x]) warn(`${p}.terrain[${y}]`, `位置 ${x},${y} 的地形「${def.name}」與 walkable 設定不一致`);
-          }),
-        );
-      }
-    }
-    checkAsset(`${p}.tilesetId`, scene.tilesetId, "tileset");
-    checkAsset(`${p}.backgroundAssetId`, scene.backgroundAssetId, "background");
-    scene.exits.forEach((exit, ei) => {
-      const ep = `${p}.exits[${ei}]`;
-      if (!walkableAt(scene, exit.x, exit.y)) err(ep, "出口位置超出地圖或位於不可行走區域");
-      const target = sceneById.get(exit.targetSceneId);
-      if (!target) err(ep, `出口目標場景「${exit.targetSceneId}」不存在`);
-      else if (!walkableAt(target, exit.targetX, exit.targetY)) err(ep, "出口目標位置超出地圖或位於不可行走區域");
-    });
-    scene.npcIds.forEach((id, ni) => {
-      const npc = project.npcs.find((n) => n.id === id);
-      if (!npc) err(`${p}.npcIds[${ni}]`, `場景引用了不存在的 NPC「${id}」`);
-      else if (npc.sceneId !== scene.id) err(`${p}.npcIds[${ni}]`, `NPC「${id}」的 sceneId 是「${npc.sceneId}」，與此場景不符`);
-    });
-    (scene.locations ?? []).forEach((loc, li) => {
-      if (!inBounds(scene, loc.x, loc.y) || !inBounds(scene, loc.x + (loc.width ?? 1) - 1, loc.y + (loc.height ?? 1) - 1)) {
-        err(`${p}.locations[${li}]`, `地點「${loc.id}」超出地圖`);
-      }
-    });
-    (scene.interactables ?? []).forEach((o, oi) => {
-      const op = `${p}.interactables[${oi}]`;
-      if (!inBounds(scene, o.x, o.y)) err(op, `調查點「${o.name}」超出地圖`);
-      if (!nodeIds.has(o.dialogueNodeId)) err(`${op}.dialogueNodeId`, `調查點「${o.name}」的對話節點「${o.dialogueNodeId}」不存在`);
-      (o.dialogueVariants ?? []).forEach((v, vi) => {
-        if (!nodeIds.has(v.dialogueNodeId)) err(`${op}.dialogueVariants[${vi}]`, `調查點的分支節點「${v.dialogueNodeId}」不存在`);
-        checkCondition(`${op}.dialogueVariants[${vi}].condition`, v.condition);
+    if (m.walkable.length !== m.height || m.walkable.some((r) => r.length !== m.width)) err(`${at}.walkable`, "walkable 尺寸與地圖不一致（請用操作 API 修改地形，會自動重算）");
+    asset(`${at}.tilesetId`, m.tilesetId);
+    if (m.parentId && !maps.has(m.parentId)) err(`${at}.parentId`, `上層地圖「${m.parentId}」不存在`);
+    const eventIds = new Set<string>();
+    for (const e of m.events) {
+      const ep = `${at}.events.${e.id}`;
+      if (eventIds.has(e.id)) err(ep, `事件 ID「${e.id}」在這張地圖重複`);
+      eventIds.add(e.id);
+      if (e.x >= m.width || e.y >= m.height) err(ep, `事件位置 (${e.x},${e.y}) 超出地圖範圍`);
+      e.pages.forEach((p, i) => {
+        const pp = `${ep}.pages[${i}]`;
+        asset(`${pp}.graphic`, p.graphic?.assetId);
+        const c = p.conditions;
+        c?.switches?.forEach((id) => switches.has(id) || err(pp, `出現條件的開關「${id}」未定義`));
+        if (c?.variable && !variables.has(c.variable.id)) err(pp, `出現條件的變數「${c.variable.id}」未定義`);
+        if (c?.itemId && !items.has(c.itemId)) err(pp, `出現條件的物品「${c.itemId}」不存在`);
+        if (c?.quest && !quests.has(c.quest.questId)) err(pp, `出現條件的任務「${c.quest.questId}」不存在`);
+        if (p.trigger === "autorun" && !hasClosing(p.commands)) err(pp, "自動執行的頁面沒有任何會改變狀態的指令（例如打開獨立開關），會無限重複執行");
+        if (p.trigger === "touch" && p.priority === "same" && !p.graphic) warn(pp, "透明的同層接觸事件只會在玩家「撞到」時觸發；觸發區通常應設為「在角色下」");
       });
-      if (project.npcs.some((n) => n.sceneId === scene.id && n.position.x === o.x && n.position.y === o.y)) err(op, `調查點「${o.name}」與 NPC 重疊`);
-      if (scene.exits.some((e) => e.x === o.x && e.y === o.y)) err(op, `調查點「${o.name}」與出口重疊`);
-    });
-    (scene.pickups ?? []).forEach((pk, pi) => {
-      if (!walkableAt(scene, pk.x, pk.y)) err(`${p}.pickups[${pi}]`, `撿取物「${pk.id}」超出地圖或位於不可行走區域`);
-      if (!itemIds.has(pk.itemId)) err(`${p}.pickups[${pi}]`, `撿取物引用了不存在的物品「${pk.itemId}」`);
-      checkCondition(`${p}.pickups[${pi}].condition`, pk.condition);
-    });
-  });
-
-  // --- NPC ---
-  project.npcs.forEach((npc, ni) => {
-    const p = `npcs[${ni}]`;
-    const scene = sceneById.get(npc.sceneId);
-    if (!scene) err(`${p}.sceneId`, `NPC「${npc.name}」所在場景「${npc.sceneId}」不存在`);
-    else {
-      if (!inBounds(scene, npc.position.x, npc.position.y)) err(`${p}.position`, `NPC「${npc.name}」位置超出地圖`);
-      else if (!walkableAt(scene, npc.position.x, npc.position.y)) warn(`${p}.position`, `NPC「${npc.name}」站在不可行走的地形上`);
-      if (!scene.npcIds.includes(npc.id)) warn(`${p}.sceneId`, `場景「${scene.id}」的 npcIds 沒有列出 NPC「${npc.id}」`);
     }
-    if (!nodeIds.has(npc.dialogueNodeId)) err(`${p}.dialogueNodeId`, `NPC「${npc.name}」的對話節點「${npc.dialogueNodeId}」不存在`);
-    (npc.dialogueVariants ?? []).forEach((v, vi) => {
-      if (!nodeIds.has(v.dialogueNodeId)) err(`${p}.dialogueVariants[${vi}]`, `對話分支節點「${v.dialogueNodeId}」不存在`);
-      checkCondition(`${p}.dialogueVariants[${vi}].condition`, v.condition);
-    });
-    (npc.questIds ?? []).forEach((id, qi) => {
-      if (!questIds.has(id)) err(`${p}.questIds[${qi}]`, `NPC 引用了不存在的任務「${id}」`);
-    });
-    checkAsset(`${p}.spriteAssetId`, npc.spriteAssetId, "character");
-  });
-  const occupied = new Set(project.npcs.map((n) => `${n.sceneId}:${n.position.x},${n.position.y}`));
-  if (occupied.size !== project.npcs.length) warn("npcs", "有多個 NPC 站在同一格");
-  if (occupied.has(`${start.sceneId}:${start.x},${start.y}`)) err("player.startPosition", "玩家起始位置與 NPC 重疊");
-  if (startScene?.interactables?.some((o) => o.x === start.x && o.y === start.y)) err("player.startPosition", "玩家起始位置與調查點重疊");
-
-  // --- 對話 ---
-  const referencedNodes = new Set<string>();
-  project.npcs.forEach((n) => {
-    referencedNodes.add(n.dialogueNodeId);
-    n.dialogueVariants?.forEach((v) => referencedNodes.add(v.dialogueNodeId));
-  });
-  project.scenes.forEach((sc) =>
-    sc.interactables?.forEach((o) => {
-      referencedNodes.add(o.dialogueNodeId);
-      o.dialogueVariants?.forEach((v) => referencedNodes.add(v.dialogueNodeId));
-    }),
-  );
-  project.dialogues.forEach((node, di) => {
-    (node.choices ?? []).forEach((choice, ci) => {
-      const p = `dialogues[${di}].choices[${ci}]`;
-      if (choice.nextNodeId) {
-        referencedNodes.add(choice.nextNodeId);
-        if (!nodeIds.has(choice.nextNodeId)) err(`${p}.nextNodeId`, `對話選項指向不存在的節點「${choice.nextNodeId}」`);
+    for (let i = 0; i < m.events.length; i++)
+      for (let j = i + 1; j < m.events.length; j++)
+        if (m.events[i].x === m.events[j].x && m.events[i].y === m.events[j].y) warn(at, `事件「${m.events[i].name}」與「${m.events[j].name}」在同一格 (${m.events[i].x},${m.events[i].y})`);
+  }
+  // 地圖樹不可循環
+  for (const m of project.maps) {
+    const seen = new Set<string>();
+    for (let cur: MapDefinition | undefined = m; cur?.parentId; cur = maps.get(cur.parentId)) {
+      if (seen.has(cur.id)) {
+        err(`maps.${m.id}.parentId`, "地圖樹的上層關係形成循環");
+        break;
       }
-      checkEffects(`${p}.effects`, choice.effects);
-      checkCondition(`${p}.condition`, choice.condition);
-    });
-  });
-  project.dialogues.forEach((node, di) => {
-    if (!referencedNodes.has(node.id)) warn(`dialogues[${di}]`, `對話節點「${node.id}」沒有任何 NPC 或選項會進入`);
+      seen.add(cur.id);
+    }
+  }
+
+  // ---------- 共用事件 ----------
+  project.commonEvents.forEach((c, i) => {
+    if (c.trigger === "autorun") {
+      if (!c.switchId) err(`commonEvents[${i}]`, `自動執行的共用事件「${c.name}」需要指定開關`);
+      else if (!switches.has(c.switchId)) err(`commonEvents[${i}]`, `開關「${c.switchId}」未定義`);
+      if (!hasClosing(c.commands)) err(`commonEvents[${i}]`, `自動執行的共用事件「${c.name}」沒有會改變狀態的指令，會無限重複執行`);
+    }
   });
 
-  // --- 任務 ---
-  project.quests.forEach((quest, qi) => {
-    const p = `quests[${qi}]`;
-    checkCondition(`${p}.startCondition`, quest.startCondition);
-    checkEffects(`${p}.rewards`, quest.rewards);
-    quest.objectives.forEach((o, oi) => {
-      const op = `${p}.objectives[${oi}]`;
-      const ok =
-        (o.type === "talk_to_npc" && npcIds.has(o.targetId)) ||
-        (o.type === "collect_item" && itemIds.has(o.targetId)) ||
-        (o.type === "reach_location" && locationIds.has(o.targetId)) ||
-        (o.type === "make_choice" && choiceIds.has(o.targetId)) ||
-        (o.type === "inspect" && interactableIds.has(o.targetId));
-      if (!ok) err(op, `任務目標「${o.description}」指向不存在的${{ talk_to_npc: " NPC", collect_item: "物品", reach_location: "地點", make_choice: "對話選項", inspect: "調查點" }[o.type]}「${o.targetId}」`);
+  // ---------- 指令 ----------
+  const usedEndings = new Set<string>();
+  const usedQuests = new Set<string>();
+  const callGraph = new Map<string, Set<string>>();
+  for (const s of allSources(project)) {
+    const labels = new Map<string, number>();
+    s.commands.forEach((c) => c.code === "label" && labels.set(c.name, (labels.get(c.name) ?? 0) + 1));
+    for (const [name, n] of labels) if (n > 1) err(s.label, `標籤「${name}」重複`);
+    const from = s.source.kind === "common" ? s.source.id : `@${s.label}`;
+    walkCommands(s.commands, (cmd, ctx) => {
+      const p = `${s.label}［${[...ctx.path, ctx.index].join(".")}］`;
+      switch (cmd.code) {
+        case "text":
+          if (cmd.actorId && !actors.has(cmd.actorId)) err(p, `顯示文字的角色「${cmd.actorId}」不存在`);
+          break;
+        case "switch":
+          cmd.ids.forEach((id) => switches.has(id) || err(p, `開關「${id}」未定義`));
+          break;
+        case "variable":
+          if (!variables.has(cmd.id)) err(p, `變數「${cmd.id}」未定義`);
+          break;
+        case "item":
+          if (!items.has(cmd.itemId)) err(p, `物品「${cmd.itemId}」不存在`);
+          break;
+        case "quest": {
+          usedQuests.add(cmd.questId);
+          const q = quests.get(cmd.questId);
+          if (!q) err(p, `任務「${cmd.questId}」不存在`);
+          else if (cmd.step !== undefined && cmd.step >= q.steps.length) err(p, `任務「${q.title}」只有 ${q.steps.length} 個步驟（step 從 0 起算），沒有 step ${cmd.step}`);
+          break;
+        }
+        case "transfer": {
+          const target = maps.get(cmd.mapId);
+          if (!target) err(p, `場所移動的目標地圖「${cmd.mapId}」不存在`);
+          else if (!target.walkable[cmd.y]?.[cmd.x]) err(p, `場所移動的目標 ${target.name} (${cmd.x},${cmd.y}) 不可通行`);
+          break;
+        }
+        case "ending":
+          usedEndings.add(cmd.endingId);
+          if (!endings.has(cmd.endingId)) err(p, `結局「${cmd.endingId}」不存在`);
+          break;
+        case "chapter":
+          if (!chapters.has(cmd.chapterId)) err(p, `章節「${cmd.chapterId}」不存在`);
+          break;
+        case "common":
+          if (!commons.has(cmd.id)) err(p, `共用事件「${cmd.id}」不存在`);
+          else (callGraph.get(from) ?? callGraph.set(from, new Set()).get(from)!).add(cmd.id);
+          break;
+        case "jump":
+          if (!labels.has(cmd.name)) err(p, `跳轉的標籤「${cmd.name}」不存在（標籤必須放在同一個事件頁的最外層）`);
+          break;
+        case "label":
+          if (ctx.path.length > 0) err(p, `標籤「${cmd.name}」放在分支裡；標籤只能放在最外層`);
+          break;
+        case "selfSwitch":
+          if (s.source.kind === "common") warn(p, "共用事件裡的獨立開關，作用在「呼叫它的事件」上");
+          break;
+      }
     });
-  });
-
-  // 任務依賴循環：A 的開始條件需要 B，B 又需要 A
-  const deps = new Map<string, string[]>();
-  project.quests.forEach((q) => {
-    const list: string[] = [];
-    walkConditions(q.startCondition, (c, negated) => {
-      if (!negated && (c.type === "quest_completed" || c.type === "quest_active")) list.push(c.questId);
-    });
-    deps.set(q.id, list);
-  });
+  }
+  // 共用事件互相呼叫形成循環
   const visiting = new Set<string>();
   const done = new Set<string>();
-  const visit = (id: string, trail: string[]): void => {
-    if (done.has(id)) return;
-    if (visiting.has(id)) {
-      err("quests", `任務依賴形成循環：${[...trail, id].join(" → ")}，任務將無法解鎖`);
-      return;
-    }
+  const dfs = (id: string): boolean => {
+    if (visiting.has(id)) return true;
+    if (done.has(id)) return false;
     visiting.add(id);
-    (deps.get(id) ?? []).forEach((d) => visit(d, [...trail, id]));
+    const cyc = [...(callGraph.get(id) ?? [])].some(dfs);
     visiting.delete(id);
     done.add(id);
+    return cyc;
   };
-  project.quests.forEach((q) => visit(q.id, []));
+  for (const c of project.commonEvents) if (dfs(c.id)) err(`commonEvents.${c.id}`, `共用事件「${c.name}」直接或間接呼叫了自己`);
 
-  // --- 結局 ---
-  project.endings.forEach((e, ei) => {
-    checkCondition(`endings[${ei}].condition`, e.condition);
-    e.epilogues?.forEach((x, xi) => checkCondition(`endings[${ei}].epilogues[${xi}].condition`, x.condition));
+  // ---------- 條件 ----------
+  const conditionRefs = (c: GameCondition, path: string) =>
+    walkCondition(c, (a) => {
+      if (a.type === "switch" && !switches.has(a.id)) err(path, `條件中的開關「${a.id}」未定義`);
+      if (a.type === "variable" && !variables.has(a.id)) err(path, `條件中的變數「${a.id}」未定義`);
+      if (a.type === "item" && !items.has(a.itemId)) err(path, `條件中的物品「${a.itemId}」不存在`);
+      if (a.type === "chapter" && !chapters.has(a.chapterId)) err(path, `條件中的章節「${a.chapterId}」不存在`);
+      if (a.type === "quest") {
+        const q = quests.get(a.questId);
+        if (!q) err(path, `條件中的任務「${a.questId}」不存在`);
+        else if (a.step !== undefined && a.step >= q.steps.length) err(path, `任務「${q.title}」沒有 step ${a.step}`);
+      }
+    });
+  allConditions(project).forEach((c) => conditionRefs(c, "conditions"));
+
+  // ---------- 章節 ----------
+  project.chapters.forEach((ch, i) => {
+    const t = ch.testStart;
+    if (!t) return warn(`chapters[${i}]`, `章節「${ch.title}」沒有設定測試起點，無法「從這一章開始測試」`);
+    const m = maps.get(t.mapId);
+    if (!m) err(`chapters[${i}].testStart`, `地圖「${t.mapId}」不存在`);
+    else if (!m.walkable[t.y]?.[t.x]) err(`chapters[${i}].testStart`, `測試起點 (${t.x},${t.y}) 不可通行`);
+    t.switches?.forEach((id) => switches.has(id) || err(`chapters[${i}].testStart`, `開關「${id}」未定義`));
+    Object.keys(t.variables ?? {}).forEach((id) => variables.has(id) || err(`chapters[${i}].testStart`, `變數「${id}」未定義`));
+    Object.keys(t.items ?? {}).forEach((id) => items.has(id) || err(`chapters[${i}].testStart`, `物品「${id}」不存在`));
+    Object.keys(t.quests ?? {}).forEach((id) => quests.has(id) || err(`chapters[${i}].testStart`, `任務「${id}」不存在`));
   });
 
-  // 引用錯誤會讓後續分析失準，先回報
-  if (errors.length > 0) return { isValid: false, errors, warnings };
+  // ---------- 結局、任務 ----------
+  project.endings.forEach((e, i) => usedEndings.has(e.id) || err(`endings[${i}]`, `結局「${e.title}」沒有任何「結局」指令會觸發它`));
+  project.quests.forEach((q, i) => usedQuests.has(q.id) || warn(`quests[${i}]`, `任務「${q.title}」沒有被任何指令使用`));
 
-  checkReachability(project, err);
+  checkReachability(project, warn);
   checkObtainability(project, err, warn);
-  return { isValid: errors.length === 0, errors, warnings };
+  return { isValid: errors.length === 0, errors: errors.slice(0, 80), warnings: warnings.slice(0, 80) };
 }
 
-/** 從玩家起點出發，跨出口做 BFS，確認 NPC、撿取物與任務地點都走得到 */
-function checkReachability(project: GameProject, err: (path: string, message: string) => void) {
-  const sceneById = new Map(project.scenes.map((s) => [s.id, s]));
-  const blocked = new Set([
-    ...project.npcs.map((n) => `${n.sceneId}:${n.position.x},${n.position.y}`),
-    ...project.scenes.flatMap((sc) => (sc.interactables ?? []).map((o) => `${sc.id}:${o.x},${o.y}`)),
-  ]);
-  const reached = new Set<string>();
-  const start = project.player.startPosition;
-  const queue: Array<[string, number, number]> = [[start.sceneId, start.x, start.y]];
-  reached.add(`${start.sceneId}:${start.x},${start.y}`);
-  while (queue.length > 0) {
-    const [sid, x, y] = queue.shift()!;
-    const scene = sceneById.get(sid)!;
-    const next: Array<[string, number, number]> = [];
-    const exit = scene.exits.find((e) => e.x === x && e.y === y);
-    if (exit) next.push([exit.targetSceneId, exit.targetX, exit.targetY]);
-    else
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (scene.walkable[ny]?.[nx] === true && !blocked.has(`${sid}:${nx},${ny}`)) next.push([sid, nx, ny]);
-      }
-    for (const n of next) {
-      const key = `${n[0]}:${n[1]},${n[2]}`;
-      if (!reached.has(key)) {
-        reached.add(key);
-        queue.push(n);
-      }
+function hasClosing(list: EventCommand[]) {
+  let found = false;
+  walkCommands(list, (c) => {
+    if (CLOSING_CODES.has(c.code)) found = true;
+  });
+  return found;
+}
+
+/** 從起始地圖沿著「場所移動」指令能到達哪些地圖（共用事件的場所移動視為任何地圖都能使用） */
+function checkReachability(project: GameProject, warn: (path: string, message: string) => void) {
+  const edges = new Map<string, Set<string>>();
+  const global = new Set<string>();
+  for (const s of allSources(project)) {
+    walkCommands(s.commands, (c) => {
+      if (c.code !== "transfer") return;
+      if (s.source.kind === "common") global.add(c.mapId);
+      else (edges.get(s.source.mapId) ?? edges.set(s.source.mapId, new Set()).get(s.source.mapId)!).add(c.mapId);
+    });
+  }
+  for (const ch of project.chapters) if (ch.testStart) global.add(ch.testStart.mapId);
+  const seen = new Set([project.system.start.mapId, ...global]);
+  const queue = [...seen];
+  while (queue.length) {
+    for (const next of edges.get(queue.shift()!) ?? []) {
+      if (seen.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
     }
   }
-  const isReached = (sid: string, x: number, y: number) => reached.has(`${sid}:${x},${y}`);
-
-  project.npcs.forEach((npc, i) => {
-    const near = [-1, 0, 1].some((dx) => [-1, 0, 1].some((dy) => (dx || dy) && isReached(npc.sceneId, npc.position.x + dx, npc.position.y + dy)));
-    if (!near) err(`npcs[${i}]`, `從玩家起點走不到 NPC「${npc.name}」旁邊，無法對話`);
-  });
-  project.scenes.forEach((scene, si) => {
-    (scene.interactables ?? []).forEach((o, oi) => {
-      const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isReached(scene.id, o.x + dx, o.y + dy));
-      if (!near) err(`scenes[${si}].interactables[${oi}]`, `從玩家起點走不到調查點「${o.name}」的正前方，無法調查`);
-    });
-    (scene.pickups ?? []).forEach((pk, pi) => {
-      if (!isReached(scene.id, pk.x, pk.y)) err(`scenes[${si}].pickups[${pi}]`, `從玩家起點走不到撿取物「${pk.id}」`);
-    });
-    (scene.locations ?? []).forEach((loc, li) => {
-      let ok = false;
-      for (let dy = 0; dy < (loc.height ?? 1) && !ok; dy++)
-        for (let dx = 0; dx < (loc.width ?? 1) && !ok; dx++) ok = isReached(scene.id, loc.x + dx, loc.y + dy);
-      if (!ok) err(`scenes[${si}].locations[${li}]`, `從玩家起點走不到地點「${loc.name}」`);
-    });
-  });
+  for (const m of project.maps) if (!seen.has(m.id)) warn(`maps.${m.id}`, `地圖「${m.name}」沒有任何場所移動可以到達`);
 }
 
-/**
- * 靜態可達性：條件需要的旗標值、物品與任務完成，必須在資料中有對應的取得來源。
- * 這是保守的必要條件檢查，不保證所有分支組合都能走到。
- */
-function checkObtainability(
-  project: GameProject,
-  err: (path: string, message: string) => void,
-  warn: (path: string, message: string) => void,
-) {
-  const flagValues = new Set<string>();
-  const obtainableItems = new Set<string>(project.player.inventoryItemIds);
-  const completable = new Set<string>();
-  const allEffects: GameEffect[] = [
-    ...project.dialogues.flatMap((d) => (d.choices ?? []).flatMap((c) => c.effects ?? [])),
-    ...project.quests.flatMap((q) => q.rewards ?? []),
-  ];
-  for (const e of allEffects) {
-    if (e.type === "set_flag") flagValues.add(`${e.flag}=${JSON.stringify(e.value)}`);
-    if (e.type === "give_item") obtainableItems.add(e.itemId);
-    if (e.type === "complete_quest") completable.add(e.questId);
-  }
-  project.scenes.forEach((s) => (s.pickups ?? []).forEach((p) => obtainableItems.add(p.itemId)));
-  project.quests.forEach((q) => completable.add(q.id));
-
-  const unmet = (condition: GameCondition | undefined): string[] => {
-    const problems: string[] = [];
-    walkConditions(condition, (c, negated) => {
-      if (negated) return;
-      if (c.type === "flag_equals" && !flagValues.has(`${c.flag}=${JSON.stringify(c.value)}`)) problems.push(`旗標 ${c.flag}=${JSON.stringify(c.value)} 沒有任何效果會設定`);
-      if (c.type === "has_item" && !obtainableItems.has(c.itemId)) problems.push(`物品「${c.itemId}」沒有任何取得方式`);
-      if ((c.type === "quest_completed" || c.type === "quest_active") && !completable.has(c.questId)) problems.push(`任務「${c.questId}」無法完成`);
-    });
-    // any 只要求其中一個成立；簡化處理：any 底下有問題只列為警告
-    return problems;
-  };
-  const hasAny = (condition: GameCondition | undefined): boolean => {
-    let found = false;
-    walkConditions(condition, (c) => {
-      if (c.type === "any") found = true;
-    });
-    return found;
-  };
-
-  project.endings.forEach((ending, i) => {
-    const problems = unmet(ending.condition);
-    if (problems.length) (hasAny(ending.condition) ? warn : err)(`endings[${i}]`, `結局「${ending.title}」可能無法達成：${problems.join("；")}`);
+/** 物品：被消耗或被條件需要，卻沒有任何取得方式；開關：被讀取卻從未被打開 */
+function checkObtainability(project: GameProject, err: (path: string, message: string) => void, warn: (path: string, message: string) => void) {
+  const gained = new Set(project.system.initialItems.map((i) => i.itemId));
+  const consumed = new Set<string>();
+  const turnedOn = new Set<string>();
+  walkProject(project, (c) => {
+    if (c.code === "item") (c.delta > 0 ? gained : consumed).add(c.itemId);
+    if (c.code === "switch" && c.value) c.ids.forEach((id) => turnedOn.add(id));
   });
-  project.quests.forEach((quest, i) => {
-    const problems = unmet(quest.startCondition);
-    if (problems.length) (hasAny(quest.startCondition) ? warn : err)(`quests[${i}].startCondition`, `任務「${quest.title}」可能無法開始：${problems.join("；")}`);
-    quest.objectives.forEach((o, oi) => {
-      if (o.type === "collect_item" && !obtainableItems.has(o.targetId)) err(`quests[${i}].objectives[${oi}]`, `任務目標需要的物品「${o.targetId}」沒有任何取得方式`);
-    });
+  project.chapters.forEach((ch) => {
+    Object.keys(ch.testStart?.items ?? {}).forEach((id) => gained.add(id));
+    ch.testStart?.switches?.forEach((id) => turnedOn.add(id));
   });
-  project.dialogues.forEach((d, di) =>
-    (d.choices ?? []).forEach((c, ci) =>
-      (c.effects ?? []).forEach((e, ei) => {
-        if (e.type === "remove_item" && !obtainableItems.has(e.itemId)) {
-          err(`dialogues[${di}].choices[${ci}].effects[${ei}]`, `移除物品「${e.itemId}」，但這個物品沒有任何取得方式（台詞與道具狀態不一致）`);
-        }
-      }),
-    ),
-  );
-  project.scenes.forEach((sc, si) =>
-    (sc.interactables ?? []).forEach((o, oi) =>
-      (o.dialogueVariants ?? []).forEach((v, vi) => {
-        const problems = unmet(v.condition);
-        if (problems.length) warn(`scenes[${si}].interactables[${oi}].dialogueVariants[${vi}]`, `調查點分支可能永遠不會出現：${problems.join("；")}`);
-      }),
-    ),
-  );
-  project.npcs.forEach((npc, i) =>
-    (npc.dialogueVariants ?? []).forEach((v, vi) => {
-      const problems = unmet(v.condition);
-      if (problems.length) warn(`npcs[${i}].dialogueVariants[${vi}]`, `對話分支可能永遠不會出現：${problems.join("；")}`);
+  for (const id of consumed) if (!gained.has(id)) err("items", `物品「${project.items.find((i) => i.id === id)?.name ?? id}」會被交出，卻沒有任何取得方式`);
+  const needed = new Set<string>();
+  const readSwitches = new Set<string>();
+  allConditions(project).forEach((c) =>
+    walkCondition(c, (a) => {
+      if (a.type === "item") needed.add(a.itemId);
+      if (a.type === "switch" && a.value) readSwitches.add(a.id);
     }),
   );
+  for (const id of needed) if (!gained.has(id)) warn("items", `條件需要物品「${project.items.find((i) => i.id === id)?.name ?? id}」，但遊戲中沒有任何取得方式`);
+  for (const id of readSwitches) if (!turnedOn.has(id)) warn("switches", `開關「${project.switches.find((s) => s.id === id)?.name ?? id}」被當成條件，卻從來沒有被打開`);
 }

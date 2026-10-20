@@ -90,3 +90,10 @@ export class ClaudeCodeProvider implements StoryProvider {
     });
   }
 }
+
+export function providerFromEnv(): StoryProvider | null {
+  const name = (process.env.AI_PROVIDER ?? "claude-code").toLowerCase();
+  if (name === "none") return null;
+  if (name === "claude-code") return new ClaudeCodeProvider();
+  throw new ProviderError(`不支援的 AI_PROVIDER：${name}`, "unavailable");
+}

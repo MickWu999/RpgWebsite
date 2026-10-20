@@ -1,27 +1,26 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import demoFixture from "../public/games/demo-lantern/project.json";
 import { runPlaytest } from "@/game/playtest";
 import { assessQuality } from "@/game/quality";
 import { validateProject } from "@/game/validate";
 
 /**
  * 給 AI／自動化流程使用的檢查指令：schema 驗證 → 邏輯驗證 → 自動試玩 → 量化品質指標（不使用 AI）。
- *   npm run validate -- <project.json|demo> [--json]
+ *   npm run validate -- <project.json> [--json] [--demo]
  * 結束碼：0 = 全部通過；1 = 用法錯誤；2 = 驗證、自動試玩或品質指標未通過。
  * --json 會輸出單一 JSON 物件：{ ok, validation: {isValid, errors, warnings}, playtest, quality }
  */
 
-const { values, positionals } = parseArgs({ allowPositionals: true, options: { json: { type: "boolean" } } });
+const { values, positionals } = parseArgs({ allowPositionals: true, options: { json: { type: "boolean" }, demo: { type: "boolean" } } });
 const target = positionals[0];
 if (!target) {
-  console.error("用法：npm run validate -- <project.json|demo> [--json]");
+  console.error("用法：npm run validate -- <project.json> [--json] [--demo]");
   process.exit(1);
 }
 
 let input: unknown;
 try {
-  input = target === "demo" ? demoFixture : JSON.parse(readFileSync(target, "utf8"));
+  input = JSON.parse(readFileSync(target, "utf8"));
 } catch (e) {
   const out = { ok: false, validation: { isValid: false, errors: [{ path: "", message: `無法讀取 JSON：${(e as Error).message}` }], warnings: [] }, playtest: null };
   console.log(values.json ? JSON.stringify(out, null, 2) : out.validation.errors[0].message);
@@ -30,7 +29,7 @@ try {
 
 const validation = validateProject(input);
 const playtest = validation.project ? runPlaytest(validation.project) : null;
-const quality = validation.project && playtest ? assessQuality(validation.project, playtest, { checkDuration: target !== "demo" }) : null;
+const quality = validation.project && playtest ? assessQuality(validation.project, playtest, { checkDuration: !values.demo }) : null;
 const ok = validation.isValid && Boolean(playtest?.ok) && quality?.blocking.length === 0;
 const result = {
   ok,
@@ -47,7 +46,7 @@ if (values.json) {
   validation.warnings.forEach((w) => console.log(`  ⚠ ${w.path}：${w.message}`));
   if (playtest) {
     console.log(`自動試玩：${playtest.ok ? "通過" : "失敗"}（探索 ${playtest.statesExplored} 個狀態${playtest.truncated ? "，已達上限被截斷" : ""}）`);
-    for (const e of playtest.endings) {
+    for (const e of playtest.goals) {
       console.log(`  ${e.reachable ? "✓" : "✗"} ${e.title}${e.reachable ? `（${e.steps!.length} 步）` : "：找不到路線"}`);
       e.steps?.forEach((s, i) => console.log(`      ${i + 1}. ${s}`));
     }

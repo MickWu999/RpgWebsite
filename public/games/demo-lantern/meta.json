@@ -1,5 +1,6 @@
 {
   "status": "demo",
-  "source": "handwritten",
-  "note": "手寫 fixture，Phase 1 垂直切片"
+  "source": "ai-agent",
+  "review": null,
+  "publishedAt": "2026-10-20T18:14:15.329Z"
 }

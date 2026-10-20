@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type RefObject } from "react";
-import type { AssetDefinition, DialogueChoice, NPCDefinition } from "@/game/schema";
+import type { AssetDefinition, Voice } from "@/game/schema";
 import { CHAR_INTERVAL_MS, getAudio } from "@/lib/audio";
 import type { VoiceMode } from "@/lib/settings";
 import Portrait from "./Portrait";
@@ -30,15 +30,15 @@ export default function MessageWindow({
 }: {
   speaker?: string;
   text: string;
-  voice?: NPCDefinition["voice"];
+  voice?: Voice;
   portrait?: AssetDefinition;
   portraitSize?: number;
   speedFactor: number;
   voiceMode?: VoiceMode;
-  choices: DialogueChoice[];
+  choices: Array<{ index: number; text: string }>;
   cursor: number;
   controlRef: RefObject<TypingControl>;
-  onChoose: (choiceId: string) => void;
+  onChoose: (index: number) => void;
   onContinue: () => void;
 }) {
   const chars = useMemo(() => [...text], [text]);
@@ -74,7 +74,7 @@ export default function MessageWindow({
       {!typing && choices.length > 0 && (
         <div className="rm-window rm-choices" role="listbox" aria-label="選項">
           {choices.map((c, i) => (
-            <button key={c.id} className={`rm-item${i === cursor ? " selected" : ""}`} data-choice-id={c.id} onClick={() => onChoose(c.id)}>
+            <button key={c.index} className={`rm-item${i === cursor ? " selected" : ""}`} data-choice-index={c.index} onClick={() => onChoose(c.index)}>
               {c.text}
             </button>
           ))}

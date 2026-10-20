@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { describeCondition, describeEffect } from "@/game/describe";
+import { describeCommandList, describeCondition, describePageConditions, PRIORITY_LABEL, TRIGGER_LABEL } from "@/game/describe";
 import type { PlaytestReport } from "@/game/playtest";
 import type { QualityReport } from "@/game/quality";
 import type { GameProject } from "@/game/schema";
@@ -56,48 +56,46 @@ ${REVIEW_RUBRIC}
 每個問題都要具體指出位置（NPC、對話節點 ID、任務或結局）並給出可以直接執行的修改建議。
 所有文字使用繁體中文（台灣用語）。`;
 
-/** 把 GameProject 轉成審查員容易閱讀的劇本摘要 */
-export function projectDigest(project: GameProject, playtest: PlaytestReport): string {
+/** 把 GameProject 轉成審查員（與 AI agent）容易閱讀的 RPG Maker 式摘要：資料庫＋每個事件頁的執行內容 */
+export function projectDigest(project: GameProject, playtest: PlaytestReport | null): string {
   const lines: string[] = [`# ${project.title}（${project.genre}）`, project.description, project.intro ?? "", ""];
-  lines.push("## 場景");
-  for (const s of project.scenes) {
-    const pickups = (s.pickups ?? []).map((p) => `${project.items.find((i) => i.id === p.itemId)?.name ?? p.itemId}${p.condition ? `（出現條件：${describeCondition(project, p.condition)}）` : ""}`);
-    const exits = s.exits.map((e) => `往 ${e.targetSceneId}`);
-    lines.push(`- ${s.name}（${s.id}）：NPC ${s.npcIds.join("、") || "無"}；地點 ${(s.locations ?? []).map((l) => l.name).join("、") || "無"}；地上可撿 ${pickups.join("、") || "無"}；出口 ${exits.join("、") || "無"}`);
-    for (const o of s.interactables ?? []) {
-      lines.push(`  - 調查點「${o.name}」（${o.id}）：預設 ${o.dialogueNodeId}`);
-      for (const v of o.dialogueVariants ?? []) lines.push(`    - 若 ${describeCondition(project, v.condition)} → ${v.dialogueNodeId}`);
-    }
-  }
-  lines.push("", "## NPC");
-  for (const n of project.npcs) {
-    lines.push(`- ${n.name}（${n.id}）：${n.description}；預設對話 ${n.dialogueNodeId}`);
-    for (const v of n.dialogueVariants ?? []) lines.push(`  - 若 ${describeCondition(project, v.condition)} → ${v.dialogueNodeId}`);
-  }
-  lines.push("", "## 對話");
-  for (const d of project.dialogues) {
-    lines.push(`- [${d.id}] ${d.speaker}：「${d.text}」`);
-    for (const c of d.choices ?? []) {
-      const effects = (c.effects ?? []).map((e) => describeEffect(project, e)).join("；");
-      lines.push(`  - 選項「${c.text}」→ ${c.nextNodeId ?? "結束對話"}${effects ? `（${effects}）` : ""}${c.condition ? `［條件：${describeCondition(project, c.condition)}］` : ""}`);
-    }
-  }
+  lines.push("## 角色");
+  for (const a of project.actors) lines.push(`- ${a.name}（${a.id}）${a.id === project.system.playerActorId ? "［主角］" : ""}${a.profile ? `：${a.profile}` : ""}`);
+  lines.push("", "## 章節");
+  project.chapters.forEach((c, i) => lines.push(`${i + 1}. ${c.title}（${c.id}）${c.summary ? `：${c.summary}` : ""}`));
   lines.push("", "## 任務");
   for (const q of project.quests) {
-    lines.push(`- ${q.title}：${q.description}${q.startCondition ? `（開始條件：${describeCondition(project, q.startCondition)}）` : ""}`);
-    q.objectives.forEach((o, i) => lines.push(`  ${i + 1}. ${o.description}`));
-    if (q.rewards?.length) lines.push(`  完成獎勵：${q.rewards.map((r) => describeEffect(project, r)).join("；")}`);
+    lines.push(`- ${q.title}（${q.id}）：${q.description}`);
+    q.steps.forEach((st, i) => lines.push(`  step ${i}. ${st.text}`));
   }
   lines.push("", "## 物品");
   for (const i of project.items) lines.push(`- ${i.name}（${i.id}）：${i.description}`);
-  lines.push(`玩家初始物品：${project.player.inventoryItemIds.join("、") || "無"}`);
+  lines.push(`初始物品：${project.system.initialItems.map((i) => `${i.itemId}×${i.count}`).join("、") || "無"}`);
   lines.push("", "## 結局");
   for (const e of project.endings) {
-    lines.push(`- ${e.title}（條件：${describeCondition(project, e.condition)}）：${e.text}`);
+    lines.push(`- ${e.title}（${e.id}）：${e.text}`);
     for (const x of e.epilogues ?? []) lines.push(`  - 尾聲（若 ${describeCondition(project, x.condition)}）：${x.text}`);
   }
-  lines.push("", "## 自動試玩找到的最短通關路線");
-  for (const e of playtest.endings) lines.push(`- ${e.title}：${e.reachable ? e.steps!.join(" → ") : "無法達成"}`);
+  lines.push("", "## 共用事件");
+  for (const c of project.commonEvents) {
+    lines.push(`### ${c.name}（${c.id}，${c.trigger === "autorun" ? `開關 ${c.switchId} ON 時自動執行` : "被呼叫時執行"}）`);
+    lines.push(...describeCommandList(project, c.commands));
+  }
+  lines.push("", "## 地圖與事件");
+  for (const m of project.maps) {
+    lines.push(`### ${m.name}（${m.id}，${m.width}×${m.height}${m.parentId ? `，上層 ${m.parentId}` : ""}）`);
+    for (const e of m.events) {
+      lines.push(`#### 事件「${e.name}」（${e.id}）@ (${e.x},${e.y})${e.note ? `｜${e.note}` : ""}`);
+      e.pages.forEach((pg, i) => {
+        lines.push(`第 ${i + 1} 頁｜條件：${describePageConditions(project, pg)}｜${TRIGGER_LABEL[pg.trigger]}｜${PRIORITY_LABEL[pg.priority]}｜圖像：${pg.graphic?.assetId ?? "無"}`);
+        lines.push(...describeCommandList(project, pg.commands, "  "));
+      });
+    }
+  }
+  if (playtest) {
+    lines.push("", "## 自動試玩找到的最短通關路線");
+    for (const g of playtest.goals) lines.push(`- ${g.title}：${g.reachable ? g.steps!.join(" → ") : "無法達成"}`);
+  }
   return lines.join("\n");
 }
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import type * as PhaserNS from "phaser";
 import { TERRAIN, TERRAIN_BASE_FRAME } from "@/game/assets";
-import { facedInteractable, findNearbyNpc, getScene, npcsInScene, visiblePickups, type PlayerState } from "@/game/engine";
+import { facedTile, getMap, isBusy, visibleEvents, type PlayerState } from "@/game/engine";
 import type { AssetDefinition, GameProject } from "@/game/schema";
 
 /**
@@ -29,9 +29,9 @@ function createWorldScene(
   return class WorldScene extends Phaser.Scene {
     private layer!: PhaserNS.GameObjects.Container;
     private player!: PhaserNS.GameObjects.Image | PhaserNS.GameObjects.Arc;
-    private npcLabels = new Map<string, PhaserNS.GameObjects.Text>();
     private marker: PhaserNS.GameObjects.Text | null = null;
-    private pickupSprites = new Map<string, PhaserNS.GameObjects.GameObject & { setVisible: (v: boolean) => unknown }>();
+    /** 目前畫面上的地圖與事件外觀；改變時重畫 */
+    private signature: string | null = null;
     private currentSceneId: string | null = null;
     private last: { x: number; y: number } | null = null;
 
@@ -70,7 +70,7 @@ function createWorldScene(
         resize: (height) => {
           this.scale.resize(VIEW_WIDTH, height);
           if (!this.currentSceneId) return;
-          const scene = getScene(project, this.currentSceneId);
+          const scene = getMap(project, this.currentSceneId);
           const ts = scene.tileSize;
           this.cameras.main.setBounds(0, 0, Math.max(scene.width * ts, VIEW_WIDTH), Math.max(scene.height * ts, height));
         },
@@ -79,7 +79,7 @@ function createWorldScene(
 
     private tapWorld(worldX: number, worldY: number) {
       if (!this.currentSceneId) return;
-      const ts = getScene(project, this.currentSceneId).tileSize;
+      const ts = getMap(project, this.currentSceneId).tileSize;
       const x = Math.floor(worldX / ts);
       const y = Math.floor(worldY / ts);
       const flash = this.add.rectangle(x * ts + ts / 2, y * ts + ts / 2, ts, ts, 0xffffff, 0.35);
@@ -94,78 +94,64 @@ function createWorldScene(
       return null;
     }
 
+    /** 地圖與事件外觀的指紋：換地圖、事件頁切換（例如寶箱打開、NPC 出現）時重畫 */
+    private signatureOf(state: PlayerState) {
+      return `${state.mapId}|${visibleEvents(project, state)
+        .map((v) => `${v.event.id}:${v.index}:${v.page.graphic?.assetId ?? ""}`)
+        .join(",")}`;
+    }
+
     private build(state: PlayerState) {
-      const scene = getScene(project, state.sceneId);
+      const scene = getMap(project, state.mapId);
       const ts = scene.tileSize;
       this.layer.removeAll(true);
-      this.npcLabels.clear();
-      this.pickupSprites.clear();
       const tileset = scene.tilesetId ? assets.get(scene.tilesetId) : undefined;
-      const useTiles = Boolean(scene.terrain && tileset && this.textures.exists(tileset.src));
+      const useTiles = Boolean(tileset && this.textures.exists(tileset.src));
 
       for (let y = 0; y < scene.height; y++) {
         for (let x = 0; x < scene.width; x++) {
           const cx = x * ts + ts / 2;
           const cy = y * ts + ts / 2;
-          const def = scene.terrain ? TERRAIN[[...scene.terrain[y]][x]] : undefined;
+          const def = TERRAIN[[...scene.terrain[y]][x]];
           if (useTiles && def && tileset) {
             if (def.overlay) this.layer.add(this.add.image(cx, cy, tileset.src, TERRAIN_BASE_FRAME).setDisplaySize(ts, ts));
             this.layer.add(this.add.image(cx, cy, tileset.src, def.frame).setDisplaySize(ts, ts));
           } else {
-            const walk = scene.walkable[y]?.[x];
-            const color = Phaser.Display.Color.HexStringToColor((walk ? scene.colors?.floor : scene.colors?.wall) ?? (walk ? "#7fa36a" : "#3a4630")).color;
+            const color = scene.walkable[y]?.[x] ? 0x7fa36a : 0x3a4630;
             this.layer.add(this.add.rectangle(cx, cy, ts, ts, color).setStrokeStyle(1, 0x000000, 0.08));
           }
         }
       }
 
-      for (const loc of scene.locations ?? []) {
-        const w = (loc.width ?? 1) * ts;
-        const h = (loc.height ?? 1) * ts;
-        const rect = this.add.rectangle(loc.x * ts + w / 2, loc.y * ts + h / 2, w, h, 0xf2b84b, 0.12).setStrokeStyle(2, 0xf2b84b, 0.5);
-        this.layer.add(rect);
-      }
-
-      for (const exit of scene.exits) {
-        const cx = exit.x * ts + ts / 2;
-        const cy = exit.y * ts + ts / 2;
-        this.layer.add(this.add.rectangle(cx, cy, ts, ts, 0x6fc3a4, 0.25).setStrokeStyle(2, 0x6fc3a4, 0.8));
-        if (exit.label) {
-          // 出口通常在地圖邊緣，名牌要夾在地圖範圍內才不會被切掉
-          const label = this.label(cx, cy - ts * 0.75, exit.label, "#c9f1e1");
+      for (const { event, page } of visibleEvents(project, state)) {
+        const cx = event.x * ts + ts / 2;
+        const cy = event.y * ts + ts / 2;
+        // 場所移動（接觸觸發、第一個指令是場所移動）：畫成出入口標記並顯示事件名稱
+        if (page.trigger === "touch" && page.commands.some((c) => c.code === "transfer") && !page.graphic) {
+          this.layer.add(this.add.rectangle(cx, cy, ts, ts, 0x6fc3a4, 0.25).setStrokeStyle(2, 0x6fc3a4, 0.8));
+          const label = this.label(cx, cy - ts * 0.75, event.name, "#c9f1e1");
           const half = label.width / 2;
           label.setX(Phaser.Math.Clamp(cx, half, scene.width * ts - half));
           this.layer.add(label);
+          continue;
         }
-      }
-
-      for (const pickup of scene.pickups ?? []) {
-        const item = project.items.find((i) => i.id === pickup.itemId);
-        const cx = pickup.x * ts + ts / 2;
-        const cy = pickup.y * ts + ts / 2;
-        const obj = this.sprite(item?.iconAssetId ? assets.get(item.iconAssetId) : undefined, cx, cy, ts * 0.8) ?? this.add.star(cx, cy, 5, ts * 0.15, ts * 0.35, 0xf2e05b);
-        this.tweens.add({ targets: obj, y: cy - 4, yoyo: true, repeat: -1, duration: 600, ease: "Sine.easeInOut" });
+        if (!page.graphic) continue;
+        const asset = assets.get(page.graphic.assetId);
+        const isCharacter = asset?.kind === "character";
+        const obj = this.sprite(asset, cx, cy, isCharacter ? ts : ts * 0.8) ?? this.add.circle(cx, cy, ts * 0.38, 0xd98c5f).setStrokeStyle(2, 0x000000);
+        if (page.priority === "below" && !isCharacter) this.tweens.add({ targets: obj, y: cy - 4, yoyo: true, repeat: -1, duration: 600, ease: "Sine.easeInOut" });
+        if (page.graphic.direction === "left" && "setFlipX" in obj) obj.setFlipX(true);
         this.layer.add(obj);
-        this.pickupSprites.set(pickup.id, obj);
-      }
-
-      for (const npc of npcsInScene(project, scene.id)) {
-        const cx = npc.position.x * ts + ts / 2;
-        const cy = npc.position.y * ts + ts / 2;
-        const obj = this.sprite(npc.spriteAssetId ? assets.get(npc.spriteAssetId) : undefined, cx, cy, ts) ?? this.add.circle(cx, cy, ts * 0.38, 0xd98c5f).setStrokeStyle(2, 0x000000);
-        this.layer.add(obj);
-        const label = this.label(cx, cy - ts * 0.72, npc.name, "#ffffff");
-        this.layer.add(label);
-        this.npcLabels.set(npc.id, label);
+        if (isCharacter) this.layer.add(this.label(cx, cy - ts * 0.72, event.name, "#ffffff"));
       }
 
       const px = state.x * ts + ts / 2;
       const py = state.y * ts + ts / 2;
       this.player =
-        this.sprite(project.player.spriteAssetId ? assets.get(project.player.spriteAssetId) : undefined, px, py, ts) ??
+        this.sprite(assets.get(project.actors.find((a) => a.id === project.system.playerActorId)?.spriteAssetId ?? ""), px, py, ts) ??
         this.add.circle(px, py, ts * 0.38, 0x4b8bf2).setStrokeStyle(2, 0xffffff);
       this.layer.add(this.player);
-      // 可以對話的 NPC 頭上顯示跳動的「！」
+      // 面前有可以按確定鍵的事件時，頭上顯示跳動的「！」
       this.marker = this.label(0, 0, "！", "#f2b84b").setVisible(false);
       this.layer.add(this.marker);
       this.tweens.add({ targets: this.marker, scale: 1.25, yoyo: true, repeat: -1, duration: 350 });
@@ -175,6 +161,7 @@ function createWorldScene(
       cam.startFollow(this.player, true, 0.2, 0.2);
       cam.centerOn(px, py);
       this.currentSceneId = scene.id;
+      this.signature = this.signatureOf(state);
       this.last = { x: state.x, y: state.y };
     }
 
@@ -193,8 +180,12 @@ function createWorldScene(
 
     sync(state: PlayerState) {
       if (!this.layer) return;
-      if (state.sceneId !== this.currentSceneId) this.build(state);
-      const scene = getScene(project, state.sceneId);
+      const mapChanged = state.mapId !== this.currentSceneId;
+      if (mapChanged || this.signatureOf(state) !== this.signature) {
+        const keep = !mapChanged && this.last ? { ...this.last } : null;
+        this.build(keep ? { ...state, ...keep } : state);
+      }
+      const scene = getMap(project, state.mapId);
       const ts = scene.tileSize;
       const tx = state.x * ts + ts / 2;
       const ty = state.y * ts + ts / 2;
@@ -209,15 +200,16 @@ function createWorldScene(
         if (state.facing === "left") this.player.setFlipX(true);
         if (state.facing === "right") this.player.setFlipX(false);
       }
-
-      const visible = new Set(visiblePickups(project, state).map((p) => p.id));
-      for (const [id, obj] of this.pickupSprites) obj.setVisible(visible.has(id));
-
-      const nearby = state.dialogue || state.endingId ? null : findNearbyNpc(project, state);
-      for (const [id, label] of this.npcLabels) label.setColor(nearby?.id === id ? "#f2b84b" : "#ffffff");
-      // 「！」提示：可對話的 NPC，或正面對的調查點
-      const object = !nearby && !state.dialogue && !state.endingId ? facedInteractable(project, state) : null;
-      const target = nearby ? nearby.position : object;
+      // 「！」提示：面前的同層事件或腳下的事件可以按確定鍵
+      const front = facedTile(state);
+      const target = isBusy(state)
+        ? null
+        : visibleEvents(project, state).find(
+            (v) =>
+              v.page.trigger === "action" &&
+              v.page.commands.length > 0 &&
+              ((v.page.priority === "same" && v.event.x === front.x && v.event.y === front.y) || (v.page.priority !== "same" && v.event.x === state.x && v.event.y === state.y)),
+          )?.event;
       if (this.marker) {
         this.marker.setVisible(Boolean(target));
         if (target) this.marker.setPosition(target.x * ts + ts / 2, target.y * ts - ts * 0.15);

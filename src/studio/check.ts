@@ -28,7 +28,7 @@ export function runCheck(project: GameProject, options: { demo?: boolean } = {})
       truncated: playtest.truncated,
       statesExplored: playtest.statesExplored,
       issues: playtest.issues,
-      endings: playtest.endings.map((e) => ({ title: e.title, reachable: e.reachable, steps: e.steps })),
+      endings: playtest.goals.map((e) => ({ title: e.title, reachable: e.reachable, steps: e.steps })),
     },
     quality,
     typicalMinutes: quality.metrics.duration?.typicalMinutes ?? null,

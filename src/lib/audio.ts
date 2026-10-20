@@ -1,6 +1,6 @@
 import { ENDING_JINGLES, FOOTSTEP_SURFACE, SOUNDS, type EndingMood } from "@/game/assets";
-import { getScene, type GameEvent, type PlayerState } from "@/game/engine";
-import type { GameProject, NPCDefinition } from "@/game/schema";
+import { getMap, type GameEvent, type PlayerState } from "@/game/engine";
+import type { GameProject, Voice as VoiceDef } from "@/game/schema";
 
 /**
  * 瀏覽器端音效（WebAudio）。
@@ -12,7 +12,7 @@ import type { GameProject, NPCDefinition } from "@/game/schema";
  */
 
 const MUTE_KEY = "rpg:audio-muted";
-type Voice = NonNullable<NPCDefinition["voice"]>;
+type Voice = VoiceDef;
 const DEFAULT_VOICE: Voice = { pitch: "mid", speed: "normal", timbre: "soft" };
 // 講話嗶嗶聲（RPG 常見做法）：音色依角色設定，音量要大到筆電喇叭也聽得到
 const PITCH_HZ = { low: 180, mid: 320, high: 520 };
@@ -191,8 +191,7 @@ class AudioManager {
     for (const e of events) {
       switch (e.type) {
         case "moved": {
-          const scene = getScene(project, state.sceneId);
-          const ch = scene.terrain ? [...scene.terrain[state.y]][state.x] : "=";
+          const ch = [...getMap(project, state.mapId).terrain[state.y]][state.x];
           const surface = FOOTSTEP_SURFACE[ch] ?? FOOTSTEP_SURFACE["="];
           this.stepIndex = (this.stepIndex + 1) % SOUNDS.footstep.length;
           this.play(SOUNDS.footstep[this.stepIndex], { volume: surface.volume, rate: surface.rate * (0.95 + Math.random() * 0.1) });
@@ -201,31 +200,18 @@ class AudioManager {
         case "blocked":
           this.play(SOUNDS.bump, { volume: 0.2 });
           break;
-        case "scene_changed":
+        case "transferred":
           this.play(SOUNDS.door, { volume: 0.4 });
           break;
-        case "item_gained":
-          this.play(SOUNDS.pickup, { volume: 0.5 });
+        case "item":
+          if (e.delta > 0) this.play(SOUNDS.pickup, { volume: 0.5 });
           break;
-        case "quest_started":
-          this.play(SOUNDS.questStart, { volume: 0.5 });
+        case "quest":
+          if (e.action === "start") this.play(SOUNDS.questStart, { volume: 0.5 });
+          else if (e.action === "step") this.play(SOUNDS.objective, { volume: 0.4 });
+          else if (e.action === "complete") this.play(SOUNDS.questComplete, { volume: 0.5 });
           break;
-        case "objective_completed":
-          this.play(SOUNDS.objective, { volume: 0.4 });
-          break;
-        case "quest_completed":
-          this.play(SOUNDS.questComplete, { volume: 0.5 });
-          break;
-        case "level_up":
-          this.play(SOUNDS.levelUp, { volume: 0.5 });
-          break;
-        case "dialogue_opened":
-          this.play(SOUNDS.dialogueOpen, { volume: 0.35 });
-          break;
-        case "dialogue_closed":
-          this.play(SOUNDS.dialogueClose, { volume: 0.3 });
-          break;
-        case "ending_reached": {
+        case "ending": {
           const mood: EndingMood = project.endings.find((x) => x.id === e.endingId)?.mood ?? "triumphant";
           this.play(ENDING_JINGLES[mood], { volume: 0.6 });
           break;
