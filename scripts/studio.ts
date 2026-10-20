@@ -32,8 +32,8 @@ if (!base.project) {
 const ops = JSON.parse(readFileSync(opsFile, "utf8"));
 const result = applyOps(base.project, Array.isArray(ops) ? ops : [ops]);
 const allOk = result.results.every((r) => r.ok);
-const playtest = values.playtest && result.report.isValid ? runPlaytest(result.project) : undefined;
+const playtest = values.playtest && result.report!.isValid ? runPlaytest(result.project) : undefined;
 const quality = playtest ? assessQuality(result.project, playtest) : undefined;
-if (values.write && allOk && result.report.isValid) writeFileSync(projectFile, JSON.stringify(result.project, null, 2) + "\n");
-console.log(JSON.stringify({ ok: allOk && result.report.isValid, written: Boolean(values.write && allOk && result.report.isValid), results: result.results, report: result.report, playtest, quality }, null, 2));
-process.exit(allOk && result.report.isValid ? 0 : 2);
+if (values.write && allOk && result.report!.isValid) writeFileSync(projectFile, JSON.stringify(result.project, null, 2) + "\n");
+console.log(JSON.stringify({ ok: allOk && result.report!.isValid, written: Boolean(values.write && allOk && result.report!.isValid), results: result.results, report: result.report!, playtest, quality }, null, 2));
+process.exit(allOk && result.report!.isValid ? 0 : 2);

@@ -104,7 +104,7 @@ export const opSchema = z.discriminatedUnion("op", [
 export type StudioOp = z.infer<typeof opSchema>;
 
 export type OpResult = { ok: boolean; message: string };
-export type ApplyResult = { project: GameProject; results: OpResult[]; report: ValidationReport };
+export type ApplyResult = { project: GameProject; results: OpResult[]; report: ValidationReport | null };
 
 /** 操作的人類可讀描述（顯示在 Studio 的歷史紀錄） */
 export function describeOp(op: StudioOp): string {
@@ -368,7 +368,8 @@ function applyOne(p: GameProject, op: StudioOp) {
  * 依序套用操作。單筆操作失敗不會影響其他操作（結果逐筆回報）；
  * 套用後重新驗證整份專案。中途狀態允許暫時不合法（例如先放 NPC 再補對話），由驗證報告提示。
  */
-export function applyOps(project: GameProject, rawOps: unknown[]): ApplyResult {
+/** options.validate=false：不做整份驗證（伺服器端使用，避免超過 CPU 限制；驗證由瀏覽器或 CLI 執行） */
+export function applyOps(project: GameProject, rawOps: unknown[], options: { validate?: boolean } = {}): ApplyResult {
   const p = structuredClone(project);
   const results: OpResult[] = [];
   for (const raw of rawOps) {
@@ -387,6 +388,7 @@ export function applyOps(project: GameProject, rawOps: unknown[]): ApplyResult {
       results.push({ ok: false, message: `${describeOp(parsed.data)}失敗：${(e as Error).message}` });
     }
   }
+  if (options.validate === false) return { project: p, results, report: null };
   const v = validateProject(p);
   return { project: p, results, report: { isValid: v.isValid, errors: v.errors, warnings: v.warnings } };
 }

@@ -8,6 +8,7 @@ import IssueList from "@/components/IssueList";
 import { coverDataOf } from "@/game/cover";
 import type { GameProject } from "@/game/schema";
 import { studioApi, type CheckResult, type VersionEntry } from "@/lib/studioApi";
+import { runCheckAsync } from "@/studio/check";
 import StudioShell, { PageHeader } from "../StudioShell";
 
 /**
@@ -48,9 +49,12 @@ export default function ProjectOverview() {
     if (!id) return;
     studioApi
       .getProject(id)
-      .then((r) => setData({ project: r.project, version: r.version }))
+      .then((r) => {
+        setData({ project: r.project, version: r.version });
+        // 檢查在瀏覽器執行（不佔伺服器 CPU）
+        return runCheckAsync(r.project).then(setCheck);
+      })
       .catch((e: Error) => setError(e.message));
-    studioApi.check(id).then(setCheck).catch(() => {});
     studioApi.versions(id).then((r) => setVersions(r.versions.slice(0, 6))).catch(() => {});
     studioApi
       .listProjects()
@@ -155,7 +159,7 @@ export default function ProjectOverview() {
                 <div><b>{p.endings.length}</b><span>結局</span></div>
               </div>
               <div className="small muted" style={{ marginTop: 8 }}>
-                預估遊玩時間：{minutes ? `${minutes[0]}～${minutes[1]} 分鐘` : check ? "需要先通過驗證才能估算" : "計算中…"}
+                預估遊玩時間：{minutes ? `${minutes[0]}～${minutes[1]} 分鐘` : check ? "需要先通過驗證才能估算" : "在你的瀏覽器計算中…"}
               </div>
             </section>
             {check && check.validation.errors.length > 0 && (

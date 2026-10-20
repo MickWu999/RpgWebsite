@@ -11,13 +11,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [remember, setRemember] = useState(true);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await studioApi.login(username, password);
+      await studioApi.login(username, password, remember);
       window.location.href = next.startsWith("/studio") ? next : "/studio/";
     } catch (err) {
       setError((err as Error).message);
@@ -39,6 +40,9 @@ export default function LoginPage() {
         <label className="field">
           密碼
           <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </label>
+        <label className="small">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> 保持登入（30 天內自動登入）
         </label>
         {error && <div className="notice err small">{error}</div>}
         <button className="btn primary" disabled={busy} type="submit">

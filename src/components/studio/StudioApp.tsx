@@ -147,7 +147,7 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
       const labels = pendingLabels.current.splice(0);
       const label = labels.length ? `${labels.slice(0, 3).join("、")}${labels.length > 3 ? ` 等 ${labels.length} 項` : ""}` : "儲存";
       try {
-        const r = await studioApi.saveProject(projectId, p, overwrite ? undefined : baseVersionRef.current, label);
+        const r = await studioApi.saveProject(projectId, p, overwrite ? undefined : baseVersionRef.current, label, applyOps(p, []).report?.isValid ?? false);
         baseVersionRef.current = r.version;
         setBaseVersion(r.version);
         if (projectRef.current === p) markDirty(false);

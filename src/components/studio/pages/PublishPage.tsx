@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import IssueList from "@/components/IssueList";
 import { PLAYER_SITE_URL, studioApi, type CheckResult } from "@/lib/studioApi";
+import { runCheckAsync } from "@/studio/check";
 import StudioShell, { PageHeader } from "../StudioShell";
 
 /** 發布：逐項顯示檢查結果，通過後發布到玩家網站（玩家網址只顯示成文字，前後台不互相連結） */
@@ -16,7 +17,11 @@ export default function PublishPage() {
   const [allowQuality, setAllowQuality] = useState(false);
 
   const load = () => {
-    studioApi.check(id).then(setCheck).catch((e: Error) => setMessage({ kind: "err", text: e.message }));
+    studioApi
+      .getProject(id)
+      .then((r) => runCheckAsync(r.project))
+      .then(setCheck)
+      .catch((e: Error) => setMessage({ kind: "err", text: e.message }));
     studioApi.listProjects().then((r) => {
       const p = r.projects.find((x) => x.id === id);
       setState({ published: Boolean(p?.published_version), version: p?.published_version });
@@ -43,7 +48,7 @@ export default function PublishPage() {
         {message && <div className={`notice ${message.kind}`}>{message.text}</div>}
         <div className="card stack" data-testid="publish-checks">
           <h2>發布前檢查</h2>
-          {!check && <div className="muted">檢查中…（驗證＋把每個結局自動玩過一遍）</div>}
+          {!check && <div className="muted">在你的瀏覽器檢查中…（驗證＋把每個結局自動玩過一遍）</div>}
           {items.map((it) => (
             <div key={it.label} className={`step${it.ok ? " done" : ""}`}>
               <span className="step-mark">{it.ok ? "✓" : "✗"}</span>
@@ -60,7 +65,13 @@ export default function PublishPage() {
             </label>
           )}
           <div className="row">
-            <button className="btn" onClick={load}>
+            <button
+              className="btn"
+              onClick={() => {
+                setCheck(null);
+                load();
+              }}
+            >
               重新檢查
             </button>
             <button
@@ -70,7 +81,7 @@ export default function PublishPage() {
               onClick={async () => {
                 setBusy(true);
                 try {
-                  const r = await studioApi.publish(id, allowQuality);
+                  const r = await studioApi.publish(id, check!, allowQuality);
                   setMessage({ kind: "info", text: `已發布第 ${r.version} 版` });
                   load();
                 } catch (e) {

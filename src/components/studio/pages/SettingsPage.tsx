@@ -35,8 +35,8 @@ export default function SettingsPage() {
             <input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} required />
           </label>
           <label className="field">
-            新密碼（至少 10 個字元）
-            <input type="password" autoComplete="new-password" minLength={10} value={next} onChange={(e) => setNext(e.target.value)} required />
+            新密碼（至少 6 個字元）
+            <input type="password" autoComplete="new-password" minLength={6} value={next} onChange={(e) => setNext(e.target.value)} required />
           </label>
           <label className="field">
             再輸入一次新密碼

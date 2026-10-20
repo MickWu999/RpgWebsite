@@ -2,10 +2,7 @@ import demoProject from "../public/games/demo-lantern/project.json";
 import { manifestEntry, walkableFromTerrain } from "../src/game/assets";
 import { coverDataOf } from "../src/game/cover";
 import { projectRevision } from "../src/game/engine";
-import { runPlaytest } from "../src/game/playtest";
-import { assessQuality } from "../src/game/quality";
 import { gameProjectSchema, SCHEMA_VERSION, type GameProject } from "../src/game/schema";
-import { validateProject } from "../src/game/validate";
 import { applyOps, opSchema } from "../src/studio/ops";
 import { z } from "zod";
 import { error, getCookie, hashPassword, HttpError, json, nowIso, randomId, randomToken, readJson, safeEqual, sha256hex, type Env } from "./lib";
@@ -15,16 +12,23 @@ import { error, getCookie, hashPassword, HttpError, json, nowIso, randomId, rand
  * - 開發者以帳號密碼登入（HttpOnly cookie 工作階段）
  * - API Token（類似 Jenkins）：在設定頁產生，AI agent 以 `Authorization: Bearer <token>` 操作同一套 API
  * - 所有修改都是 Studio 操作（src/studio/ops.ts）或整份儲存，每次都留下版本紀錄
+ * - 伺服器不執行驗證與自動試玩（大型遊戲會超過 Workers 免費方案 CPU 限制）；檢查在瀏覽器或 AI 的本機 CLI 執行（src/studio/check.ts），
+ *   發布時附上檢查摘要，伺服器只比對內容指紋（revision）
  * API 說明：GET /api/docs（給 AI 閱讀的 Markdown）
  */
 
 const SESSION_COOKIE = "rpgs_session";
-const SESSION_DAYS = 7;
+/** 「保持登入」30 天；未勾選時 12 小時 */
+const REMEMBER_DAYS = 30;
+const SHORT_SESSION_HOURS = 12;
+const MIN_PASSWORD = 6;
+const LOCK_FAILURES = 5;
+const LOCK_MINUTES = 15;
 const VERSION_KEEP = 60;
 export const PASSWORD_ITERATIONS = 100_000;
 
 type Actor = { userId: string; username: string; kind: "user" | "token"; tokenName?: string; label: string };
-type ProjectRow = { id: string; owner_id: string; title: string; data: string; version: number; is_valid: number; created_at: string; updated_at: string };
+type ProjectRow = { id: string; owner_id: string; title: string; data: string; version: number; is_valid: number; created_at: string; updated_at: string; archived_at: string | null };
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -85,8 +89,10 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
 
   // ---------- 專案 ----------
   if (path === "/api/projects" && method === "GET") {
+    // ?archived=1 列出典藏區；預設只列使用中的專案
+    const archived = url.searchParams.get("archived") === "1";
     const { results } = await env.DB.prepare(
-      "SELECT p.id, p.title, p.version, p.is_valid, p.updated_at, p.created_at, g.version AS published_version, g.published_at FROM projects p LEFT JOIN published_games g ON g.project_id = p.id WHERE p.owner_id = ? ORDER BY p.updated_at DESC",
+      `SELECT p.id, p.title, p.version, p.is_valid, p.updated_at, p.created_at, p.archived_at, g.version AS published_version, g.published_at FROM projects p LEFT JOIN published_games g ON g.project_id = p.id WHERE p.owner_id = ? AND p.archived_at IS ${archived ? "NOT NULL" : "NULL"} ORDER BY ${archived ? "p.archived_at" : "p.updated_at"} DESC`,
     )
       .bind(actor.userId)
       .all();
@@ -98,35 +104,44 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   if (m) {
     const [, id, sub] = m;
     const row = await getProject(env, id, actor);
-    if (!sub && method === "GET") return json({ ok: true, id: row.id, version: row.version, project: JSON.parse(row.data), updatedAt: row.updated_at });
+    if (!sub && method === "GET") return json({ ok: true, id: row.id, version: row.version, project: JSON.parse(row.data), updatedAt: row.updated_at, archivedAt: row.archived_at });
     if (!sub && method === "PUT") {
-      const body = await readJson<{ project?: unknown; baseVersion?: number; label?: string }>(req);
+      const body = await readJson<{ project?: unknown; baseVersion?: number; label?: string; isValid?: boolean }>(req);
       const parsed = gameProjectSchema.safeParse(body.project);
       if (!parsed.success) return error(400, "project 格式錯誤", { issues: parsed.error.issues.slice(0, 20) });
-      const saved = await saveVersion(env, row, { ...parsed.data, id: row.id }, body.baseVersion, String(body.label ?? "儲存").slice(0, 200), actor);
-      return json({ ok: true, version: saved.version, report: saved.report });
+      const saved = await saveVersion(env, row, { ...parsed.data, id: row.id }, body.baseVersion, String(body.label ?? "儲存").slice(0, 200), actor, body.isValid === true);
+      return json({ ok: true, version: saved.version });
     }
-    if (!sub && method === "DELETE") {
-      if (actor.kind !== "user") return error(403, "刪除專案只能在 Studio 介面操作");
-      await env.DB.batch([
-        env.DB.prepare("DELETE FROM project_versions WHERE project_id = ?").bind(row.id),
-        env.DB.prepare("DELETE FROM published_games WHERE project_id = ?").bind(row.id),
-        env.DB.prepare("DELETE FROM projects WHERE id = ?").bind(row.id),
-      ]);
-      return json({ ok: true });
+    // 典藏（軟刪除）：只標記典藏時間，資料、版本紀錄、已發布狀態都保留，可以還原
+    if ((!sub && method === "DELETE") || (sub === "archive" && method === "POST")) {
+      if (actor.kind !== "user") return error(403, "典藏專案只能在 Studio 介面操作");
+      await env.DB.prepare("UPDATE projects SET archived_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
+      return json({ ok: true, archived: true });
+    }
+    if (sub === "unarchive" && method === "POST") {
+      if (actor.kind !== "user") return error(403, "還原典藏只能在 Studio 介面操作");
+      await env.DB.prepare("UPDATE projects SET archived_at = NULL, updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
+      return json({ ok: true, archived: false });
     }
     if (sub === "ops" && method === "POST") {
       const body = await readJson<{ ops?: unknown[]; baseVersion?: number; label?: string; includeProject?: boolean }>(req);
       if (!Array.isArray(body.ops) || body.ops.length === 0) return error(400, "ops 必須是非空陣列");
       if (body.ops.length > 200) return error(400, "一次最多 200 筆操作，請分批送出");
-      const result = applyOps(JSON.parse(row.data), body.ops);
+      const result = applyOps(JSON.parse(row.data), body.ops, { validate: false });
       const allOk = result.results.every((r) => r.ok);
-      if (!allOk) return json({ ok: false, written: false, results: result.results, report: result.report }, 422);
+      if (!allOk) return json({ ok: false, written: false, results: result.results }, 422);
       const label = String(body.label ?? result.results.map((r) => r.message).join("、")).slice(0, 200);
-      const saved = await saveVersion(env, row, result.project, body.baseVersion, label, actor, result.report);
-      return json({ ok: true, written: true, version: saved.version, results: result.results, report: result.report, ...(body.includeProject ? { project: result.project } : {}) });
+      const saved = await saveVersion(env, row, result.project, body.baseVersion, label, actor, false);
+      return json({
+        ok: true,
+        written: true,
+        version: saved.version,
+        results: result.results,
+        notice: "伺服器只檢查操作格式；請在本機執行 npm run game -- remote check 驗證與自動試玩",
+        ...(body.includeProject ? { project: result.project } : {}),
+      });
     }
-    if (sub === "check" && method === "GET") return json({ ok: true, ...checkProject(JSON.parse(row.data), url.searchParams.get("demo") === "1") });
+    if (sub === "check") return error(410, "伺服器不執行檢查（會超過 CPU 限制）。請在 Studio 頁面或本機執行：npm run game -- remote check <id>");
     if (sub === "versions" && method === "GET") {
       const { results } = await env.DB.prepare("SELECT version, label, actor, created_at FROM project_versions WHERE project_id = ? ORDER BY version DESC LIMIT 100").bind(row.id).all();
       return json({ ok: true, versions: results });
@@ -141,7 +156,7 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
       const body = await readJson<{ version?: number }>(req);
       const v = await env.DB.prepare("SELECT data FROM project_versions WHERE project_id = ? AND version = ?").bind(row.id, Number(body.version)).first<{ data: string }>();
       if (!v) return error(404, "找不到這個版本");
-      const saved = await saveVersion(env, row, JSON.parse(v.data), undefined, `還原到第 ${body.version} 版`, actor);
+      const saved = await saveVersion(env, row, JSON.parse(v.data), undefined, `還原到第 ${body.version} 版`, actor, false);
       return json({ ok: true, version: saved.version });
     }
     if (sub === "duplicate" && method === "POST") {
@@ -182,18 +197,46 @@ async function authenticate(req: Request, env: Env): Promise<Actor | null> {
   return { userId: row.id, username: row.username, kind: "user", label: row.username };
 }
 
+/** 防暴力破解：同一帳號或同一 IP 在 15 分鐘內失敗 5 次就暫時鎖定 */
+async function checkLock(env: Env, keys: string[]) {
+  const since = new Date(Date.now() - LOCK_MINUTES * 60_000).toISOString();
+  for (const key of keys) {
+    const row = await env.DB.prepare("SELECT failures, window_start FROM login_attempts WHERE key = ?").bind(key).first<{ failures: number; window_start: string }>();
+    if (row && row.window_start > since && row.failures >= LOCK_FAILURES) throw new HttpError(429, `登入失敗次數過多，請 ${LOCK_MINUTES} 分鐘後再試`);
+  }
+}
+
+async function recordFailure(env: Env, keys: string[]) {
+  const since = new Date(Date.now() - LOCK_MINUTES * 60_000).toISOString();
+  for (const key of keys) {
+    await env.DB.prepare(
+      "INSERT INTO login_attempts (key, failures, window_start) VALUES (?1, 1, ?2) ON CONFLICT(key) DO UPDATE SET failures = CASE WHEN window_start > ?3 THEN failures + 1 ELSE 1 END, window_start = CASE WHEN window_start > ?3 THEN window_start ELSE ?2 END",
+    )
+      .bind(key, nowIso(), since)
+      .run();
+  }
+}
+
 async function login(req: Request, env: Env) {
-  const body = await readJson<{ username?: string; password?: string }>(req);
+  const body = await readJson<{ username?: string; password?: string; remember?: boolean }>(req);
   const username = String(body.username ?? "").trim();
   const password = String(body.password ?? "");
+  const lockKeys = [`user:${username.toLowerCase()}`, `ip:${req.headers.get("CF-Connecting-IP") ?? "unknown"}`];
+  await checkLock(env, lockKeys);
   const user = await env.DB.prepare("SELECT id, username, password_hash, password_salt, password_iterations FROM users WHERE username = ?")
     .bind(username)
     .first<{ id: string; username: string; password_hash: string; password_salt: string; password_iterations: number }>();
   // 帳號不存在時也做一次雜湊，避免從回應時間猜出帳號是否存在
   const hash = await hashPassword(password, user?.password_salt ?? "no-user", user?.password_iterations ?? PASSWORD_ITERATIONS);
-  if (!user || !safeEqual(hash, user.password_hash)) return error(401, "帳號或密碼錯誤");
+  if (!user || !safeEqual(hash, user.password_hash)) {
+    await recordFailure(env, lockKeys);
+    return error(401, "帳號或密碼錯誤");
+  }
+  await env.DB.batch(lockKeys.map((k) => env.DB.prepare("DELETE FROM login_attempts WHERE key = ?").bind(k)));
+  const remember = body.remember !== false;
+  const maxAge = remember ? REMEMBER_DAYS * 86400 : SHORT_SESSION_HOURS * 3600;
   const token = randomToken(32);
-  const expires = new Date(Date.now() + SESSION_DAYS * 86400_000).toISOString();
+  const expires = new Date(Date.now() + maxAge * 1000).toISOString();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(nowIso()),
     env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)").bind(await sha256hex(token), user.id, expires, nowIso()),
@@ -201,7 +244,7 @@ async function login(req: Request, env: Env) {
   return json(
     { ok: true, user: { id: user.id, username: user.username } },
     200,
-    { "Set-Cookie": `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_DAYS * 86400}` },
+    { "Set-Cookie": `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}` },
   );
 }
 
@@ -215,7 +258,7 @@ async function changePassword(req: Request, env: Env, actor: Actor) {
   if (actor.kind !== "user") return error(403, "修改密碼只能在 Studio 介面操作");
   const body = await readJson<{ current?: string; next?: string }>(req);
   const next = String(body.next ?? "");
-  if (next.length < 10) return error(400, "新密碼至少 10 個字元");
+  if (next.length < MIN_PASSWORD) return error(400, `新密碼至少 ${MIN_PASSWORD} 個字元`);
   const user = await env.DB.prepare("SELECT password_hash, password_salt, password_iterations FROM users WHERE id = ?")
     .bind(actor.userId)
     .first<{ password_hash: string; password_salt: string; password_iterations: number }>();
@@ -272,7 +315,7 @@ async function createProject(req: Request, env: Env, actor: Actor) {
 async function insertProject(env: Env, actor: Actor, project: GameProject, label: string) {
   const id = `${(project.title.toLowerCase().match(/[a-z0-9]+/g) ?? ["game"]).join("-").slice(0, 20) || "game"}-${randomToken(4).toLowerCase().replace(/[^a-z0-9]/g, "x")}`;
   const data = { ...project, id };
-  const isValid = validateProject(data).isValid ? 1 : 0;
+  const isValid = 0; // 驗證在瀏覽器執行，開啟總覽或儲存時更新
   const now = nowIso();
   const text = JSON.stringify(data);
   await env.DB.batch([
@@ -283,7 +326,7 @@ async function insertProject(env: Env, actor: Actor, project: GameProject, label
 }
 
 /** 儲存新版本：baseVersion 不符時拒絕（樂觀鎖），避免人和 AI 同時修改互相覆蓋 */
-async function saveVersion(env: Env, row: ProjectRow, project: GameProject, baseVersion: number | undefined, label: string, actor: Actor, report = validateProject(project)) {
+async function saveVersion(env: Env, row: ProjectRow, project: GameProject, baseVersion: number | undefined, label: string, actor: Actor, isValid: boolean) {
   if (baseVersion !== undefined && baseVersion !== row.version) {
     throw new HttpError(409, `專案已被修改（目前第 ${row.version} 版，你的基礎是第 ${baseVersion} 版），請重新讀取後再操作`, { currentVersion: row.version });
   }
@@ -292,36 +335,23 @@ async function saveVersion(env: Env, row: ProjectRow, project: GameProject, base
   const version = row.version + 1;
   const now = nowIso();
   const res = await env.DB.batch([
-    env.DB.prepare("UPDATE projects SET data = ?, title = ?, version = ?, is_valid = ?, updated_at = ? WHERE id = ? AND version = ?").bind(text, project.title, version, report.isValid ? 1 : 0, now, row.id, row.version),
+    env.DB.prepare("UPDATE projects SET data = ?, title = ?, version = ?, is_valid = ?, updated_at = ? WHERE id = ? AND version = ?").bind(text, project.title, version, isValid ? 1 : 0, now, row.id, row.version),
     env.DB.prepare("INSERT INTO project_versions (project_id, version, data, label, actor, created_at) VALUES (?, ?, ?, ?, ?, ?)").bind(row.id, version, text, label, actor.label, now),
     env.DB.prepare("DELETE FROM project_versions WHERE project_id = ? AND version <= ?").bind(row.id, version - VERSION_KEEP),
   ]);
   if (!res[0].meta.changes) throw new HttpError(409, "專案剛被其他人修改，請重新讀取後再操作");
-  return { version, report: { isValid: report.isValid, errors: report.errors, warnings: report.warnings } };
-}
-
-function checkProject(project: GameProject, demo: boolean) {
-  const validation = validateProject(project);
-  if (!validation.project) return { passed: false, validation: { errors: validation.errors, warnings: validation.warnings }, playtest: null, quality: null };
-  const playtest = runPlaytest(validation.project);
-  const quality = assessQuality(validation.project, playtest, { checkDuration: !demo });
-  return {
-    passed: playtest.ok && quality.blocking.length === 0,
-    validation: { errors: [], warnings: validation.warnings },
-    playtest: { ok: playtest.ok, truncated: playtest.truncated, statesExplored: playtest.statesExplored, issues: playtest.issues, endings: playtest.endings.map((e) => ({ title: e.title, reachable: e.reachable, steps: e.steps })) },
-    quality,
-  };
+  return { version };
 }
 
 async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
-  const body = await readJson<{ allowQualityWarnings?: boolean }>(req);
+  const body = await readJson<{ allowQualityWarnings?: boolean; check?: { revision?: string; valid?: boolean; playtestOk?: boolean; qualityBlocking?: number; typicalMinutes?: [number, number] | null } }>(req);
   const project = JSON.parse(row.data) as GameProject;
-  const check = checkProject(project, false);
-  if (!check.playtest || !check.playtest.ok) return error(422, "專案未通過驗證或自動試玩，不能發布", { check });
+  const check = body.check;
+  // 檢查在瀏覽器／本機執行；伺服器只確認報告是針對「目前這一版內容」做的
+  if (!check || check.revision !== projectRevision(project)) return error(422, "缺少檢查報告，或報告不是針對目前版本（請重新檢查後再發布）", { revision: projectRevision(project) });
+  if (!check.valid || !check.playtestOk) return error(422, "專案未通過驗證或自動試玩，不能發布");
   // 品質指標（時長、規模等）未達標時，只有人在 Studio 介面明確確認才可以發布；AI（API Token）一律不行
-  if (check.quality && check.quality.blocking.length > 0 && !(body.allowQualityWarnings && actor.kind === "user")) {
-    return error(422, "品質指標未達標，不能發布", { check });
-  }
+  if ((check.qualityBlocking ?? 99) > 0 && !(body.allowQualityWarnings && actor.kind === "user")) return error(422, "品質指標未達標，不能發布");
   const catalog = {
     id: row.id,
     title: project.title,
@@ -330,7 +360,7 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
     status: "approved",
     endings: project.endings.length,
     npcs: project.npcs.length,
-    typicalMinutes: check.quality?.metrics.duration?.typicalMinutes ?? null,
+    typicalMinutes: check.typicalMinutes ?? null,
     cover: coverDataOf(project),
     path: `/games/${row.id}/project.json`,
     revision: projectRevision(project),
@@ -338,7 +368,8 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
   await env.DB.prepare("INSERT OR REPLACE INTO published_games (id, project_id, version, data, catalog, published_at) VALUES (?, ?, ?, ?, ?, ?)")
     .bind(row.id, row.id, row.version, row.data, JSON.stringify(catalog), nowIso())
     .run();
-  return json({ ok: true, published: row.id, version: row.version, check });
+  await env.DB.prepare("UPDATE projects SET is_valid = 1 WHERE id = ?").bind(row.id).run();
+  return json({ ok: true, published: row.id, version: row.version });
 }
 
 const API_DOCS = `# AI RPG Studio API
@@ -354,10 +385,10 @@ const API_DOCS = `# AI RPG Studio API
 | GET /api/projects/:id | 讀取專案與目前版本號 |
 | POST /api/projects/:id/ops \`{ops, baseVersion?, label?, includeProject?}\` | 套用 Studio 操作；全部成功才寫入並產生新版本 |
 | PUT /api/projects/:id \`{project, baseVersion?, label?}\` | 整份儲存（建議改用 ops） |
-| GET /api/projects/:id/check | 驗證＋自動試玩＋品質指標 |
+| （檢查） | 不在伺服器執行：用 \`npm run game -- remote check <id>\` 在本機驗證＋自動試玩＋品質指標 |
 | GET /api/projects/:id/versions、GET .../versions/:v、POST .../restore \`{version}\` | 版本紀錄與還原 |
-| POST /api/projects/:id/publish | 通過檢查後發布到前台（API Token 不能略過品質指標） |
+| POST /api/projects/:id/publish \`{check}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標。建議用 \`npm run game -- remote publish <id>\` |
 
-建議流程：GET 專案 → 小批次 POST ops（帶 baseVersion）→ GET check → 修正 → … → publish。
+建議流程：GET 專案 → 小批次 POST ops（帶 baseVersion）→ remote check（本機）→ 修正 → … → remote publish。
 回應的 report.errors 是程式實際驗證的結果，請依它修正，不要假設已完成。
 `;

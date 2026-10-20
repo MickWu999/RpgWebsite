@@ -93,7 +93,7 @@ npm run game -- remote pull <專案ID>          # 下載到 content/<ID>/project
 npm run game -- remote apply <專案ID> ops.json # 送出操作（帶版本號，避免覆蓋你的修改）
 npm run game -- remote check <專案ID>
 npm run game -- remote publish <專案ID>`}</pre>
-          <p className="small muted">AI 的每次修改都會留下版本紀錄（🤖），你可以隨時在「版本紀錄」還原。API Token 不能刪除專案、不能管理其他 token、也不能略過品質指標發布。</p>
+          <p className="small muted">AI 的每次修改都會留下版本紀錄（🤖），你可以隨時在「版本紀錄」還原。API Token 不能典藏專案、不能管理其他 token、也不能略過品質指標發布。</p>
         </div>
       </div>
     </StudioShell>

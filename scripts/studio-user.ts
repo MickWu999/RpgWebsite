@@ -27,8 +27,8 @@ if ((command !== "add" && command !== "reset") || !username || !/^[A-Za-z0-9_.-]
   process.exit(1);
 }
 const password = values.password ?? b64url(randomBytes(12));
-if (password.length < 10) {
-  console.error("密碼至少 10 個字元");
+if (password.length < 6) {
+  console.error("密碼至少 6 個字元");
   process.exit(1);
 }
 const salt = b64url(randomBytes(16));

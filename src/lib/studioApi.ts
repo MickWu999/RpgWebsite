@@ -1,6 +1,5 @@
 import type { GameProject } from "@/game/schema";
-import type { ValidationIssue, ValidationReport } from "@/game/validate";
-import type { QualityReport } from "@/game/quality";
+import { publishSummary, type CheckReport } from "@/studio/check";
 
 /** Studio 後台 API 用戶端（同網域，登入 cookie 自動帶上）。401 時導向登入頁。 */
 
@@ -31,33 +30,40 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
-export type ProjectSummary = { id: string; title: string; version: number; is_valid: number; updated_at: string; created_at: string; published_version: number | null; published_at: string | null };
+export type ProjectSummary = {
+  id: string;
+  title: string;
+  version: number;
+  is_valid: number;
+  updated_at: string;
+  created_at: string;
+  archived_at: string | null;
+  published_version: number | null;
+  published_at: string | null;
+};
 export type VersionEntry = { version: number; label: string; actor: string; created_at: string };
 export type TokenEntry = { id: string; name: string; token_prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
-export type CheckResult = {
-  passed: boolean;
-  validation: { errors: ValidationIssue[]; warnings: ValidationIssue[] };
-  playtest: null | { ok: boolean; truncated: boolean; statesExplored: number; issues: ValidationIssue[]; endings: Array<{ title: string; reachable: boolean; steps?: string[] }> };
-  quality: QualityReport | null;
-};
+export type { CheckReport as CheckResult } from "@/studio/check";
 
 export const studioApi = {
   me: () => call<{ user: { id: string; username: string } }>("GET", "/api/auth/me"),
-  login: (username: string, password: string) => call<{ user: { username: string } }>("POST", "/api/auth/login", { username, password }),
+  login: (username: string, password: string, remember = true) => call<{ user: { username: string } }>("POST", "/api/auth/login", { username, password, remember }),
   logout: () => call("POST", "/api/auth/logout", {}),
   changePassword: (current: string, next: string) => call<{ notice: string }>("POST", "/api/auth/password", { current, next }),
-  listProjects: () => call<{ projects: ProjectSummary[] }>("GET", "/api/projects"),
+  listProjects: (archived = false) => call<{ projects: ProjectSummary[] }>("GET", `/api/projects${archived ? "?archived=1" : ""}`),
   createProject: (title: string, template: "blank" | "demo") => call<{ id: string }>("POST", "/api/projects", { title, template }),
   importProject: (project: unknown, title?: string) => call<{ id: string }>("POST", "/api/projects", { project, title }),
   getProject: (id: string) => call<{ id: string; version: number; project: GameProject; updatedAt: string }>("GET", `/api/projects/${id}`),
-  saveProject: (id: string, project: GameProject, baseVersion: number | undefined, label: string) =>
-    call<{ version: number; report: ValidationReport }>("PUT", `/api/projects/${id}`, { project, baseVersion, label }),
-  deleteProject: (id: string) => call("DELETE", `/api/projects/${id}`),
+  saveProject: (id: string, project: GameProject, baseVersion: number | undefined, label: string, isValid: boolean) =>
+    call<{ version: number }>("PUT", `/api/projects/${id}`, { project, baseVersion, label, isValid }),
+  /** 典藏（軟刪除），可用 unarchiveProject 還原 */
+  archiveProject: (id: string) => call("POST", `/api/projects/${id}/archive`, {}),
+  unarchiveProject: (id: string) => call("POST", `/api/projects/${id}/unarchive`, {}),
   duplicateProject: (id: string, title?: string) => call<{ id: string }>("POST", `/api/projects/${id}/duplicate`, { title }),
-  check: (id: string, demo = false) => call<CheckResult>("GET", `/api/projects/${id}/check${demo ? "?demo=1" : ""}`),
   versions: (id: string) => call<{ versions: VersionEntry[] }>("GET", `/api/projects/${id}/versions`),
   restore: (id: string, version: number) => call<{ version: number }>("POST", `/api/projects/${id}/restore`, { version }),
-  publish: (id: string, allowQualityWarnings = false) => call<{ version: number; check: CheckResult }>("POST", `/api/projects/${id}/publish`, { allowQualityWarnings }),
+  /** 發布：附上在瀏覽器執行的檢查摘要（伺服器只比對內容指紋） */
+  publish: (id: string, check: CheckReport, allowQualityWarnings = false) => call<{ version: number }>("POST", `/api/projects/${id}/publish`, { allowQualityWarnings, check: publishSummary(check) }),
   unpublish: (id: string) => call("DELETE", `/api/projects/${id}/publish`),
   listTokens: () => call<{ tokens: TokenEntry[] }>("GET", "/api/tokens"),
   createToken: (name: string) => call<{ id: string; token: string }>("POST", "/api/tokens", { name }),

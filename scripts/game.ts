@@ -10,6 +10,7 @@ import { assessQuality } from "@/game/quality";
 import { SCHEMA_VERSION, gameProjectSchema, type GameProject } from "@/game/schema";
 import { validateProject } from "@/game/validate";
 import { applyOps } from "@/studio/ops";
+import { publishSummary, runCheck } from "@/studio/check";
 import { loadLocalEnv } from "./env";
 
 /**
@@ -80,12 +81,22 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       const r = await api("POST", `/api/projects/${target}/ops`, { ops: Array.isArray(ops) ? ops : [ops], baseVersion: cur.data.version });
       return done(r);
     }
-    case "check":
-      return done(await api("GET", `/api/projects/${target}/check`));
+    case "check": {
+      // 伺服器不執行檢查（CPU 限制）：下載目前版本，在本機驗證＋自動試玩＋品質指標
+      const r = await api("GET", `/api/projects/${target}`);
+      if (!r.ok) return done(r);
+      const report = runCheck(r.data.project, { demo: values.demo });
+      return out({ ok: report.passed, version: r.data.version, ...report }, report.passed ? 0 : 2);
+    }
     case "versions":
       return done(await api("GET", `/api/projects/${target}/versions`));
-    case "publish":
-      return done(await api("POST", `/api/projects/${target}/publish`, {}));
+    case "publish": {
+      const r = await api("GET", `/api/projects/${target}`);
+      if (!r.ok) return done(r);
+      const report = runCheck(r.data.project);
+      if (!report.passed) return out({ ok: false, stage: "check", ...report }, 2);
+      return done(await api("POST", `/api/projects/${target}/publish`, { check: publishSummary(report) }));
+    }
     default:
       fail("用法：npm run game -- remote <list|create|pull|apply|check|versions|publish> …", 1);
   }

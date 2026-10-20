@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { studioApi, type ProjectSummary } from "@/lib/studioApi";
 import StudioShell, { PageHeader } from "../StudioShell";
 
-/** 專案列表：新增（空白／範本）、匯入、開啟、複製、刪除 */
+/** 專案列表：新增（空白／範本）、匯入、開啟、複製、典藏（軟刪除，可還原） */
 export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
@@ -13,17 +13,23 @@ export default function ProjectsPage() {
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [template, setTemplate] = useState<"blank" | "demo">("demo");
+  const [showArchived, setShowArchived] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const refresh = () =>
-    studioApi
-      .listProjects()
-      .then((r) => setProjects(r.projects))
-      .catch((e: Error) => setError(e.message));
+  // 每次請求編號，只採用最新一次的結果：避免切換分頁時，較晚回來的舊請求覆蓋畫面
+  const requestSeq = useRef(0);
+  const refresh = (archived = showArchived) => {
+    const seq = ++requestSeq.current;
+    return studioApi
+      .listProjects(archived)
+      .then((r) => seq === requestSeq.current && setProjects(r.projects))
+      .catch((e: Error) => seq === requestSeq.current && setError(e.message));
+  };
 
   useEffect(() => {
-    void refresh();
-  }, []);
+    void refresh(showArchived);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showArchived]);
 
   const create = async () => {
     try {
@@ -62,6 +68,15 @@ export default function ProjectsPage() {
             </>
           }
         />
+        <div className="tabs" role="tablist">
+          <button className={`tab${showArchived ? "" : " active"}`} onClick={() => setShowArchived(false)} data-testid="tab-active">
+            使用中
+          </button>
+          <button className={`tab${showArchived ? " active" : ""}`} onClick={() => setShowArchived(true)} data-testid="tab-archived">
+            🗄 典藏
+          </button>
+        </div>
+        {showArchived && <div className="notice info small">典藏的專案資料與版本紀錄都完整保留，按「還原」就會回到使用中。已發布的遊戲不會因為典藏而下架。</div>}
         {error && <div className="notice err">{error}</div>}
 
         {creating && (
@@ -93,7 +108,8 @@ export default function ProjectsPage() {
         )}
 
         {projects === null && !error && <div className="muted">載入中…</div>}
-        {projects?.length === 0 && !creating && (
+        {projects?.length === 0 && showArchived && <div className="muted">典藏區沒有專案。</div>}
+        {projects?.length === 0 && !creating && !showArchived && (
           <div className="empty-state">
             <div className="empty-icon">🎮</div>
             <h2>還沒有任何專案</h2>
@@ -119,28 +135,47 @@ export default function ProjectsPage() {
                 </div>
               </button>
               <div className="row project-actions">
-                <button className="btn small" onClick={() => router.push(`/studio/edit/?id=${p.id}`)}>
-                  開啟編輯器
-                </button>
-                <button
-                  className="btn small"
-                  onClick={async () => {
-                    await studioApi.duplicateProject(p.id);
-                    void refresh();
-                  }}
-                >
-                  複製
-                </button>
-                <button
-                  className="btn small danger"
-                  onClick={async () => {
-                    if (!window.confirm(`確定刪除「${p.title}」？所有版本紀錄與已發布的遊戲都會一起刪除，無法復原。`)) return;
-                    await studioApi.deleteProject(p.id);
-                    void refresh();
-                  }}
-                >
-                  刪除
-                </button>
+                {p.archived_at ? (
+                  <>
+                    <span className="small muted grow">典藏於 {new Date(p.archived_at).toLocaleString("zh-TW", { hour12: false })}</span>
+                    <button
+                      className="btn small primary"
+                      data-testid="unarchive"
+                      onClick={async () => {
+                        await studioApi.unarchiveProject(p.id);
+                        void refresh();
+                      }}
+                    >
+                      還原
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="btn small" onClick={() => router.push(`/studio/edit/?id=${p.id}`)}>
+                      開啟編輯器
+                    </button>
+                    <button
+                      className="btn small"
+                      onClick={async () => {
+                        await studioApi.duplicateProject(p.id);
+                        void refresh();
+                      }}
+                    >
+                      複製
+                    </button>
+                    <button
+                      className="btn small"
+                      data-testid="archive"
+                      onClick={async () => {
+                        if (!window.confirm(`把「${p.title}」移到典藏區？資料與版本紀錄都會保留，之後可以在「典藏」還原。`)) return;
+                        await studioApi.archiveProject(p.id);
+                        void refresh();
+                      }}
+                    >
+                      🗄 典藏
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
