@@ -1,0 +1,10 @@
+# service worker 與遊戲目錄需要即時更新，不讓 CDN／瀏覽器長時間快取
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache
+/games/*
+  Cache-Control: no-cache
+# 素材內容固定，可長時間快取
+/assets/*
+  Cache-Control: public, max-age=604800

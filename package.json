@@ -13,7 +13,8 @@
     "generate": "tsx scripts/generate.ts",
     "validate": "tsx scripts/validate.ts",
     "review": "tsx scripts/review.ts",
-    "catalog": "tsx scripts/build-catalog.ts"
+    "catalog": "tsx scripts/build-catalog.ts",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "next": "^16.4.2",
@@ -30,6 +31,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.4.2",
     "tsx": "^4.23.15",
-    "typescript": "5.9"
+    "typescript": "5.9",
+    "wrangler": "^4.151.3"
   }
 }

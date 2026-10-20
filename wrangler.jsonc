@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // 純靜態網站：next build（output: export）產生 out/，以 Workers 靜態資源部署
+  "name": "ai-rpg-builder",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./out",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

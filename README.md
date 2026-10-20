@@ -64,7 +64,10 @@ public/games/index.json          自動產生的遊戲目錄，內含封面資�
 
 ## 部署
 
-`npm run build` 會產生純靜態的 `out/`，可以直接部署到 Cloudflare（Workers 靜態資源或 Pages）。
+`npm run deploy` 會先 build，再用 wrangler 部署到 Cloudflare Workers 靜態資源，設定寫在 `wrangler.jsonc`。
+
+- 線上網址：https://ai-rpg-builder.wuminzhe9.workers.dev
+- 快取設定寫在 `public/_headers`：`sw.js` 和遊戲目錄不快取，素材快取 7 天。
 
 - 遊戲進度存在玩家瀏覽器的 localStorage。
 - 換裝置或清除網站資料之前，請先匯出 JSON 備份。

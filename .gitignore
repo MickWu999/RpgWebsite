@@ -9,3 +9,4 @@ playwright-report
 next-env.d.ts
 generated
 public/games/index.json
+.wrangler
