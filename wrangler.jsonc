@@ -1,11 +1,22 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   // 純靜態網站：next build（output: export）產生 out/，以 Workers 靜態資源部署
+  // 預設環境＝玩家版（npm run deploy）；env.dev＝開發者版（npm run deploy:dev，另一個 Worker／網址）
   "name": "ai-rpg-builder",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./out",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page"
+  },
+  "env": {
+    "dev": {
+      "name": "ai-rpg-builder-dev",
+      "assets": {
+        "directory": "./out",
+        "html_handling": "auto-trailing-slash",
+        "not_found_handling": "404-page"
+      }
+    }
   }
 }
