@@ -71,4 +71,4 @@ export const studioApi = {
 };
 
 /** 前台網址（只顯示成文字，不做成連結；前後台互相獨立） */
-export const PLAYER_SITE_URL = process.env.NEXT_PUBLIC_PLAYER_URL ?? "https://ai-rpg-builder.wuminzhe9.workers.dev";
+export const PLAYER_SITE_URL = process.env.NEXT_PUBLIC_PLAYER_URL ?? "https://ai-rpg-builder.<你的子網域>.workers.dev";
