@@ -3,12 +3,13 @@
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import CreatorOnly from "@/components/CreatorOnly";
-import StudioView from "@/components/StudioView";
-import { DEMO_PROJECT_ID } from "@/game/storage";
+import StudioApp from "@/components/studio/StudioApp";
+import StudioHome from "@/components/studio/StudioHome";
 
+/** /studio：Studio 首頁（專案列表）；/studio/?id=<專案>：RPG Maker 式編輯器 */
 function StudioPage() {
-  const id = useSearchParams().get("id") ?? DEMO_PROJECT_ID;
-  return <StudioView key={id} projectId={id} />;
+  const id = useSearchParams().get("id");
+  return id ? <StudioApp key={id} projectId={id} /> : <StudioHome />;
 }
 
 export default function Page() {

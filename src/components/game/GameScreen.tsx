@@ -461,7 +461,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
             if (latest) enterMap(latest.save!.state);
             else flash({ notice: "沒有可以繼續的存檔" }, 2200, "notice");
           } else if (command === "讀取存檔") update({ ...u, titleLoad: true, slotCursor: 0 });
-          else router.push(source.kind === "local" ? "/create/" : "/");
+          else router.push(source.kind === "local" ? "/studio/" : "/");
         }
         return;
       }
@@ -679,7 +679,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       <div className="rm-stage">
         <div className="rm-error">
           <p>{loadError}</p>
-          <Link href={source.kind === "local" ? "/create/" : "/"}>回到網站</Link>
+          <Link href={source.kind === "local" ? "/studio/" : "/"}>回到網站</Link>
         </div>
       </div>
     );
@@ -826,7 +826,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                         const latest = saves.filter((s) => s.save).sort((a, b) => b.save!.savedAt.localeCompare(a.save!.savedAt))[0];
                         if (latest) enterMap(latest.save!.state);
                       } else if (c === "讀取存檔") update((u) => ({ ...u, titleLoad: true, slotCursor: 0 }));
-                      else router.push(source.kind === "local" ? "/create/" : "/");
+                      else router.push(source.kind === "local" ? "/studio/" : "/");
                     }}
                   >
                     {c}

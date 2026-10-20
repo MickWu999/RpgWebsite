@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import IssueList from "@/components/IssueList";
-import CreatorOnly from "@/components/CreatorOnly";
 import { projectFromFixture } from "@/game/fixtureProject";
 import { GENRE_LABELS, type GameProject } from "@/game/schema";
 import {
@@ -31,15 +30,8 @@ const SOURCE_LABELS: Record<ProjectMetadata["source"], string> = {
   manual: "手動",
 };
 
-export default function CreatePage() {
-  return (
-    <CreatorOnly>
-      <CreatorDashboard />
-    </CreatorOnly>
-  );
-}
-
-function CreatorDashboard() {
+/** Studio 首頁：專案列表、新增專案（本機 AI 生成或 demo 範本）、匯入 JSON */
+export default function StudioHome() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectMetadata[]>([]);
   const [bridge, setBridge] = useState<BridgeStatus | null>(null);
@@ -124,14 +116,14 @@ function CreatorDashboard() {
       <section className="hero">
         <div className="row">
           <h1 className="grow" style={{ margin: 0 }}>
-            開發者工具
+            Studio
           </h1>
           <Link className="btn small" href="/">
             ← 遊戲首頁
           </Link>
         </div>
         <p className="muted" style={{ maxWidth: 680 }}>
-          建立新遊戲（本機 AI 生成或 demo 範本）、管理瀏覽器中的專案、匯入 JSON。這一頁只在開發者版本提供，部署給玩家的網站不會出現。
+          製作 RPG 的地方：可以完全手動創作（RPG Maker 式的地圖與事件編輯器、資料庫），也可以讓 AI 透過同一套操作 API 協助開發。專案存在這個瀏覽器中。
         </p>
       </section>
 

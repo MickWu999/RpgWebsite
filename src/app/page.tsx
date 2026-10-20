@@ -30,8 +30,8 @@ export default function Home() {
         <div className="row">
           <InstallPrompt />
           {!IS_PLAYER_SITE && (
-            <Link className="btn small" href="/create/" data-testid="creator-link">
-              開發者工具 →
+            <Link className="btn small" href="/studio/" data-testid="creator-link">
+              Studio →
             </Link>
           )}
         </div>
@@ -40,7 +40,7 @@ export default function Home() {
       <section className="library" aria-label="選擇遊戲">
         {error && <div className="notice err">目前無法載入遊戲列表，請稍後再試。（{error}）</div>}
         {library === null && !error && <div className="muted small">載入遊戲中…</div>}
-        {library && <GameCarousel games={library} onCreate={IS_PLAYER_SITE ? undefined : () => router.push("/create/")} />}
+        {library && <GameCarousel games={library} onCreate={IS_PLAYER_SITE ? undefined : () => router.push("/studio/")} />}
       </section>
 
       <footer className="portal-footer small muted">

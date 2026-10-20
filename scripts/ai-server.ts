@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { generateProject, providerFromEnv, repairProject } from "@/ai/pipeline";
 import { ProviderError } from "@/ai/provider";
 import { validateProject, type ValidationIssue } from "@/game/validate";
+import { applyOps } from "@/studio/ops";
 import { loadLocalEnv } from "./env";
 
 /**
@@ -92,6 +93,14 @@ const server = createServer(async (req, res) => {
     if (url.pathname === "/api/projects/validate") {
       const result = validateProject(body.project);
       return send(res, 200, { isValid: result.isValid, errors: result.errors, warnings: result.warnings }, cors);
+    }
+    // Studio 操作 API：AI 與 Studio 使用同一套操作（見 docs/ai-development-spec.md）
+    if (url.pathname === "/api/studio/ops") {
+      const base = validateProject(body.project);
+      if (!base.project) return send(res, 400, { error: "project 未通過驗證，請先修正", errors: base.errors }, cors);
+      if (!Array.isArray(body.ops)) return send(res, 400, { error: "ops 必須是陣列" }, cors);
+      const result = applyOps(base.project, body.ops.slice(0, 500));
+      return send(res, 200, result, cors);
     }
     if (url.pathname === "/api/projects/export") {
       const result = validateProject(body.project);
