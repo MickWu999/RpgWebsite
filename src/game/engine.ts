@@ -474,3 +474,9 @@ export function questTracker(project: GameProject, state: PlayerState) {
       };
     });
 }
+
+/** 結局尾聲：依玩家累積的狀態，挑出條件成立的追加描述 */
+export function endingEpilogues(project: GameProject, state: PlayerState): string[] {
+  const ending = project.endings.find((e) => e.id === state.endingId);
+  return (ending?.epilogues ?? []).filter((x) => evaluateCondition(state, x.condition)).map((x) => x.text);
+}

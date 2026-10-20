@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -5,11 +6,12 @@ import { generateProject, providerFromEnv } from "@/ai/pipeline";
 import { loadLocalEnv } from "./env";
 
 /**
- * 命令列生成：npm run generate -- <故事檔.txt> [--title 名稱] [--genre fantasy|modern|sci-fi|mystery] [--style 冒險] [--out 檔案] [--json] [--no-review]
+ * 命令列生成：npm run generate -- <故事檔.txt> [--title 名稱] [--genre fantasy|modern|sci-fi|mystery] [--style 冒險] [--out 檔案] [--json] [--no-review] [--publish]
  * 流程：本機 Claude Code 生成 → 驗證 → 自動試玩 → 修復 → 品質指標 → 獨立 AI 審查 → 依意見修改，全程不需人工介入。
  * 結束碼：0 = approved（可直接發布）；3 = needs_human_review／unreviewed（能玩但未通過品質審查）；2 = 失敗。
  * --json 會在 stdout 輸出完整結果（含驗證報告、試玩路線與每次嘗試的錯誤），進度訊息改輸出到 stderr。
- * 產出的 JSON 可在網站首頁「匯入 JSON」載入試玩。
+ * --publish：只有 approved 的結果會寫成模組包 public/games/<id>/ 並重建遊戲目錄（needs_human_review 不會發布）。
+ * 產出的 JSON 也可在網站首頁「匯入 JSON」載入試玩。
  */
 
 loadLocalEnv();
@@ -22,6 +24,7 @@ const { values, positionals } = parseArgs({
     out: { type: "string" },
     json: { type: "boolean" },
     "no-review": { type: "boolean" },
+    publish: { type: "boolean" },
   },
 });
 if (positionals.length === 0) {
@@ -43,6 +46,22 @@ async function main() {
   const out = values.out ?? path.join("generated", `${projectId}.json`);
   mkdirSync(path.dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(result.project ?? result.rawProject, null, 2) + "\n");
+
+  if (values.publish) {
+    if (result.status === "approved" && result.project) {
+      const dir = path.join("public", "games", result.project.id);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, "project.json"), JSON.stringify(result.project, null, 2) + "\n");
+      writeFileSync(
+        path.join(dir, "meta.json"),
+        JSON.stringify({ status: "approved", source: "ai", provider: result.provider, review: result.review?.review.overall, publishedAt: new Date().toISOString() }, null, 2) + "\n",
+      );
+      log(`已發布模組包：${dir}`);
+      execFileSync(process.execPath, [path.join("node_modules", "tsx", "dist", "cli.mjs"), path.join("scripts", "build-catalog.ts")], { stdio: values.json ? "ignore" : "inherit" });
+    } else {
+      log(`狀態為 ${result.status}，不發布（只有 approved 會自動發布）`);
+    }
+  }
 
   if (values.json) {
     console.log(JSON.stringify({ ok: result.status === "approved", outFile: out, ...result, rawProject: undefined }, null, 2));

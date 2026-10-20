@@ -59,6 +59,10 @@ export function normalizeAiProject(raw: unknown, projectId: string): { project: 
   const items = Array.isArray(p.items) ? (p.items as Obj[]).filter(isObj) : [];
   items.forEach((i) => pick(i, "iconAssetId", "icon", DEFAULT_ITEM_ICON, `物品「${String(i.name)}」`));
 
+  if (isObj(p.cover) && Array.isArray(p.cover.characterAssetIds)) {
+    p.cover.characterAssetIds = (p.cover.characterAssetIds as unknown[]).filter((id) => typeof id === "string" && findCatalogAsset(id)?.kind === "character");
+    (p.cover.characterAssetIds as string[]).forEach((id) => used.add(id));
+  }
   p.assetManifest = { assets: [...used].map(manifestEntry) };
   return { project: p, notes };
 }

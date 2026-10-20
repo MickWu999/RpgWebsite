@@ -11,7 +11,8 @@ npm install
 npm run dev            # http://localhost:3000
 ```
 
-- 試玩 demo：http://localhost:3000/play/?id=demo-lantern
+- 首頁「遊戲庫」可以左右捲動選擇遊戲；直接試玩 demo：http://localhost:3000/play/?pack=demo-lantern
+- 遊戲啟動流程：開發者 Logo → 封面（按任意鍵開始）→ 標題選單
 - 操作方式：
   - 鍵盤：方向鍵或 WASD 移動，Z／Enter 確認，X／Esc 開啟選單
   - 手機（請橫向遊玩）：用搖桿移動、點擊地面移動、點擊 NPC 對話
@@ -27,6 +28,7 @@ npm run dev            # http://localhost:3000
 | `npm run generate -- <故事.txt> [--json]` | 用本機 Claude Code 從故事生成遊戲，全程自動驗證與審查 |
 | `npm run review -- <project.json> --story <故事.txt>` | 對既有遊戲執行獨立的 AI 審查 |
 | `npm run ai` | 啟動本機 AI bridge，讓網頁上的「AI 生成」按鈕可以使用 |
+| `npm run catalog` | 驗證 `public/games/` 底下的模組包並產生遊戲目錄（`build`、`dev` 會自動執行） |
 
 ## AI 生成（本機 Claude Code，不需要 API key）
 
@@ -39,6 +41,26 @@ AI 生成使用本機已登入的 Claude Code CLI，只能在本機執行。部�
 
 - 流程：生成 → 驗證 → 自動試玩 → 修復 → 品質指標 → 獨立 AI 審查 → 依意見修改
 - 最終狀態只有兩種：`approved`（可以發布）或 `needs_human_review`（不會自動發布）
+
+## 遊戲模組包
+
+每款遊戲都是一個靜態資料夾，引擎與素材所有遊戲共用：
+
+```
+public/games/<id>/project.json   遊戲本體（GameProject JSON），玩家選擇後才下載
+public/games/<id>/meta.json      狀態：demo 或 approved
+public/games/index.json          自動產生的遊戲目錄，內含封面資料，不要手動修改
+```
+
+- 只有通過驗證、自動試玩、品質指標，而且狀態是 `demo` 或 `approved` 的遊戲，才會被收錄進目錄。
+- `npm run generate -- <故事> --publish`：只有生成結果為 `approved` 時，才會自動發布到這裡。
+- 之後若要讓使用者自行發布，可以把這兩個網址換成 API（例如 Cloudflare R2 加上 Worker），資料格式不需要改。
+
+## PWA（可安裝、可離線）
+
+- **Android／Chrome**：首頁會出現「安裝到主畫面」按鈕。
+- **iPhone**：點 Safari 的「分享」→「加入主畫面」。從主畫面開啟可以全螢幕遊玩，這是 iPhone 上唯一能全螢幕的方式。
+- **離線**：玩過的遊戲離線也能玩。service worker 寫在 `public/sw.js`：網頁一律先抓網路上的新版本，素材則優先使用快取。
 
 ## 部署
 

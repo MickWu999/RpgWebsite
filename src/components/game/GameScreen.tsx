@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_MUSIC, MUSIC, SOUNDS } from "@/game/assets";
 import {
   availableChoices,
@@ -11,6 +11,7 @@ import {
   closeDialogue,
   createInitialState,
   currentDialogueNode,
+  endingEpilogues,
   getScene,
   interact,
   move,
@@ -23,16 +24,20 @@ import {
 } from "@/game/engine";
 import { findPath, pathToNpc } from "@/game/pathfinding";
 import type { GameProject } from "@/game/schema";
+import { coverDataOf } from "@/game/cover";
 import { listSaves, loadProject, savePlayerState, type SaveSlot } from "@/game/storage";
+import { fetchPack } from "@/lib/packs";
 import { getAudio } from "@/lib/audio";
 import { loadSettings, saveSettings, TEXT_SPEED_FACTOR, TEXT_SPEED_LABEL, type Settings, type TextSpeed } from "@/lib/settings";
+import CoverArt from "./CoverArt";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
 import TouchControls, { type InputKey } from "./TouchControls";
 
 const GameCanvas = dynamic(() => import("../GameCanvas"), { ssr: false });
 
 /**
- * RPG Maker 式的單一遊戲畫面：標題 → 地圖 →（選單）→ 結局 → 標題。
+ * RPG Maker 式的單一遊戲畫面：開發者 Logo → 封面（按任意鍵開始）→ 標題 → 地圖 →（選單）→ 結局 → 標題。
+ * 遊戲來源可以是模組包（/games/<id>/project.json）或瀏覽器中的本機專案。
  * 所有 UI 都畫在 640×480 的邏輯畫面裡，整體等比縮放到視窗大小。
  * 確認：Z／Enter／空白鍵／E　取消／選單：X／Esc　移動：方向鍵／WASD
  * 手機：虛擬十字鍵＋A（確認）／B（取消／選單），與鍵盤共用同一套輸入邏輯。
@@ -44,7 +49,8 @@ const MOVE_INTERVAL_MS = 140;
 /** 手機橫向時畫面依螢幕比例變寬（固定寬 640，高度介於此範圍），搖桿與按鈕疊在畫面上 */
 const MIN_SCREEN_H = 260;
 
-type Mode = "loading" | "title" | "map" | "menu" | "ending";
+type Mode = "loading" | "splash" | "cover" | "title" | "map" | "menu" | "ending";
+export type GameSource = { kind: "pack" | "local"; id: string };
 type MenuPage = "root" | "items" | "quests" | "status" | "save" | "load" | "options" | "title";
 type Toast = { id: number; text: string };
 type UI = {
@@ -141,7 +147,8 @@ function formatTime(iso: string) {
 const sfx = (src: string, volume = 0.35) => getAudio().play(src, { volume });
 const wrap = (n: number, len: number) => (len === 0 ? 0 : (n + len) % len);
 
-export default function GameScreen({ projectId }: { projectId: string }) {
+export default function GameScreen({ source }: { source: GameSource }) {
+  const projectId = source.id;
   const [project, setProject] = useState<GameProject | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ui, setUi] = useState<UI | null>(null);
@@ -167,42 +174,58 @@ export default function GameScreen({ projectId }: { projectId: string }) {
     setUi(value);
   }, []);
 
-  // ---------- 載入 ----------
+  // ---------- 載入（模組包從伺服器下載並驗證；本機專案從 localStorage 讀取） ----------
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect -- 專案與存檔存在 localStorage，只能在瀏覽器端讀取 */
-    const loaded = loadProject(projectId);
-    if (!loaded) {
-      setLoadError(`找不到專案「${projectId}」。專案只存在建立它的瀏覽器中。`);
-      return;
-    }
-    projectRef.current = loaded.project;
-    const settings = loadSettings();
-    const latest = listSaves(loaded.project)
-      .filter((s) => s.save)
-      .sort((a, b) => b.save!.savedAt.localeCompare(a.save!.savedAt))[0];
-    const initial: UI = {
-      mode: "title",
-      game: latest?.save?.state ?? createInitialState(loaded.project),
-      titleCursor: latest ? 1 : 0,
-      titleLoad: false,
-      slotCursor: 0,
-      messages: [],
-      messageSeq: 0,
-      choiceCursor: 0,
-      menuPage: "root",
-      menuCursor: 0,
-      subCursor: 0,
-      banner: null,
-      fadeId: 0,
-      toasts: [],
-      notice: null,
-      settings,
+    let cancelled = false;
+    const start = (project: GameProject) => {
+      if (cancelled) return;
+      projectRef.current = project;
+      const latest = listSaves(project)
+        .filter((s) => s.save)
+        .sort((a, b) => b.save!.savedAt.localeCompare(a.save!.savedAt))[0];
+      const initial: UI = {
+        mode: "splash",
+        game: latest?.save?.state ?? createInitialState(project),
+        titleCursor: latest ? 1 : 0,
+        titleLoad: false,
+        slotCursor: 0,
+        messages: [],
+        messageSeq: 0,
+        choiceCursor: 0,
+        menuPage: "root",
+        menuCursor: 0,
+        subCursor: 0,
+        banner: null,
+        fadeId: 0,
+        toasts: [],
+        notice: null,
+        settings: loadSettings(),
+      };
+      uiRef.current = initial;
+      setProject(project);
+      setUi(initial);
+      // 開發者 Logo 顯示一下後自動進入封面
+      window.setTimeout(() => {
+        if (!cancelled && uiRef.current?.mode === "splash") {
+          uiRef.current = { ...uiRef.current, mode: "cover" };
+          setUi(uiRef.current);
+        }
+      }, 1600);
     };
-    uiRef.current = initial;
-    setProject(loaded.project);
-    setUi(initial);
-    /* eslint-enable react-hooks/set-state-in-effect */
-  }, [projectId]);
+    if (source.kind === "pack") {
+      fetchPack(source.id)
+        .then(start)
+        .catch((e: Error) => !cancelled && setLoadError(e.message));
+    } else {
+      const loaded = loadProject(source.id);
+      Promise.resolve().then(() => (loaded ? start(loaded.project) : !cancelled && setLoadError(`找不到專案「${source.id}」。專案只存在建立它的瀏覽器中。`)));
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [source.kind, source.id]);
+
+  const cover = useMemo(() => (project ? coverDataOf(project) : null), [project]);
 
   // ---------- 縮放 ----------
   useEffect(() => {
@@ -247,11 +270,11 @@ export default function GameScreen({ projectId }: { projectId: string }) {
   useEffect(() => {
     const p = projectRef.current;
     if (!p || !musicMode || musicMode === "loading") return;
-    if (!bgmOn || musicMode === "ending") {
+    if (!bgmOn || musicMode === "ending" || musicMode === "splash") {
       getAudio().playMusic(null);
       return;
     }
-    const sceneId = musicMode === "title" ? p.startSceneId : musicScene!;
+    const sceneId = musicMode === "title" || musicMode === "cover" ? (p.cover?.sceneId ?? p.startSceneId) : musicScene!;
     const mood = p.scenes.find((sc) => sc.id === sceneId)?.music ?? DEFAULT_MUSIC;
     getAudio().playMusic(MUSIC[mood].src);
   }, [musicMode, musicScene, bgmOn]);
@@ -364,6 +387,11 @@ export default function GameScreen({ projectId }: { projectId: string }) {
       const p = projectRef.current;
       if (!u || !p) return;
 
+      if (u.mode === "splash" || u.mode === "cover") {
+        if (u.mode === "cover") sfx(SOUNDS.select);
+        update({ ...u, mode: u.mode === "splash" ? "cover" : "title" });
+        return;
+      }
       if (u.mode === "title") {
         if (u.titleLoad) {
           if (key === "up" || key === "down") update({ ...u, slotCursor: wrap(u.slotCursor + (key === "up" ? -1 : 1), 4) });
@@ -584,7 +612,9 @@ export default function GameScreen({ projectId }: { projectId: string }) {
   const saves = ui.mode === "title" || ui.menuPage === "save" || ui.menuPage === "load" ? listSaves(project) : [];
   const hasSave = saves.some((s) => s.save);
   const buttonLabels =
-    ui.mode === "title"
+    ui.mode === "splash" || ui.mode === "cover"
+      ? { a: "開始", b: "" }
+      : ui.mode === "title"
       ? { a: "確定", b: ui.titleLoad ? "返回" : "" }
       : ui.mode === "menu"
         ? { a: "確定", b: "返回" }
@@ -654,10 +684,27 @@ export default function GameScreen({ projectId }: { projectId: string }) {
           />
         )}
 
+        {(ui.mode === "cover" || ui.mode === "title") && cover && <CoverArt cover={cover} className="rm-cover-bg" />}
+
+        {ui.mode === "splash" && (
+          <div className="rm-splash" data-testid="splash" onClick={() => update((u) => ({ ...u, mode: "cover" }))}>
+            <div className="rm-splash-logo">AI RPG Builder</div>
+            <div className="rm-splash-sub">presents</div>
+          </div>
+        )}
+
+        {ui.mode === "cover" && (
+          <div className="rm-cover" data-testid="cover-screen" onClick={() => update((u) => ({ ...u, mode: "title" }))}>
+            <h1 className="rm-game-title">{project.title}</h1>
+            {project.cover?.tagline && <p className="rm-tagline">{project.cover.tagline}</p>}
+            <div className="rm-press-start">{layout.touch ? "點擊畫面開始" : "按任意鍵開始"}</div>
+          </div>
+        )}
+
         {ui.mode === "title" && (
           <div className="rm-title" data-testid="title-screen">
             <h1 className="rm-game-title">{project.title}</h1>
-            <p className="rm-subtitle">{project.description}</p>
+            <p className="rm-subtitle">{project.cover?.tagline ?? project.description}</p>
             {ui.titleLoad ? (
               <div className="rm-window rm-title-slots">
                 {(["auto", "1", "2", "3"] as SaveSlot[]).map((slot, i) => (
@@ -798,6 +845,11 @@ export default function GameScreen({ projectId }: { projectId: string }) {
           <div className="rm-ending" data-testid="ending" data-ending-id={ending.id} onClick={() => update((u) => ({ ...u, mode: "title", titleCursor: 0 }))}>
             <h2>{ending.title}</h2>
             <p>{ending.text}</p>
+            {endingEpilogues(project, game).map((line, i) => (
+              <p key={i} className="rm-epilogue">
+                {line}
+              </p>
+            ))}
             <div className="rm-the-end">— THE END —</div>
             <div className="rm-dim">Lv {game.stats.level}・經驗值 {game.stats.xp}・步數 {game.steps}</div>
             <div className="rm-hint">按確認鍵回到標題</div>

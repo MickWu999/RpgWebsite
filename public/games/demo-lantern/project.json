@@ -5,6 +5,15 @@
   "description": "守望燈塔熄滅了三夜，迷霧從東邊森林湧進燈火村。找到星光燈芯，決定它的歸屬。",
   "genre": "fantasy",
   "intro": "你是一名路過燈火村的旅人。村子的守望燈塔已經熄滅三夜，迷霧一天比一天濃。村長艾琳就站在燈塔旁，似乎在等著什麼人。\n\n操作：方向鍵移動・Z／Enter 對話與確認・X／Esc 開啟選單。",
+  "cover": {
+    "sceneId": "village",
+    "characterAssetIds": [
+      "char_hero",
+      "char_hooded_elder",
+      "char_ranger"
+    ],
+    "tagline": "燈芯該歸誰，由你決定。"
+  },
   "startSceneId": "village",
   "player": {
     "name": "旅人",
@@ -882,7 +891,17 @@
           }
         ]
       },
-      "mood": "bittersweet"
+      "mood": "bittersweet",
+      "epilogues": [
+        {
+          "condition": {
+            "type": "stat_at_least",
+            "stat": "level",
+            "value": 2
+          },
+          "text": "旅途中累積的歷練，讓你在離開燈火村時，腳步比來時更加堅定。"
+        }
+      ]
     },
     {
       "id": "end_forest",
@@ -902,7 +921,17 @@
           }
         ]
       },
-      "mood": "triumphant"
+      "mood": "triumphant",
+      "epilogues": [
+        {
+          "condition": {
+            "type": "stat_at_least",
+            "stat": "level",
+            "value": 2
+          },
+          "text": "旅途中累積的歷練，讓你在離開燈火村時，腳步比來時更加堅定。"
+        }
+      ]
     }
   ],
   "assetManifest": {

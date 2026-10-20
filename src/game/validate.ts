@@ -142,6 +142,10 @@ export function validateLogic(project: GameProject): ValidationReport {
   });
   checkAsset("player.spriteAssetId", project.player.spriteAssetId, "character");
 
+  // --- 封面 ---
+  if (project.cover?.sceneId && !sceneIds.has(project.cover.sceneId)) err("cover.sceneId", `封面場景「${project.cover.sceneId}」不存在`);
+  project.cover?.characterAssetIds?.forEach((id, i) => checkAsset(`cover.characterAssetIds[${i}]`, id, "character"));
+
   // --- 場景 ---
   project.scenes.forEach((scene, si) => {
     const p = `scenes[${si}]`;
@@ -273,7 +277,10 @@ export function validateLogic(project: GameProject): ValidationReport {
   project.quests.forEach((q) => visit(q.id, []));
 
   // --- 結局 ---
-  project.endings.forEach((e, ei) => checkCondition(`endings[${ei}].condition`, e.condition));
+  project.endings.forEach((e, ei) => {
+    checkCondition(`endings[${ei}].condition`, e.condition);
+    e.epilogues?.forEach((x, xi) => checkCondition(`endings[${ei}].epilogues[${xi}].condition`, x.condition));
+  });
 
   // 引用錯誤會讓後續分析失準，先回報
   if (errors.length > 0) return { isValid: false, errors, warnings };

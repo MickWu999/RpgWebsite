@@ -225,3 +225,31 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #f2b84b55; border
 .rm-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
 .rm-btn-label { font-size: 12px; font-weight: 400; margin-top: 2px; }
 .rm-btn.idle { opacity: 0.3 !important; }
+
+/* ---------- 開發者 Logo、封面 ---------- */
+.cover-art { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.rm-cover-bg { position: absolute; inset: 0; z-index: 9; }
+.rm-title { background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.45)); }
+.rm-splash { position: absolute; inset: 0; z-index: 15; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; animation: rm-splash 1.6s ease forwards; }
+.rm-splash-logo { font-size: 30px; letter-spacing: 0.25em; color: #fff3cf; text-shadow: 0 0 16px rgba(255, 200, 90, 0.5); }
+.rm-splash-sub { font-size: 13px; letter-spacing: 0.5em; color: #9aa0bd; margin-top: 6px; }
+@keyframes rm-splash { 0% { opacity: 0; } 25%, 75% { opacity: 1; } 100% { opacity: 0.9; } }
+.rm-cover { position: absolute; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; padding-top: 60px; cursor: pointer; animation: rm-fade-in 0.8s ease; }
+@keyframes rm-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.rm-tagline { margin: 12px 0 0; font-size: 16px; color: #ffe9b0; text-shadow: 1px 1px 0 #000, 0 0 10px rgba(0, 0, 0, 0.8); letter-spacing: 0.08em; }
+.rm-press-start { position: absolute; bottom: 36px; font-size: 18px; letter-spacing: 0.2em; color: #fff; text-shadow: 2px 2px 0 #000; animation: rm-press 1.4s ease-in-out infinite; }
+@keyframes rm-press { 50% { opacity: 0.25; } }
+.rm-screen.short .rm-cover { padding-top: 30px; }
+.rm-screen.short .rm-press-start { bottom: 20px; }
+
+/* ---------- 首頁遊戲庫（可左右捲動） ---------- */
+.library { margin-bottom: 28px; display: flex; flex-direction: column; gap: 12px; }
+.shelf { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; scrollbar-width: thin; }
+.game-card { flex: 0 0 300px; scroll-snap-align: start; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; color: var(--text); text-decoration: none; transition: transform 0.15s, border-color 0.15s; }
+.game-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+.game-card-cover { position: relative; aspect-ratio: 4 / 3; background: #000; }
+.game-card-title { position: absolute; left: 0; right: 0; top: 14px; text-align: center; font-size: 22px; font-weight: 700; color: #fff3cf; text-shadow: 0 0 12px rgba(255, 200, 90, 0.5), 2px 2px 0 #000; padding: 0 10px; }
+.game-card-body { padding: 10px 12px 12px; }
+.game-card-desc { margin: 8px 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.rm-ending .rm-epilogue { margin: 4px 0; font-size: 15px; color: #c9cfe8; }
+.rm-screen.short .rm-ending { padding: 16px 50px; overflow: auto; justify-content: flex-start; }

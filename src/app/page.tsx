@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import IssueList from "@/components/IssueList";
+import CoverArt from "@/components/game/CoverArt";
+import { InstallPrompt } from "@/components/PwaSupport";
 import { projectFromFixture } from "@/game/fixtureProject";
 import { GENRE_LABELS, type GameProject } from "@/game/schema";
 import {
@@ -20,6 +22,7 @@ import {
 import type { ValidationIssue } from "@/game/validate";
 import { bridgeGenerate, checkBridge, type BridgeStatus } from "@/lib/aiBridge";
 import { STATUS_LABELS } from "@/lib/labels";
+import { fetchCatalog, type CatalogEntry } from "@/lib/packs";
 
 const STYLES = ["冒險", "輕鬆", "嚴肅", "黑暗"];
 const SOURCE_LABELS: Record<ProjectMetadata["source"], string> = {
@@ -44,6 +47,9 @@ export default function Home() {
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [failedRaw, setFailedRaw] = useState<unknown>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const shelfRef = useRef<HTMLDivElement>(null);
+  const [library, setLibrary] = useState<CatalogEntry[] | null>(null);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
 
   const refresh = () => setProjects(listProjects().filter((p) => p.id !== DEMO_PROJECT_ID));
 
@@ -51,6 +57,9 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 專案列表存在 localStorage，只能在瀏覽器端讀取
     refresh();
     checkBridge().then(setBridge);
+    fetchCatalog()
+      .then((c) => setLibrary(c.games))
+      .catch((e: Error) => setLibraryError(e.message));
   }, []);
 
   useEffect(() => {
@@ -119,12 +128,48 @@ export default function Home() {
           你也可以直接在 Studio 編輯或匯入 JSON。
         </p>
         <div className="row">
-          <Link className="btn primary" href={`/play/?id=${DEMO_PROJECT_ID}`} data-testid="play-demo">
+          <Link className="btn primary" href={`/play/?pack=${DEMO_PROJECT_ID}`} data-testid="play-demo">
             ▶ 試玩 demo：迷霧森林的燈火
           </Link>
           <Link className="btn" href={`/studio/?id=${DEMO_PROJECT_ID}`}>
             在 Studio 檢視 demo
           </Link>
+          <InstallPrompt />
+        </div>
+      </section>
+
+      <section className="library" aria-label="遊戲庫">
+        <div className="row">
+          <h2 className="grow" style={{ margin: 0 }}>
+            遊戲庫
+          </h2>
+          <button className="btn small" aria-label="往左捲動" onClick={() => shelfRef.current?.scrollBy({ left: -320, behavior: "smooth" })}>
+            ◀
+          </button>
+          <button className="btn small" aria-label="往右捲動" onClick={() => shelfRef.current?.scrollBy({ left: 320, behavior: "smooth" })}>
+            ▶
+          </button>
+        </div>
+        {libraryError && <div className="notice err">{libraryError}</div>}
+        {library === null && !libraryError && <div className="muted small">載入遊戲目錄中…</div>}
+        <div className="shelf" ref={shelfRef} data-testid="library">
+          {library?.map((g) => (
+            <Link key={g.id} className="game-card" href={`/play/?pack=${encodeURIComponent(g.id)}`} data-pack={g.id}>
+              <div className="game-card-cover">
+                <CoverArt cover={g.cover} />
+                <div className="game-card-title">{g.title}</div>
+              </div>
+              <div className="game-card-body">
+                <div className="row small">
+                  <span className="badge">{GENRE_LABELS[g.genre]}</span>
+                  {g.typicalMinutes && <span className="badge">約 {g.typicalMinutes[0]}～{g.typicalMinutes[1]} 分鐘</span>}
+                  <span className="badge">{g.endings} 種結局</span>
+                  {g.status === "approved" && <span className="badge ok">AI 生成・審查通過</span>}
+                </div>
+                <p className="small muted game-card-desc">{g.description}</p>
+              </div>
+            </Link>
+          ))}
         </div>
       </section>
 

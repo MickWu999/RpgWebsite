@@ -15,6 +15,8 @@
 npm run validate -- <project.json|demo> --json   # 結束碼 0 表示全部通過
 npm run generate -- <story.txt> --json           # 結束碼 0=approved, 3=needs_human_review, 2=失敗
 npm run review -- <project.json> --story <story.txt> --json
+npm run generate -- <story.txt> --publish        # 只有 approved 才會自動寫入 public/games/ 並重建目錄
+npm run catalog                                  # 重建遊戲目錄
 npm run check                                    # 修改程式後必須跑：lint、typecheck、build
 ```
 
@@ -35,13 +37,18 @@ npm run check                                    # 修改程式後必須跑：li
 | `src/components/GameCanvas.tsx` | Phaser 3 渲染層，只負責繪製，不處理遊戲邏輯 |
 | `scripts/` | 本機 CLI：validate、generate、review，以及 AI bridge |
 | `docs/narrative-design-guide.md` | 敘事設計準則與參考來源 |
+| `public/games/<id>/` | 遊戲模組包（`project.json` 加上 `meta.json`）。`index.json` 是自動產生的，不要手動修改 |
+| `src/game/cover.ts`、`src/components/game/CoverArt.tsx` | 用素材組合出封面圖（不使用 AI 生圖） |
+| `src/game/duration.ts` | 依自動試玩的最短路線估算遊玩時長 |
+| `public/sw.js`、`public/manifest.webmanifest` | PWA 設定。快取策略改變時，要遞增 `CACHE` 版本號 |
 
 ## 撰寫或修改 GameProject 的規則
 
 - 地圖使用 `terrain` 字元，可用字元見 `TERRAIN`。`walkable` 由地形推導出來。
 - 任務目標會**依序**完成。與 NPC 互動時，會先推進 `talk_to_npc` 目標，然後才挑選對話分支。
 - `dialogueVariants` 由上往下取第一個條件成立的分支，所以條件越嚴格的要放越前面。
-- 每位 NPC 都要設定 `voice`，每個場景都要設定 `music`，每個結局都要設定 `mood`。
+- 每位 NPC 都要設定 `voice`，每個場景都要設定 `music`，每個結局都要設定 `mood`，專案要設定 `cover`。
+- 用 `ending.epilogues`（結局尾聲）回應其他主要選擇，不要為了回應選擇而增加結局數量。
 - 規模上限：結局最多 4 個、NPC 最多 6 位、對話節點最多 50 個。超過上限會被品質指標擋下。
 - 敘事規則見 `src/ai/designGuide.ts`，其中可以由程式判斷的部分已經寫進 `quality.ts`。
 

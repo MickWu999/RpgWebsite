@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
+    "dev": "tsx scripts/build-catalog.ts && next dev -p 3000",
+    "build": "tsx scripts/build-catalog.ts && next build",
     "start": "npx serve@14 out -l 3000",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -12,7 +12,8 @@
     "ai": "tsx scripts/ai-server.ts",
     "generate": "tsx scripts/generate.ts",
     "validate": "tsx scripts/validate.ts",
-    "review": "tsx scripts/review.ts"
+    "review": "tsx scripts/review.ts",
+    "catalog": "tsx scripts/build-catalog.ts"
   },
   "dependencies": {
     "next": "^16.4.2",

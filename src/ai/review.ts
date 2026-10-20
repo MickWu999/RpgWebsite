@@ -87,7 +87,10 @@ export function projectDigest(project: GameProject, playtest: PlaytestReport): s
   for (const i of project.items) lines.push(`- ${i.name}（${i.id}）：${i.description}`);
   lines.push(`玩家初始物品：${project.player.inventoryItemIds.join("、") || "無"}`);
   lines.push("", "## 結局");
-  for (const e of project.endings) lines.push(`- ${e.title}（條件：${describeCondition(project, e.condition)}）：${e.text}`);
+  for (const e of project.endings) {
+    lines.push(`- ${e.title}（條件：${describeCondition(project, e.condition)}）：${e.text}`);
+    for (const x of e.epilogues ?? []) lines.push(`  - 尾聲（若 ${describeCondition(project, x.condition)}）：${x.text}`);
+  }
   lines.push("", "## 自動試玩找到的最短通關路線");
   for (const e of playtest.endings) lines.push(`- ${e.title}：${e.reachable ? e.steps!.join(" → ") : "無法達成"}`);
   return lines.join("\n");

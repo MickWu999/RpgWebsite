@@ -1,3 +1,4 @@
+import { estimateDuration, type DurationEstimate } from "./duration";
 import type { PlaytestReport } from "./playtest";
 import type { GameCondition, GameProject } from "./schema";
 import type { ValidationIssue } from "./validate";
@@ -40,6 +41,8 @@ export type QualityMetrics = {
   endingsHaveDistinctChoices: boolean;
   /** 至少在一條結局路線上被對話過的 NPC 比例 */
   npcCoverage: number;
+  /** 預估遊玩時長（分鐘） */
+  duration: DurationEstimate | null;
 };
 
 export type QualityReport = { metrics: QualityMetrics; blocking: ValidationIssue[]; suggestions: ValidationIssue[] };
@@ -74,6 +77,7 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport): Q
     stepsToEnding,
     endingsHaveDistinctChoices,
     npcCoverage: Math.round(npcCoverage * 100) / 100,
+    duration: estimateDuration(project, playtest),
   };
 
   const need = (ok: boolean, path: string, message: string) => ok || blocking.push({ path, message });
@@ -111,7 +115,10 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport): Q
   project.npcs.forEach((n) => n.dialogueVariants?.forEach((v) => collectReads(v.condition)));
   project.dialogues.forEach((d) => d.choices?.forEach((c) => collectReads(c.condition)));
   project.quests.forEach((q) => collectReads(q.startCondition));
-  project.endings.forEach((e) => collectReads(e.condition));
+  project.endings.forEach((e) => {
+    collectReads(e.condition);
+    e.epilogues?.forEach((x) => collectReads(x.condition));
+  });
   project.scenes.forEach((sc) => sc.pickups?.forEach((pk) => collectReads(pk.condition)));
   const effects = [...choices.flatMap((c) => c.effects ?? []), ...project.quests.flatMap((q) => q.rewards ?? [])];
   const setFlags = new Set(effects.flatMap((e) => (e.type === "set_flag" ? [e.flag] : [])));

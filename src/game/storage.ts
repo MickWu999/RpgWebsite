@@ -1,5 +1,5 @@
 import { z } from "zod";
-import demoFixture from "@/fixtures/demo-project.json";
+import demoFixture from "../../public/games/demo-lantern/project.json";
 import { projectRevision, type PlayerState } from "./engine";
 import type { GameProject } from "./schema";
 import { validateProject } from "./validate";

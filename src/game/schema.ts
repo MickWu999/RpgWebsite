@@ -12,6 +12,8 @@ import { z } from "zod";
  * - `player.spriteAssetId`、`asset.frame/frameSize`：角色圖與 spritesheet 圖塊。
  * - `npc.voice`：對話逐字顯示時的合成語音（由 AI 依角色個性設計）；`ending.mood`：結局音樂的情緒；
  *   `scene.music`：場景背景音樂的情緒標籤（對應素材庫曲目）。
+ * - `cover`：封面設定（背景場景、主視覺角色、標語），由程式用素材組合成封面圖。
+ * - `ending.epilogues`：結局尾聲，依玩家累積的選擇追加描述，不必增加結局數量就能回應多個選擇。
  * - `npc.dialogueVariants`：依條件切換 NPC 的起始對話節點。
  * - condition 新增 `quest_active`、`all`、`any`、`not`；effect 新增 `remove_item`。
  * 不在 schema 中的 effect / condition 一律拒絕（strict object + discriminated union）。
@@ -216,6 +218,10 @@ export const endingSchema = z.strictObject({
   text: z.string().min(1).max(4000),
   condition: conditionSchema,
   mood: z.enum(["triumphant", "bittersweet", "somber", "mysterious"]).optional(),
+  epilogues: z
+    .array(z.strictObject({ condition: conditionSchema, text: z.string().min(1).max(300) }))
+    .max(8)
+    .optional(),
 });
 
 /** 素材只允許站內路徑（SPEC §12 對外部 URL 採 allowlist） */
@@ -242,6 +248,13 @@ export const gameProjectSchema = z.strictObject({
   description: longText,
   genre: z.enum(["fantasy", "modern", "sci-fi", "mystery"]),
   intro: z.string().max(4000).optional(),
+  cover: z
+    .strictObject({
+      sceneId: idSchema.optional(),
+      characterAssetIds: z.array(idSchema).max(3).optional(),
+      tagline: z.string().max(60).optional(),
+    })
+    .optional(),
   startSceneId: idSchema,
   player: playerSchema,
   scenes: z.array(sceneSchema).min(1).max(10),

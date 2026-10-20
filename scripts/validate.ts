@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import demoFixture from "@/fixtures/demo-project.json";
+import demoFixture from "../public/games/demo-lantern/project.json";
 import { runPlaytest } from "@/game/playtest";
 import { assessQuality } from "@/game/quality";
 import { validateProject } from "@/game/validate";
