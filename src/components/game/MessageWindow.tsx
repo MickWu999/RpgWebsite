@@ -1,0 +1,85 @@
+"use client";
+
+import { useEffect, useMemo, useState, type RefObject } from "react";
+import type { AssetDefinition, DialogueChoice, NPCDefinition } from "@/game/schema";
+import { CHAR_INTERVAL_MS, getAudio } from "@/lib/audio";
+import Portrait from "./Portrait";
+
+export type TypingControl = { typing: boolean; finish: () => void };
+
+const SILENT = /[\s，。、！？；：「」『』（）…—,.!?;:()"'-]/;
+
+/**
+ * RPG Maker 式訊息視窗：畫面下方、名字框、頭像、逐字顯示並播放 NPC 合成講話聲。
+ * 文字顯示完畢後才出現選項視窗（右側、可用方向鍵移動游標）。每則訊息以 key 重新掛載。
+ */
+export default function MessageWindow({
+  speaker,
+  text,
+  voice,
+  portrait,
+  portraitSize = 72,
+  speedFactor,
+  choices,
+  cursor,
+  controlRef,
+  onChoose,
+  onContinue,
+}: {
+  speaker?: string;
+  text: string;
+  voice?: NPCDefinition["voice"];
+  portrait?: AssetDefinition;
+  portraitSize?: number;
+  speedFactor: number;
+  choices: DialogueChoice[];
+  cursor: number;
+  controlRef: RefObject<TypingControl>;
+  onChoose: (choiceId: string) => void;
+  onContinue: () => void;
+}) {
+  const chars = useMemo(() => [...text], [text]);
+  const [shown, setShown] = useState(0);
+  const typing = shown < chars.length;
+
+  useEffect(() => {
+    controlRef.current = { typing, finish: () => setShown(chars.length) };
+  }, [controlRef, typing, chars.length]);
+
+  useEffect(() => {
+    if (!typing) return;
+    const interval = CHAR_INTERVAL_MS[voice?.speed ?? "normal"] * speedFactor;
+    const timer = window.setInterval(() => setShown((n) => Math.min(n + 1, chars.length)), interval);
+    return () => window.clearInterval(timer);
+  }, [typing, chars.length, voice?.speed, speedFactor]);
+
+  // 每兩個字發一個音節，標點與空白不發聲；系統訊息（沒有說話者）不發聲
+  useEffect(() => {
+    if (!speaker || shown === 0 || shown >= chars.length || shown % 2 !== 0 || SILENT.test(chars[shown - 1])) return;
+    getAudio().blip(voice);
+  }, [shown, chars, voice, speaker]);
+
+  return (
+    <>
+      {!typing && choices.length > 0 && (
+        <div className="rm-window rm-choices" role="listbox" aria-label="選項">
+          {choices.map((c, i) => (
+            <button key={c.id} className={`rm-item${i === cursor ? " selected" : ""}`} data-choice-id={c.id} onClick={() => onChoose(c.id)}>
+              {c.text}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="rm-message" data-testid="dialogue" data-typing={typing}>
+        {speaker && <div className="rm-window rm-namebox">{speaker}</div>}
+        <div className="rm-window rm-message-body" onClick={() => (typing ? setShown(chars.length) : choices.length === 0 && onContinue())}>
+          {portrait && <Portrait asset={portrait} size={portraitSize} />}
+          <div className="rm-text">
+            {chars.slice(0, shown).join("")}
+            {!typing && choices.length === 0 && <span className="rm-pause">▼</span>}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

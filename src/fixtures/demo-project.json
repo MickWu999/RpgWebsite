@@ -1,0 +1,966 @@
+{
+  "schemaVersion": "1.0",
+  "id": "demo-lantern",
+  "title": "迷霧森林的燈火",
+  "description": "守望燈塔熄滅了三夜，迷霧從東邊森林湧進燈火村。找到星光燈芯，決定它的歸屬。",
+  "genre": "fantasy",
+  "intro": "你是一名路過燈火村的旅人。村子的守望燈塔已經熄滅三夜，迷霧一天比一天濃。村長艾琳就站在燈塔旁，似乎在等著什麼人。\n\n操作：方向鍵移動・Z／Enter 對話與確認・X／Esc 開啟選單。",
+  "startSceneId": "village",
+  "player": {
+    "name": "旅人",
+    "description": "四處流浪、願意伸出援手的年輕旅人。",
+    "spriteAssetId": "char_hero",
+    "startPosition": {
+      "sceneId": "village",
+      "x": 3,
+      "y": 6
+    },
+    "baseStats": {
+      "hp": 100,
+      "level": 1,
+      "xp": 0
+    },
+    "inventoryItemIds": []
+  },
+  "scenes": [
+    {
+      "id": "village",
+      "name": "燈火村",
+      "width": 16,
+      "height": 12,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "colors": {
+        "floor": "#8fbf6a",
+        "wall": "#4b5d3a"
+      },
+      "terrain": [
+        "TTTTTTTTTTTTTTTT",
+        "T..*......,...*T",
+        "T.RRR.....GG...T",
+        "T.HDH.....SS.*.T",
+        "T.=========....T",
+        "T.=..*....=..X.T",
+        "T.=.......======",
+        "T.=..W....=....T",
+        "T.==========.B.T",
+        "T....F.FF..=...T",
+        "T.*.......*..*.T",
+        "TTTTTTTTTTTTTTTT"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "exits": [
+        {
+          "x": 15,
+          "y": 6,
+          "targetSceneId": "forest",
+          "targetX": 1,
+          "targetY": 6,
+          "label": "往迷霧森林"
+        }
+      ],
+      "npcIds": [
+        "npc_elder"
+      ],
+      "locations": [
+        {
+          "id": "lighthouse_base",
+          "name": "守望燈塔下",
+          "x": 9,
+          "y": 4,
+          "width": 4,
+          "height": 1
+        }
+      ],
+      "pickups": [],
+      "music": "peaceful"
+    },
+    {
+      "id": "forest",
+      "name": "迷霧森林",
+      "width": 16,
+      "height": 12,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "colors": {
+        "floor": "#5f8a6e",
+        "wall": "#25402f"
+      },
+      "terrain": [
+        "TTTTTTTTTTTTTTTT",
+        "TP...TT..M..PPYT",
+        "T..P..T.....P..T",
+        "T......Y..T....T",
+        "T.M..T....T..P.T",
+        "T....B.....=...T",
+        "===========....T",
+        "TP...T..Y..=.T.T",
+        "T..TT...Y..=.T.T",
+        "T.....M....=...T",
+        "T.*..PP....====T",
+        "TTTTTTTTTTTTTTTT"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          false,
+          true,
+          true,
+          true,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          false,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "exits": [
+        {
+          "x": 0,
+          "y": 6,
+          "targetSceneId": "village",
+          "targetX": 14,
+          "targetY": 6,
+          "label": "回燈火村"
+        }
+      ],
+      "npcIds": [
+        "npc_karl"
+      ],
+      "locations": [],
+      "pickups": [
+        {
+          "id": "pickup_wick",
+          "itemId": "item_wick",
+          "x": 13,
+          "y": 10,
+          "count": 1,
+          "condition": {
+            "type": "flag_equals",
+            "flag": "karl_told",
+            "value": true
+          }
+        }
+      ],
+      "music": "mysterious"
+    }
+  ],
+  "npcs": [
+    {
+      "id": "npc_elder",
+      "name": "村長艾琳",
+      "description": "守護燈火村多年的村長，總是站在燈塔旁。",
+      "sceneId": "village",
+      "position": {
+        "x": 12,
+        "y": 3
+      },
+      "spriteAssetId": "char_hooded_elder",
+      "dialogueNodeId": "elder_intro",
+      "dialogueVariants": [
+        {
+          "condition": {
+            "type": "quest_completed",
+            "questId": "q_main"
+          },
+          "dialogueNodeId": "elder_final"
+        },
+        {
+          "condition": {
+            "type": "quest_active",
+            "questId": "q_main"
+          },
+          "dialogueNodeId": "elder_waiting"
+        }
+      ],
+      "questIds": [
+        "q_main"
+      ],
+      "voice": {
+        "pitch": "low",
+        "speed": "slow",
+        "timbre": "soft"
+      }
+    },
+    {
+      "id": "npc_karl",
+      "name": "守林人卡爾",
+      "description": "獨自住在迷霧森林裡的守林人，對外人很警戒。",
+      "sceneId": "forest",
+      "position": {
+        "x": 4,
+        "y": 5
+      },
+      "spriteAssetId": "char_ranger",
+      "dialogueNodeId": "karl_idle",
+      "dialogueVariants": [
+        {
+          "condition": {
+            "type": "flag_equals",
+            "flag": "karl_told",
+            "value": true
+          },
+          "dialogueNodeId": "karl_after"
+        },
+        {
+          "condition": {
+            "type": "quest_active",
+            "questId": "q_main"
+          },
+          "dialogueNodeId": "karl_intro"
+        }
+      ],
+      "questIds": [
+        "q_main"
+      ],
+      "voice": {
+        "pitch": "low",
+        "speed": "normal",
+        "timbre": "buzzy"
+      }
+    }
+  ],
+  "dialogues": [
+    {
+      "id": "elder_intro",
+      "speaker": "村長艾琳",
+      "text": "旅人，你來得正好。守望燈塔已經熄滅三夜，迷霧正從東邊的森林湧進村子。",
+      "choices": [
+        {
+          "id": "c_accept",
+          "text": "我來幫忙重新點燃燈塔。",
+          "nextNodeId": "elder_accept",
+          "effects": [
+            {
+              "type": "set_flag",
+              "flag": "quest_accepted",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "c_ask",
+          "text": "燈塔為什麼會熄滅？",
+          "nextNodeId": "elder_lore"
+        },
+        {
+          "id": "c_leave",
+          "text": "我再想想。"
+        }
+      ]
+    },
+    {
+      "id": "elder_lore",
+      "speaker": "村長艾琳",
+      "text": "燈塔靠一枚「星光燈芯」發光。三天前它被迷霧帶走，落進了森林深處。",
+      "choices": [
+        {
+          "id": "c_accept_after_lore",
+          "text": "我明白了，我去把燈芯找回來。",
+          "nextNodeId": "elder_accept",
+          "effects": [
+            {
+              "type": "set_flag",
+              "flag": "quest_accepted",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "c_leave_after_lore",
+          "text": "聽起來很危險，我先離開。"
+        }
+      ]
+    },
+    {
+      "id": "elder_accept",
+      "speaker": "村長艾琳",
+      "text": "謝謝你！往東走就是迷霧森林，去找守林人卡爾，他知道燈芯的下落。找到之後回到燈塔下來見我。"
+    },
+    {
+      "id": "elder_waiting",
+      "speaker": "村長艾琳",
+      "text": "卡爾住在東邊的森林裡。拿到星光燈芯後，回到燈塔下來見我。"
+    },
+    {
+      "id": "elder_final",
+      "speaker": "村長艾琳",
+      "text": "你真的帶回了星光燈芯……卡爾託你轉告，森林失去它也會枯萎。這枚燈芯該歸誰，由你決定。",
+      "choices": [
+        {
+          "id": "c_light",
+          "text": "交給艾琳，重新點燃守望燈塔。",
+          "effects": [
+            {
+              "type": "remove_item",
+              "itemId": "item_wick"
+            },
+            {
+              "type": "set_flag",
+              "flag": "ending_choice",
+              "value": "light"
+            },
+            {
+              "type": "add_xp",
+              "amount": 50
+            }
+          ]
+        },
+        {
+          "id": "c_forest",
+          "text": "把燈芯還給森林，請卡爾用它平息迷霧。",
+          "effects": [
+            {
+              "type": "remove_item",
+              "itemId": "item_wick"
+            },
+            {
+              "type": "set_flag",
+              "flag": "ending_choice",
+              "value": "forest"
+            },
+            {
+              "type": "add_xp",
+              "amount": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "karl_idle",
+      "speaker": "守林人卡爾",
+      "text": "這片森林不歡迎閒逛的人。沒事的話就回村子去吧。"
+    },
+    {
+      "id": "karl_intro",
+      "speaker": "守林人卡爾",
+      "text": "艾琳派你來的？星光燈芯是森林的心臟。告訴我，你拿走它之後打算怎麼做？",
+      "choices": [
+        {
+          "id": "c_karl_promise",
+          "text": "我會尊重森林，絕不濫用它的力量。",
+          "nextNodeId": "karl_hint",
+          "effects": [
+            {
+              "type": "set_flag",
+              "flag": "karl_told",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "c_karl_rude",
+          "text": "那不關你的事。",
+          "nextNodeId": "karl_rude"
+        }
+      ]
+    },
+    {
+      "id": "karl_rude",
+      "speaker": "守林人卡爾",
+      "text": "……那你就自己在迷霧裡打轉吧。",
+      "choices": [
+        {
+          "id": "c_karl_retry",
+          "text": "抱歉，請讓我重新回答。",
+          "nextNodeId": "karl_intro"
+        },
+        {
+          "id": "c_karl_go",
+          "text": "（轉身離開）"
+        }
+      ]
+    },
+    {
+      "id": "karl_hint",
+      "speaker": "守林人卡爾",
+      "text": "好。燈芯落在森林東南角的古樹根下，現在它會為你發光。記住你的承諾。"
+    },
+    {
+      "id": "karl_after",
+      "speaker": "守林人卡爾",
+      "text": "燈芯在東南角的古樹根下。記住你的承諾，旅人。"
+    }
+  ],
+  "quests": [
+    {
+      "id": "q_main",
+      "title": "重燃守望燈塔",
+      "description": "找回星光燈芯，並決定它的歸屬。",
+      "startCondition": {
+        "type": "flag_equals",
+        "flag": "quest_accepted",
+        "value": true
+      },
+      "objectives": [
+        {
+          "id": "o_meet_karl",
+          "type": "talk_to_npc",
+          "targetId": "npc_karl",
+          "description": "到東邊的迷霧森林找守林人卡爾"
+        },
+        {
+          "id": "o_promise",
+          "type": "make_choice",
+          "targetId": "c_karl_promise",
+          "description": "向卡爾承諾會尊重森林"
+        },
+        {
+          "id": "o_wick",
+          "type": "collect_item",
+          "targetId": "item_wick",
+          "description": "在森林東南角找到星光燈芯"
+        },
+        {
+          "id": "o_return",
+          "type": "reach_location",
+          "targetId": "lighthouse_base",
+          "description": "回到燈火村的守望燈塔下"
+        },
+        {
+          "id": "o_report",
+          "type": "talk_to_npc",
+          "targetId": "npc_elder",
+          "description": "向村長艾琳報告"
+        }
+      ],
+      "rewards": [
+        {
+          "type": "add_xp",
+          "amount": 100
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "item_wick",
+      "name": "星光燈芯",
+      "description": "散發柔和星光的燈芯，是守望燈塔與迷霧森林共同的心臟。",
+      "iconAssetId": "icon_potion_blue",
+      "stackable": false
+    }
+  ],
+  "endings": [
+    {
+      "id": "end_light",
+      "title": "結局：燈火重燃",
+      "text": "守望燈塔再次亮起，迷霧退回森林邊緣。村民們圍著燈塔歡呼，而你知道，森林深處的某個角落正悄悄失去光芒。",
+      "condition": {
+        "type": "all",
+        "conditions": [
+          {
+            "type": "quest_completed",
+            "questId": "q_main"
+          },
+          {
+            "type": "flag_equals",
+            "flag": "ending_choice",
+            "value": "light"
+          }
+        ]
+      },
+      "mood": "bittersweet"
+    },
+    {
+      "id": "end_forest",
+      "title": "結局：森林的守護者",
+      "text": "卡爾把燈芯放回古樹根下，迷霧化成細雨落進土裡。燈塔雖然不再發光，但村子與森林第一次真正和解。",
+      "condition": {
+        "type": "all",
+        "conditions": [
+          {
+            "type": "quest_completed",
+            "questId": "q_main"
+          },
+          {
+            "type": "flag_equals",
+            "flag": "ending_choice",
+            "value": "forest"
+          }
+        ]
+      },
+      "mood": "triumphant"
+    }
+  ],
+  "assetManifest": {
+    "assets": [
+      {
+        "id": "tileset_tiny_town",
+        "kind": "tileset",
+        "src": "/assets/kenney/tiny-town/tilemap_packed.png",
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-town",
+        "attribution": "Tiny Town by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_hero",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 97,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_hooded_elder",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 100,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_ranger",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 112,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_potion_blue",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 116,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      }
+    ]
+  }
+}
