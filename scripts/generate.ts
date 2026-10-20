@@ -51,6 +51,7 @@ async function main() {
   const out = values.out ?? path.join("generated", `${projectId}.json`);
   mkdirSync(path.dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(result.project ?? result.rawProject, null, 2) + "\n");
+  if (result.treatment) writeFileSync(out.replace(/\.json$/, ".treatment.json"), JSON.stringify(result.treatment, null, 2) + "\n");
 
   if (values.publish) {
     if (result.status === "approved" && result.project) {
@@ -81,6 +82,7 @@ async function main() {
   }
   result.report.warnings.forEach((w) => console.log(`  ⚠ ${w.path}：${w.message}`));
   for (const e of result.playtest?.endings ?? []) console.log(`  ${e.reachable ? "✓" : "✗"} 結局「${e.title}」${e.reachable ? `可達成（${e.steps!.length} 步）` : "找不到路線"}`);
+  if (result.treatment) console.log(`劇本大綱：${result.treatment.logline}（${result.treatment.chapters.length} 章、${result.treatment.sideQuests.length} 條支線、${result.treatment.endings.length} 種結局）`);
   if (result.quality) console.log(`品質指標：${JSON.stringify(result.quality.metrics)}`);
   if (result.review) {
     const r = result.review.review;

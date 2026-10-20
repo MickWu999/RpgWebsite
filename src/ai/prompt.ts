@@ -79,7 +79,7 @@ ${icons}
 - effect 只能是：give_item、remove_item、add_xp、set_flag、complete_quest。
 
 ## 規模建議
-- 目標遊玩時間 15～30 分鐘（程式會依自動試玩的最短路線估算，不在範圍內會被退回）。
+- 目標遊玩時間 25～40 分鐘，約需 4,000～6,000 字的對話（程式會依自動試玩的最短路線估算，不在範圍內會被退回）。
 - 3～5 個場景、5～10 個 NPC、1 條主線（分 3 章，共 8～12 個目標）＋ 1～2 條支線（各 2～4 個目標，獎勵會影響尾聲或結局）、3～8 個物品、2～4 個結局（最多 4）、70～130 個對話節點（最多 140）、4～8 個調查點。
 - 章節之間要有明確的轉折（新地點、新角色、真相揭露），每章至少一個需要在多個 NPC 之間往返的目標，讓探索有份量；不要用無意義的來回跑腿灌水。
 - 結局文字只能描述「達成該結局的條件」保證成立的事；不要提到玩家在這條路線上不一定看過的對話或物品。
@@ -92,7 +92,7 @@ ${DESIGN_GUIDE}
 
 export type StoryPreferences = { title?: string; genre?: string; style?: string };
 
-export function generationPrompt(story: string, prefs: StoryPreferences): string {
+export function generationPrompt(story: string, prefs: StoryPreferences, treatment?: string): string {
   return `${runtimeContext()}
 
 <preferences>
@@ -105,8 +105,8 @@ export function generationPrompt(story: string, prefs: StoryPreferences): string
 <story>
 ${story}
 </story>
-
-請依照上述故事設計一款可以從頭玩到結局的 RPG，輸出符合 schema 的資料。`;
+${treatment ? `\n<treatment>\n以下是編劇已完成的劇本大綱，請完整實作其中的 3 章、支線、角色動機、轉折、抉擇與結局：\n${treatment}\n</treatment>\n` : ""}
+請依照上述${treatment ? "劇本大綱" : "故事"}設計一款可以從頭玩到結局的 RPG，輸出符合 schema 的資料。`;
 }
 
 export function repairPrompt(previous: unknown, issues: ValidationIssue[]): string {
@@ -129,13 +129,13 @@ ${list}
 }
 
 /** 依品質指標或 AI 審查意見改進（內容層面的修改，結構仍需重新驗證） */
-export function revisePrompt(story: string, previous: unknown, feedback: string[]): string {
+export function revisePrompt(story: string, previous: unknown, feedback: string[], treatment?: string): string {
   return `${runtimeContext()}
 
 <story>
 ${story}
 </story>
-
+${treatment ? `\n<treatment>\n劇本大綱（修改時請朝這份大綱補齊內容）：\n${treatment}\n</treatment>\n` : ""}
 <current_project>
 ${JSON.stringify(previous)}
 </current_project>

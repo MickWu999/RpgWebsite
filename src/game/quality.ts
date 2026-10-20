@@ -25,7 +25,7 @@ export const QUALITY_THRESHOLDS = {
   maxNpcs: 10,
   maxDialogueNodes: 140,
   /** 一般玩家預估時長（分鐘）的目標範圍 */
-  targetMinutes: [15, 30] as [number, number],
+  targetMinutes: [25, 40] as [number, number],
   // E3／互動回饋：至少 2 個可調查物件，讓環境分擔說明、降低迷失感
   minInteractables: 2,
 };

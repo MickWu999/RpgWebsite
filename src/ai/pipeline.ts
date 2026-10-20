@@ -9,6 +9,7 @@ import { generationPrompt, repairPrompt, revisePrompt, SYSTEM_PROMPT, type Story
 import { normalizeAiProject } from "./normalize";
 import { ProviderError, type StoryProvider } from "./provider";
 import { reviewProject, type ReviewResult } from "./review";
+import { treatmentText, writeTreatment, type Treatment } from "./treatment";
 
 /**
  * 故事 → GameProject 無人值守流程（SPEC §8.1）：
@@ -42,6 +43,8 @@ export type GenerateResponse = {
   playtest: PlaytestReport | null;
   quality: QualityReport | null;
   review: ReviewResult | null;
+  /** 生成前先寫好的劇本大綱 */
+  treatment?: Treatment | null;
   attempts: AttemptLog[];
   message: string;
 };
@@ -110,7 +113,7 @@ export async function generateProject(
   provider: StoryProvider | null,
   req: GenerateRequest,
   onProgress?: Progress,
-  options: { review?: boolean; from?: GameProject } = {},
+  options: { review?: boolean; from?: GameProject; treatment?: boolean } = {},
 ): Promise<GenerateResponse> {
   const story = checkStory(req.story);
   if (!provider) return fixtureResponse(req, "未設定 AI provider，");
@@ -118,7 +121,18 @@ export async function generateProject(
   if (!status.ok) return fixtureResponse(req, `${status.detail}。`);
 
   const attempts: AttemptLog[] = [];
-  const base = { source: "ai" as const, provider: provider.name, attempts };
+  // 先寫劇本大綱：角色動機、章節轉折、支線與結局意義先想清楚，長度才是靠劇情撐起來
+  let treatment: Treatment | null = null;
+  if (options.treatment !== false) {
+    onProgress?.("撰寫劇本大綱中…");
+    try {
+      treatment = await writeTreatment(provider, story, req);
+    } catch (e) {
+      onProgress?.(`劇本大綱失敗（${(e as Error).message}），改為直接依故事生成`);
+    }
+  }
+  const outline = treatment ? treatmentText(treatment) : undefined;
+  const base = { source: "ai" as const, provider: provider.name, attempts, treatment };
   // --from：從既有、已通過驗證的遊戲開始改進（保留內容，只依品質指標與審查意見修改）
   let best: Produced;
   if (options.from) {
@@ -127,7 +141,7 @@ export async function generateProject(
     best = { project: fromProject, raw: fromProject, report: validateProject(fromProject), playtest };
     onProgress?.("從既有遊戲開始改進…");
   } else {
-    best = await produce(provider, req.projectId, generationPrompt(story, req), "generate", MAX_REPAIR_ATTEMPTS, attempts, onProgress);
+    best = await produce(provider, req.projectId, generationPrompt(story, req, outline), "generate", MAX_REPAIR_ATTEMPTS, attempts, onProgress);
   }
   if (!best.project) {
     return {
@@ -179,7 +193,7 @@ export async function generateProject(
     if (round >= MAX_REVIEW_ROUNDS) {
       return done("needs_human_review", quality, review, `經過 ${MAX_REVIEW_ROUNDS} 輪修改仍未達品質標準，需要人工 review（遊戲本身可以正常遊玩）。`);
     }
-    const candidate = await produce(provider, req.projectId, revisePrompt(story, best.raw, feedback), "revise", 1, attempts, onProgress);
+    const candidate = await produce(provider, req.projectId, revisePrompt(story, best.raw, feedback, outline), "revise", 1, attempts, onProgress);
     if (!candidate.project) {
       return done("needs_human_review", quality, review, "依審查意見修改後的版本未通過驗證，保留上一個可遊玩版本，需要人工 review。");
     }
