@@ -4,6 +4,43 @@
 
 故事會先被轉成結構化的遊戲資料（GameProject JSON），再交給固定的 RPG Runtime 執行。AI 只是產生資料的其中一種方式，也可以直接在 Studio 編輯，或匯入 JSON。
 
+## 給製作者：clone 下來，交給 AI 做遊戲
+
+不需要雲端帳號，也不需要任何 API key，只要用你自己 VS Code 裡的 Claude Code 就能製作。
+
+```bash
+git clone https://github.com/WUMINCHE3331/RpgWebsite.git
+cd RpgWebsite
+npm install
+cp .env.example .env.local   # 設定 CLAUDE_CLI_PATH，供 AI 審查使用
+code .                       # 用 VS Code 打開
+```
+
+在 VS Code 的 Claude Code 裡輸入：
+
+```
+/rpg-new 一個關於台灣新兵在懇親會前想挽回家人信任的故事
+```
+
+AI 會依照 `docs/ai-development-spec.md` 依序完成以下步驟，幾乎不需要人工介入：
+
+1. 擴寫故事、寫劇本大綱
+2. 一章一章用 Studio 操作 API 實作，每一步都經過驗證與自動試玩
+3. 交給另一個獨立的 AI 審查
+4. 通過後發布到 `public/games/`
+
+完成之後：
+
+- `npm run dev`：在 http://localhost:3000 試玩，或到 `/studio` 用 RPG Maker 式的編輯器手動微調。
+- `npm run deploy`：部署到你自己的 Cloudflare。請先把 `wrangler.jsonc` 裡的 `name` 改成你自己的名稱，並執行 `npx wrangler login`。
+
+其他斜線指令：
+
+- `/rpg-expand <遊戲 ID> <擴充內容>`：擴充已上線的遊戲，玩家的舊存檔可以繼續玩。
+- `/rpg-review <遊戲 ID>`：只做檢查與審查。
+
+> **`CLAUDE_CLI_PATH`**：AI 審查需要另外啟動一個 `claude` 程序。如果你只安裝了 VS Code 擴充套件，終端機裡沒有 `claude` 指令，請把它設定成擴充套件內附的執行檔路徑，例如 `~/.vscode/extensions/anthropic.claude-code-<版本>/resources/native-binary/claude`。
+
 ## 快速開始
 
 ```bash
