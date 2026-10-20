@@ -9,7 +9,7 @@
 不需要雲端帳號，也不需要任何 API key，只要用你自己 VS Code 裡的 Claude Code 就能製作。
 
 ```bash
-git clone https://github.com/WUMINCHE3331/RpgWebsite.git
+git clone https://github.com/MickWu999/RpgWebsite.git
 cd RpgWebsite
 npm install
 cp .env.example .env.local   # 設定 CLAUDE_CLI_PATH，供 AI 審查使用
