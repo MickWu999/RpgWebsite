@@ -320,3 +320,85 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #f2b84b55; border
 .db-row.active { background: #2a3050; border-color: var(--border); }
 .db-form { overflow: auto; padding: 14px; }
 @media (max-width: 1000px) { .studio-main { grid-template-columns: 200px minmax(0, 1fr); } .studio-right { grid-column: 1 / -1; max-height: 40vh; } }
+
+/* ---------- Studio 後台外框 ---------- */
+.studio-shell { position: fixed; inset: 0; display: grid; grid-template-columns: 210px minmax(0, 1fr); background: #10121a; }
+.shell-sidebar { background: #151826; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 10px 8px; gap: 6px; overflow-y: auto; }
+.shell-brand { display: flex; align-items: center; gap: 8px; padding: 8px 10px 14px; color: var(--text); text-decoration: none; font-size: 16px; letter-spacing: 0.04em; }
+.shell-brand b, .login-brand b { color: var(--accent); }
+.shell-logo { color: var(--accent); font-size: 18px; }
+.shell-nav { display: flex; flex-direction: column; gap: 2px; }
+.shell-bottom { margin-top: auto; border-top: 1px solid var(--border); padding-top: 8px; }
+.shell-nav-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; font-size: 14px; }
+.shell-nav-item:hover { background: #1e2234; color: var(--text); }
+.shell-nav-item.active { background: #2a3050; color: var(--text); box-shadow: inset 3px 0 0 var(--accent); }
+.shell-icon { width: 20px; text-align: center; flex: none; }
+.shell-section { font-size: 11px; color: var(--muted); padding: 12px 10px 4px; letter-spacing: 0.06em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell-user { display: flex; align-items: center; gap: 10px; padding: 8px 10px; font-size: 13px; color: var(--muted); }
+.shell-user .shell-label { display: flex; gap: 8px; align-items: center; }
+.link-button { background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
+.shell-main { position: relative; overflow-y: auto; min-width: 0; }
+.shell-main.full { overflow: hidden; }
+.shell-main.full .studio-app { position: absolute; inset: 0; }
+.shell-loading { padding: 40px; }
+.page { max-width: 1180px; margin: 0 auto; padding: 24px 28px 60px; display: flex; flex-direction: column; gap: 16px; }
+.page-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.page-header h1 { font-size: 24px; margin: 0 0 4px; }
+.page-header p { margin: 0; max-width: 720px; font-size: 14px; }
+.card { background: #181b29; border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+.card h2 { font-size: 16px; }
+.studio-banner { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 40; background: #3a2a10; border: 1px solid #7a5a1c; color: #ffe2a8; padding: 8px 14px; border-radius: 8px; display: flex; gap: 10px; align-items: center; font-size: 14px; }
+.studio-toast { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 40; background: #14302a; border: 1px solid #2f6b55; color: #c9f1e1; padding: 8px 16px; border-radius: 8px; font-size: 14px; max-width: 80%; }
+.tour-overlay { position: absolute; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; }
+.tour-card { width: min(460px, 90%); background: #1d2131; border: 1px solid var(--accent); border-radius: 12px; padding: 20px 22px; box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+.tour-card h2 { margin: 6px 0 8px; }
+
+/* 登入 */
+.login-page { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at top, #1d2240, #0c0e16); }
+.login-card { width: min(380px, 92%); background: #181b29; border: 1px solid var(--border); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+.login-brand { font-size: 22px; letter-spacing: 0.04em; }
+
+/* 專案列表 */
+.project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.project-card { background: #181b29; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+.project-card:hover { border-color: var(--accent); }
+.project-open { text-align: left; background: none; border: none; color: var(--text); padding: 16px; cursor: pointer; font: inherit; flex: 1; }
+.project-title { font-size: 17px; font-weight: 700; }
+.project-actions { padding: 10px 16px; border-top: 1px solid var(--border); }
+.template-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.template { text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 14px; background: #141726; border: 2px solid var(--border); border-radius: 10px; color: var(--text); cursor: pointer; font: inherit; }
+.template.active { border-color: var(--accent); }
+.empty-state { text-align: center; padding: 50px 20px; border: 2px dashed var(--border); border-radius: 12px; }
+.empty-icon { font-size: 48px; }
+
+/* 專案總覽 */
+.overview-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .overview-grid { grid-template-columns: 1fr; } .studio-shell { grid-template-columns: 64px minmax(0,1fr); } .shell-label, .shell-section { display: none; } }
+.progress { height: 8px; background: #0f111a; border-radius: 4px; overflow: hidden; }
+.progress > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+.next-step { background: #222842; border: 1px solid var(--accent); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.steps { display: flex; flex-direction: column; gap: 6px; }
+.step { display: flex; gap: 12px; align-items: center; padding: 8px 10px; border-radius: 8px; background: #141726; }
+.step-mark { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--border); color: var(--muted); flex: none; font-size: 13px; }
+.step.done .step-mark { background: var(--accent-2); border-color: var(--accent-2); color: #08261c; font-weight: 700; }
+.step.done > .grow > div:first-child { color: var(--muted); }
+.overview-cover { position: relative; aspect-ratio: 4 / 3; border-radius: 8px; overflow: hidden; background: #000; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat-grid > div { background: #141726; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; align-items: center; }
+.stat-grid b { font-size: 22px; color: var(--accent); }
+.stat-grid span { font-size: 12px; color: var(--muted); }
+.version-line { padding: 6px 0; border-bottom: 1px solid var(--border); }
+.version-line:last-child { border-bottom: none; }
+.actor-ai { color: #a8dceb; }
+.actor-human { color: var(--text); }
+
+/* 表格、程式碼 */
+.version-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.version-table th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.version-table td { padding: 8px; border-bottom: 1px solid #23273a; vertical-align: middle; }
+.code-block { background: #0d0f17; border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; white-space: pre-wrap; margin: 0; }
+.copyable { display: block; margin-top: 6px; padding: 8px 10px; background: #0d0f17; border: 1px solid var(--border); border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; word-break: break-all; user-select: all; }
+.help ol { padding-left: 22px; line-height: 2; }
+.glossary dt { font-weight: 700; color: var(--accent); margin-top: 10px; }
+.glossary dd { margin: 4px 0 0; color: var(--text); font-size: 14px; }
+kbd { background: #23273a; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; font-size: 12px; font-family: ui-monospace, Menlo, monospace; }

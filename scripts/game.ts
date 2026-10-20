@@ -22,6 +22,15 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- check <id>                                   驗證＋自動試玩＋品質指標（JSON）
  *   npm run game -- review <id>                                  獨立 AI 審查（另開一次 Claude Code，看不到製作過程）
  *   npm run game -- publish <id>                                 check 與 review 都通過才發布到 public/games/<id>/
+ *
+ * 遠端模式（操作線上的 Studio 後台；需在 .env.local 設定 STUDIO_URL 與 STUDIO_TOKEN，token 在 Studio「AI 協作」產生）：
+ *   npm run game -- remote list
+ *   npm run game -- remote create <名稱> [--template blank|demo]
+ *   npm run game -- remote pull <id>               下載到 content/<id>/project.json（含版本號）
+ *   npm run game -- remote apply <id> <ops.json>   送出操作（自動帶目前版本號，避免覆蓋人的修改）
+ *   npm run game -- remote check <id>
+ *   npm run game -- remote versions <id>
+ *   npm run game -- remote publish <id>            Studio 端會再做一次檢查；API Token 不能略過品質指標
  * 所有子指令都輸出 JSON；結束碼 0＝成功／通過，2＝失敗，1＝用法錯誤。
  */
 
@@ -29,9 +38,58 @@ loadLocalEnv();
 const CONTENT = "content";
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { title: { type: "string" }, genre: { type: "string" }, demo: { type: "boolean" } },
+  options: { title: { type: "string" }, genre: { type: "string" }, demo: { type: "boolean" }, template: { type: "string" } },
 });
 const [command, id, arg] = positionals;
+
+/** 遠端模式：以 API Token 呼叫 Studio 後台 */
+async function remote(sub: string | undefined, target: string | undefined, file: string | undefined) {
+  const base = process.env.STUDIO_URL?.replace(/\/$/, "");
+  const token = process.env.STUDIO_TOKEN;
+  if (!base || !token) fail("遠端模式需要在 .env.local 設定 STUDIO_URL 與 STUDIO_TOKEN（token 在 Studio「AI 協作」產生）", 1);
+  const api = async (method: string, path: string, body?: unknown) => {
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+    return { status: res.status, ok: res.ok, data };
+  };
+  const done = (r: { ok: boolean; data: unknown }) => out(r.data, r.ok ? 0 : 2);
+  switch (sub) {
+    case "list":
+      return done(await api("GET", "/api/projects"));
+    case "create":
+      if (!target) fail("用法：npm run game -- remote create <名稱> [--template blank|demo]", 1);
+      return done(await api("POST", "/api/projects", { title: target, template: values.template === "demo" ? "demo" : "blank" }));
+    case "pull": {
+      if (!target) fail("用法：npm run game -- remote pull <id>", 1);
+      const r = await api("GET", `/api/projects/${target}`);
+      if (!r.ok) return done(r);
+      mkdirSync(dir(target!), { recursive: true });
+      writeFileSync(projectFile(target!), JSON.stringify(r.data.project, null, 2) + "\n");
+      writeFileSync(path.join(dir(target!), ".studio-version"), String(r.data.version));
+      return out({ ok: true, pulled: projectFile(target!), version: r.data.version }, 0);
+    }
+    case "apply": {
+      if (!target || !file) fail("用法：npm run game -- remote apply <id> <ops.json>", 1);
+      const ops = JSON.parse(readFileSync(file!, "utf8"));
+      const cur = await api("GET", `/api/projects/${target}`);
+      if (!cur.ok) return done(cur);
+      const r = await api("POST", `/api/projects/${target}/ops`, { ops: Array.isArray(ops) ? ops : [ops], baseVersion: cur.data.version });
+      return done(r);
+    }
+    case "check":
+      return done(await api("GET", `/api/projects/${target}/check`));
+    case "versions":
+      return done(await api("GET", `/api/projects/${target}/versions`));
+    case "publish":
+      return done(await api("POST", `/api/projects/${target}/publish`, {}));
+    default:
+      fail("用法：npm run game -- remote <list|create|pull|apply|check|versions|publish> …", 1);
+  }
+}
 
 const out = (data: unknown, code: number) => {
   console.log(JSON.stringify(data, null, 2));
@@ -63,6 +121,7 @@ function check(project: GameProject) {
 }
 
 async function main() {
+  if (command === "remote") return remote(id, arg, positionals[3]);
   if (!command || (command !== "list" && !id)) fail("用法：npm run game -- <new|inspect|apply|check|review|publish> <id> …", 1);
   if (id && !/^[a-z0-9-]{3,48}$/.test(id)) fail("遊戲 ID 只能用小寫英數字與連字號（3～48 字）", 1);
 

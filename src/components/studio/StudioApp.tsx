@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MUSIC_MOODS, TERRAIN } from "@/game/assets";
 import type { GameProject } from "@/game/schema";
-import { downloadJson, exportProjectJson, loadProject, saveProject } from "@/game/storage";
+import { downloadJson, exportProjectJson } from "@/game/storage";
+import { ApiError, studioApi } from "@/lib/studioApi";
 import { applyOps, describeOp, type StudioOp } from "@/studio/ops";
 import Database, { type DbTab } from "./Database";
 import EventEditor from "./EventEditor";
@@ -15,12 +16,23 @@ import MapCanvas, { TilePalette, type MapMode } from "./MapCanvas";
  * 版面：上方工具列｜左側圖塊調色盤＋地圖清單｜中間地圖畫布｜右側事件編輯器；資料庫另開視窗。
  * 所有編輯都轉成 Studio 操作 API（src/studio/ops.ts），與 AI 使用同一套操作。
  * 快捷鍵：Ctrl/⌘+Z 復原、Ctrl/⌘+Shift+Z 重做、Ctrl/⌘+S 儲存、F9 資料庫、F5 測試遊玩、Esc 關閉資料庫。
+ * 專案存在雲端（後台 API）：有修改時每 20 秒自動儲存；每 8 秒檢查雲端版本，AI 透過 API Token 的修改會即時出現。
  */
+
+const AUTOSAVE_MS = 20_000;
+const POLL_MS = 8_000;
+const TOUR_KEY = "rpg:studio-tour-done";
+const TOUR = [
+  { title: "歡迎使用 Studio", text: "這裡是 RPG 的編輯器。上方工具列可以切換「🖌 地圖」與「❗ 事件」兩種模式，也能開啟「📚 資料庫」與「▶ 測試遊玩」。" },
+  { title: "🖌 地圖模式", text: "從左側「圖塊」選一種地形（草地、道路、樹、房屋…），在中間的畫布上按住拖曳就能繪製。✕ 代表不可通行。" },
+  { title: "❗ 事件模式", text: "點選格子會在右側顯示上面的事件；雙擊空格可以新增 NPC、調查點、撿取物、出口、地點，或設為玩家起點。" },
+  { title: "📚 資料庫與儲存", text: "對話、任務、物品、結局都在資料庫（F9）。修改會每 20 秒自動存到雲端，也可以按 Ctrl/⌘+S；每次儲存都會留下版本，可以隨時還原。" },
+];
 
 const HISTORY_LIMIT = 100;
 const MUSIC_LABELS: Record<string, string> = { peaceful: "平和", lively: "熱鬧", adventure: "冒險", mysterious: "神秘", tense: "緊張", melancholy: "感傷" };
 
-export default function StudioApp({ projectId }: { projectId: string }) {
+export default function StudioApp({ projectId, initialDb }: { projectId: string; initialDb?: DbTab | null }) {
   const [project, setProject] = useState<GameProject | null>(null);
   const [notFound, setNotFound] = useState(false);
   // 復原／重做的歷史放在 ref，state 只記筆數（觸發重繪）
@@ -37,16 +49,47 @@ export default function StudioApp({ projectId }: { projectId: string }) {
   const [db, setDb] = useState<{ tab: DbTab; focusId: string | null } | null>(null);
   const [log, setLog] = useState<Array<{ ok: boolean; text: string }>>([]);
   const projectRef = useRef<GameProject | null>(null);
+  const baseVersionRef = useRef<number | undefined>(undefined);
+  const dirtyRef = useRef(false);
+  const savingRef = useRef(false);
+  const pendingLabels = useRef<string[]>([]);
+  const [baseVersion, setBaseVersion] = useState<number | null>(null);
+  const [conflict, setConflict] = useState<{ version: number; label: string } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [tour, setTour] = useState<number | null>(null);
+
+  const markDirty = (v: boolean) => {
+    dirtyRef.current = v;
+    setDirty(v);
+  };
+
+  const loadRemote = useCallback(async (message?: string) => {
+    try {
+      const r = await studioApi.getProject(projectId);
+      projectRef.current = r.project;
+      baseVersionRef.current = r.version;
+      setBaseVersion(r.version);
+      setProject(r.project);
+      setSceneId((s) => (r.project.scenes.some((x) => x.id === s) ? s : r.project.startSceneId));
+      historyRef.current = { past: [], future: [] };
+      setCounts({ past: 0, future: 0 });
+      markDirty(false);
+      setConflict(null);
+      if (message) setToast(message);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) setNotFound(true);
+    }
+  }, [projectId]);
 
   useEffect(() => {
-    const loaded = loadProject(projectId);
-    Promise.resolve().then(() => {
-      if (!loaded) return setNotFound(true);
-      projectRef.current = loaded.project;
-      setProject(loaded.project);
-      setSceneId(loaded.project.startSceneId);
-    });
-  }, [projectId]);
+    void loadRemote();
+    if (initialDb) setDb({ tab: initialDb, focusId: null });
+    try {
+      if (!window.localStorage.getItem(TOUR_KEY)) requestAnimationFrame(() => setTour(0));
+    } catch {
+      // 無法記住導覽狀態時略過
+    }
+  }, [loadRemote, initialDb]);
 
   const report = useMemo(() => (project ? applyOps(project, []).report : null), [project]);
 
@@ -64,7 +107,8 @@ export default function StudioApp({ projectId }: { projectId: string }) {
     setCounts({ past: h.past.length, future: 0 });
     projectRef.current = result.project;
     setProject(result.project);
-    setDirty(true);
+    pendingLabels.current.push(ops.map(describeOp).join("、"));
+    markDirty(true);
   }, []);
 
   const undo = useCallback(() => {
@@ -75,7 +119,8 @@ export default function StudioApp({ projectId }: { projectId: string }) {
     projectRef.current = last.project;
     setProject(last.project);
     setCounts({ past: h.past.length, future: h.future.length });
-    setDirty(true);
+    pendingLabels.current.push(`復原：${last.label}`);
+    markDirty(true);
     setLog((l) => [{ ok: true, text: `復原：${last.label}` }, ...l].slice(0, 40));
   }, []);
 
@@ -87,26 +132,67 @@ export default function StudioApp({ projectId }: { projectId: string }) {
     projectRef.current = next.project;
     setProject(next.project);
     setCounts({ past: h.past.length, future: h.future.length });
-    setDirty(true);
+    pendingLabels.current.push(`重做：${next.label}`);
+    markDirty(true);
     setLog((l) => [{ ok: true, text: `重做：${next.label}` }, ...l].slice(0, 40));
   }, []);
 
-  const save = useCallback(() => {
-    const p = projectRef.current;
-    if (!p) return false;
-    try {
-      saveProject(p);
-      setDirty(false);
-      setLog((l) => [{ ok: true, text: "已儲存" }, ...l]);
-      return true;
-    } catch (e) {
-      setLog((l) => [{ ok: false, text: `無法儲存：${(e as Error).message}` }, ...l]);
-      return false;
-    }
-  }, []);
+  /** 儲存到雲端（帶版本號，若別人或 AI 已修改會回報衝突）；overwrite=true 只用於衝突提示中的「以我的版本覆蓋」 */
+  const save = useCallback(
+    async (overwrite = false) => {
+      const p = projectRef.current;
+      if (!p || savingRef.current) return false;
+      if (!dirtyRef.current && !overwrite) return true;
+      savingRef.current = true;
+      const labels = pendingLabels.current.splice(0);
+      const label = labels.length ? `${labels.slice(0, 3).join("、")}${labels.length > 3 ? ` 等 ${labels.length} 項` : ""}` : "儲存";
+      try {
+        const r = await studioApi.saveProject(projectId, p, overwrite ? undefined : baseVersionRef.current, label);
+        baseVersionRef.current = r.version;
+        setBaseVersion(r.version);
+        if (projectRef.current === p) markDirty(false);
+        setConflict(null);
+        setLog((l) => [{ ok: true, text: `已儲存為第 ${r.version} 版` }, ...l].slice(0, 40));
+        return true;
+      } catch (e) {
+        pendingLabels.current.unshift(...labels);
+        if (e instanceof ApiError && e.status === 409) setConflict({ version: Number(e.data.currentVersion ?? 0), label: "其他人或 AI 已修改專案" });
+        setLog((l) => [{ ok: false, text: `無法儲存：${(e as Error).message}` }, ...l].slice(0, 40));
+        return false;
+      } finally {
+        savingRef.current = false;
+      }
+    },
+    [projectId],
+  );
 
-  const playtest = useCallback(() => {
-    if (save()) window.open(`/play/?id=${encodeURIComponent(projectId)}`, "_blank");
+  // 自動儲存與雲端版本輪詢（AI 透過 API Token 的修改會即時出現）
+  useEffect(() => {
+    const autosave = window.setInterval(() => {
+      if (dirtyRef.current) void save();
+    }, AUTOSAVE_MS);
+    const poll = window.setInterval(async () => {
+      if (savingRef.current || baseVersionRef.current === undefined) return;
+      const r = await studioApi.versions(projectId).catch(() => null);
+      const latest = r?.versions[0];
+      if (!latest || latest.version <= baseVersionRef.current) return;
+      if (dirtyRef.current) setConflict({ version: latest.version, label: `${latest.actor}：${latest.label}` });
+      else void loadRemote(`${latest.actor.includes("API Token") ? "🤖" : "👤"} ${latest.actor} 更新了專案（第 ${latest.version} 版）：${latest.label}`);
+    }, POLL_MS);
+    return () => {
+      window.clearInterval(autosave);
+      window.clearInterval(poll);
+    };
+  }, [save, loadRemote, projectId]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  const playtest = useCallback(async () => {
+    if (await save()) window.open(`/studio/play/?id=${encodeURIComponent(projectId)}`, "_blank");
   }, [save, projectId]);
 
   useEffect(() => {
@@ -116,7 +202,7 @@ export default function StudioApp({ projectId }: { projectId: string }) {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        save();
+        void save();
       } else if (!typing && mod && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -126,7 +212,7 @@ export default function StudioApp({ projectId }: { projectId: string }) {
         setDb((d) => (d ? null : { tab: "dialogues", focusId: null }));
       } else if (e.key === "F5") {
         e.preventDefault();
-        playtest();
+        void playtest();
       } else if (e.key === "Escape") setDb(null);
     };
     window.addEventListener("keydown", onKey);
@@ -143,7 +229,7 @@ export default function StudioApp({ projectId }: { projectId: string }) {
   if (notFound) {
     return (
       <div className="container">
-        <div className="notice err">找不到專案「{projectId}」。專案只存在建立它的瀏覽器中。</div>
+        <div className="notice err">找不到專案「{projectId}」，或你沒有權限開啟。</div>
         <p>
           <Link href="/studio/">回到 Studio 首頁</Link>
         </p>
@@ -187,13 +273,15 @@ export default function StudioApp({ projectId }: { projectId: string }) {
   return (
     <div className="studio-app">
       <div className="studio-toolbar">
-        <Link href="/studio/" className="btn small" title="Studio 首頁">
-          ☰
+        <Link href={`/studio/project/?id=${projectId}`} className="btn small" title="回到專案總覽">
+          ←
         </Link>
         <strong className="studio-title">{project.title}</strong>
-        <span className={`badge ${dirty ? "warn" : "ok"}`}>{dirty ? "未儲存" : "已儲存"}</span>
+        <span className={`badge ${dirty ? "warn" : "ok"}`} title="有修改時每 20 秒自動儲存到雲端" data-testid="save-state">
+          {dirty ? "未儲存" : `已儲存・v${baseVersion ?? "?"}`}
+        </span>
         <div className="tool-group">
-          <button className="btn small" onClick={save} title="儲存（Ctrl/⌘+S）" data-testid="studio-save">
+          <button className="btn small" onClick={() => void save()} title="儲存到雲端（Ctrl/⌘+S）" data-testid="studio-save">
             💾 儲存
           </button>
           <button className="btn small" onClick={undo} disabled={counts.past === 0} title="復原（Ctrl/⌘+Z）" data-testid="studio-undo">
@@ -240,7 +328,10 @@ export default function StudioApp({ projectId }: { projectId: string }) {
         <button className="btn small" onClick={() => downloadJson(`${project.id}.json`, exportProjectJson(project))}>
           匯出
         </button>
-        <button className="btn small primary" onClick={playtest} title="測試遊玩（F5）" data-testid="studio-play">
+        <button className="btn small" onClick={() => setTour(0)} title="重新顯示導覽">
+          ？導覽
+        </button>
+        <button className="btn small primary" onClick={() => void playtest()} title="測試遊玩（F5）" data-testid="studio-play">
           ▶ 測試遊玩
         </button>
       </div>
@@ -347,6 +438,70 @@ export default function StudioApp({ projectId }: { projectId: string }) {
         </aside>
       </div>
 
+      {conflict && (
+        <div className="studio-banner" data-testid="conflict">
+          ⚠ 專案在別處被修改了（第 {conflict.version} 版：{conflict.label}）。
+          <button className="btn small" onClick={() => void loadRemote("已載入最新版本（你未儲存的修改已捨棄）")}>
+            載入最新版本
+          </button>
+          <button className="btn small" onClick={() => void save(true)}>
+            以我的版本覆蓋
+          </button>
+        </div>
+      )}
+      {toast && (
+        <div className="studio-toast" data-testid="studio-toast">
+          {toast}
+        </div>
+      )}
+      {tour !== null && (
+        <div className="tour-overlay" data-testid="tour">
+          <div className="tour-card">
+            <div className="small muted">
+              導覽 {tour + 1} / {TOUR.length}
+            </div>
+            <h2>{TOUR[tour].title}</h2>
+            <p>{TOUR[tour].text}</p>
+            <div className="row">
+              <button
+                className="btn small"
+                onClick={() => {
+                  setTour(null);
+                  try {
+                    window.localStorage.setItem(TOUR_KEY, "1");
+                  } catch {
+                    // 略過
+                  }
+                }}
+              >
+                略過
+              </button>
+              <span className="grow" />
+              {tour > 0 && (
+                <button className="btn small" onClick={() => setTour(tour - 1)}>
+                  上一步
+                </button>
+              )}
+              <button
+                className="btn small primary"
+                onClick={() => {
+                  if (tour < TOUR.length - 1) setTour(tour + 1);
+                  else {
+                    setTour(null);
+                    try {
+                      window.localStorage.setItem(TOUR_KEY, "1");
+                    } catch {
+                      // 略過
+                    }
+                  }
+                }}
+              >
+                {tour < TOUR.length - 1 ? "下一步" : "開始製作"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {db && (
         <Database
           project={project}

@@ -31,6 +31,7 @@ import { listSaves, loadProject, savePlayerState, type SaveSlot } from "@/game/s
 import { estimateDuration } from "@/game/duration";
 import { runPlaytest } from "@/game/playtest";
 import { fetchPack } from "@/lib/packs";
+import { studioApi } from "@/lib/studioApi";
 import { getAudio } from "@/lib/audio";
 import {
   loadSettings,
@@ -63,7 +64,7 @@ const MOVE_INTERVAL_MS = 140;
 const MIN_SCREEN_H = 260;
 
 type Mode = "loading" | "splash" | "cover" | "title" | "map" | "menu" | "ending";
-export type GameSource = { kind: "pack" | "local"; id: string };
+export type GameSource = { kind: "pack" | "local" | "studio"; id: string };
 type MenuPage = "root" | "items" | "quests" | "status" | "save" | "load" | "options" | "title";
 type Toast = { id: number; text: string };
 type UI = {
@@ -230,7 +231,17 @@ export default function GameScreen({ source }: { source: GameSource }) {
         }
       }, 1600);
     };
-    if (source.kind === "pack") {
+    if (source.kind === "studio") {
+      // 後台測試遊玩：直接讀取雲端專案的最新版本（不需要先發布）
+      studioApi
+        .getProject(source.id)
+        .then(({ project }) => {
+          if (cancelled) return;
+          setLoadInfo({ minutes: estimateDuration(project, runPlaytest(project, { maxStates: 1500 }))?.typicalMinutes ?? null });
+          start(project);
+        })
+        .catch((e: Error) => !cancelled && setLoadError(e.message));
+    } else if (source.kind === "pack") {
       fetchPack(source.id)
         .then(({ project, bytes, entry }) => {
           if (cancelled) return;
@@ -461,7 +472,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
             if (latest) enterMap(latest.save!.state);
             else flash({ notice: "沒有可以繼續的存檔" }, 2200, "notice");
           } else if (command === "讀取存檔") update({ ...u, titleLoad: true, slotCursor: 0 });
-          else router.push(source.kind === "local" ? "/studio/" : "/");
+          else router.push(source.kind === "studio" ? `/studio/project/?id=${source.id}` : "/");
         }
         return;
       }
@@ -679,7 +690,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       <div className="rm-stage">
         <div className="rm-error">
           <p>{loadError}</p>
-          <Link href={source.kind === "local" ? "/studio/" : "/"}>回到網站</Link>
+          <Link href={source.kind === "studio" ? "/studio/" : "/"}>回到網站</Link>
         </div>
       </div>
     );
@@ -826,7 +837,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                         const latest = saves.filter((s) => s.save).sort((a, b) => b.save!.savedAt.localeCompare(a.save!.savedAt))[0];
                         if (latest) enterMap(latest.save!.state);
                       } else if (c === "讀取存檔") update((u) => ({ ...u, titleLoad: true, slotCursor: 0 }));
-                      else router.push(source.kind === "local" ? "/studio/" : "/");
+                      else router.push(source.kind === "studio" ? `/studio/project/?id=${source.id}` : "/");
                     }}
                   >
                     {c}

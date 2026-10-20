@@ -1,16 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import GameCarousel from "@/components/GameCarousel";
 import { InstallPrompt } from "@/components/PwaSupport";
 import { fetchCatalog, type CatalogEntry } from "@/lib/packs";
-import { IS_PLAYER_SITE } from "@/lib/siteMode";
 
-/** 玩家首頁：只有遊戲選單。開發者版本另外顯示「開發者工具」入口。 */
+/** 玩家首頁：只有遊戲選單（前台不連到後台 Studio） */
 export default function Home() {
-  const router = useRouter();
   const [library, setLibrary] = useState<CatalogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,18 +25,13 @@ export default function Home() {
         </div>
         <div className="row">
           <InstallPrompt />
-          {!IS_PLAYER_SITE && (
-            <Link className="btn small" href="/studio/" data-testid="creator-link">
-              Studio →
-            </Link>
-          )}
         </div>
       </header>
 
       <section className="library" aria-label="選擇遊戲">
         {error && <div className="notice err">目前無法載入遊戲列表，請稍後再試。（{error}）</div>}
         {library === null && !error && <div className="muted small">載入遊戲中…</div>}
-        {library && <GameCarousel games={library} onCreate={IS_PLAYER_SITE ? undefined : () => router.push("/studio/")} />}
+        {library && <GameCarousel games={library} />}
       </section>
 
       <footer className="portal-footer small muted">

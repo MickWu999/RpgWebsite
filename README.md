@@ -54,15 +54,18 @@ npm run dev            # http://localhost:3000
   - 鍵盤：方向鍵或 WASD 移動，Z／Enter 確認，X／Esc 開啟選單
   - 手機（請橫向遊玩）：用搖桿移動、點擊地面移動、點擊 NPC 對話
 
-## 網站版本：玩家版與開發者版
+## 前台與後台（完全分開的兩個網站）
 
-| | 玩家版（`npm run deploy`，部署到 Cloudflare） | 開發者版（`npm run dev`） |
+| | 前台（玩家） | 後台（AI RPG Studio） |
 |---|---|---|
-| `/` | 遊戲選單 | 遊戲選單，以及「開發者工具」入口 |
-| `/play` | 遊戲畫面 | 遊戲畫面 |
-| `/create`、`/studio` | 不提供 | 建立遊戲、AI 生成、我的專案、匯入 JSON、編輯器 |
+| 網址 | https://ai-rpg-builder.wuminzhe9.workers.dev | https://ai-rpg-studio.wuminzhe9.workers.dev |
+| 內容 | 遊戲選單與遊戲畫面 | 需要登入：專案管理、總覽與製作清單、RPG Maker 式編輯器、資料庫、測試遊玩、版本紀錄、發布、AI 協作（API Token）、設定、說明 |
+| 部署 | `npm run deploy` | `npm run deploy:studio` |
 
-版本由 build 時的環境變數 `NEXT_PUBLIC_SITE_MODE=player` 決定。
+- 兩邊互不連結：前台的 build 會移除後台頁面，後台的 build 也會移除前台頁面。
+- 後台的專案存在 Cloudflare D1。在後台按「發布」後，前台會立即出現這款遊戲，不需要重新部署。
+- 開發者帳號用 `npm run studio:user -- add <帳號>` 建立，密碼會在本機雜湊後才寫入資料庫。
+- AI agent 用 Studio 產生的 API Token 操作後台，做法見 `docs/ai-development-spec.md` 第 2 節。
 
 ## 指令
 
