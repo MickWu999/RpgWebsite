@@ -1,10 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { z } from "zod";
 import { providerFromEnv } from "@/ai/claudeCodeProvider";
-import { projectDigest, reviewProject } from "@/ai/review";
+import { projectDigest, reviewProject, reviewTreatment, type ReviewResult } from "@/ai/review";
+import { chapterPlaytest, checkChapters } from "@/game/chapters";
+import { projectRevision } from "@/game/engine";
+import { applyAction } from "@/game/playtest";
 import { runPlaytest } from "@/game/playtest";
 import { assessQuality } from "@/game/quality";
 import { gameProjectSchema, type GameProject } from "@/game/schema";
@@ -22,8 +25,12 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- inspect <id>                                 以 RPG Maker 事件清單的形式輸出目前內容
  *   npm run game -- apply <id> <ops.json>                        套用操作（每筆都成功才寫檔）
  *   npm run game -- check <id>                                   驗證＋自動試玩＋品質指標
- *   npm run game -- review <id>                                  獨立 AI 審查（另開一次 Claude Code，看不到製作過程）
- *   npm run game -- publish <id>                                 check 與 review 都通過才發布到 public/games/<id>/
+ *   npm run game -- review-treatment <id>                        劇本大綱審查（動工前，通過後才能 apply）
+ *   npm run game -- review <id> --chapter <章節ID>               章節審查（通過後才能新增下一章）
+ *   npm run game -- review <id>                                  整體審查（發布前）
+ *   npm run game -- status <id>                                  目前卡在哪一關
+ *   npm run game -- publish <id>                                 所有關卡都通過才發布到 public/games/<id>/
+ * 審查都是另開一次 Claude Code 的獨立審查員，看不到製作過程；結果存在 content/<id>/reviews/。
  *
  * 遠端模式（操作線上的 Studio 後台；需在 .env.local 設定 STUDIO_URL 與 STUDIO_TOKEN，token 在 Studio「AI 協作」產生）：
  *   npm run game -- remote list
@@ -32,6 +39,11 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- remote inspect <id>            下載並以事件清單形式輸出
  *   npm run game -- remote apply <id> <ops.json>   送出操作（自動帶目前版本號，避免覆蓋人的修改）
  *   npm run game -- remote check <id>
+ *   npm run game -- remote story <id>              讀取人在 Studio 寫的故事 → content/<id>/story.md
+ *   npm run game -- remote push-docs <id>          上傳 story.md、treatment.md 到 Studio（給人看）
+ *   npm run game -- remote review-treatment <id>   （審查結果自動上傳到 Studio）
+ *   npm run game -- remote review <id> [--chapter <章節ID>]
+ *   npm run game -- remote status <id>
  *   npm run game -- remote versions <id>
  *   npm run game -- remote publish <id>            在本機檢查後發布；API Token 不能略過品質指標
  * 結束碼 0＝成功／通過，2＝失敗，1＝用法錯誤。
@@ -41,7 +53,7 @@ loadLocalEnv();
 const CONTENT = "content";
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { title: { type: "string" }, genre: { type: "string" }, demo: { type: "boolean" } },
+  options: { title: { type: "string" }, genre: { type: "string" }, demo: { type: "boolean" }, chapter: { type: "string" } },
 });
 const [command, id, arg] = positionals;
 
@@ -52,6 +64,96 @@ const out = (data: unknown, code: number) => {
 const fail = (message: string, code = 2): never => out({ ok: false, error: message }, code) as never;
 const dir = (gameId: string) => path.join(CONTENT, gameId);
 const projectFile = (gameId: string) => path.join(dir(gameId), "project.json");
+
+// ---------- 關卡（三層把關） ----------
+
+const reviewFile = (gameId: string, target: string) => path.join(dir(gameId), "reviews", `${target}.json`);
+function readReview(gameId: string, target: string): ReviewResult | null {
+  const f = reviewFile(gameId, target);
+  return existsSync(f) ? (JSON.parse(readFileSync(f, "utf8")) as ReviewResult) : null;
+}
+function writeReview(gameId: string, r: ReviewResult) {
+  mkdirSync(path.join(dir(gameId), "reviews"), { recursive: true });
+  writeFileSync(reviewFile(gameId, r.target), JSON.stringify(r, null, 2) + "\n");
+}
+
+/** 送出操作前的關卡：大綱要先通過審查；新增下一章前，上一章要先通過章節審查；一次只能新增一章 */
+function opsGate(gameId: string, project: GameProject, ops: unknown[]): string | null {
+  if (values.demo) return null;
+  if (!readReview(gameId, "treatment")?.passed) return `劇本大綱尚未通過審查：先寫 ${path.join(dir(gameId), "treatment.md")}，再執行 npm run game -- review-treatment ${gameId}`;
+  const added = ops.filter((o): o is { op: "chapter.upsert"; chapter: { id: string } } => (o as { op?: string }).op === "chapter.upsert" && !project.chapters.some((c) => c.id === (o as { chapter: { id: string } }).chapter.id));
+  if (added.length > 1) return "一次只能新增一章：完成這一章並通過章節審查後，再新增下一章";
+  const last = project.chapters.at(-1);
+  if (added.length === 1 && last && !readReview(gameId, last.id)?.passed) return `第 ${project.chapters.length} 章「${last.title}」尚未通過章節審查（npm run game -- review ${gameId} --chapter ${last.id}），不能開始下一章`;
+  return null;
+}
+
+/** 目前的關卡狀態 */
+function gateStatus(gameId: string, project: GameProject) {
+  const revision = projectRevision(project);
+  const treatment = readReview(gameId, "treatment");
+  const chapters = project.chapters.map((c, i) => ({ index: i + 1, id: c.id, title: c.title, reviewPassed: Boolean(readReview(gameId, c.id)?.passed) }));
+  const full = readReview(gameId, "full");
+  const fullCurrent = Boolean(full?.passed && full.revision === revision);
+  const blockers = [
+    ...(treatment?.passed ? [] : ["劇本大綱尚未通過審查（review-treatment）"]),
+    ...chapters.filter((c) => !c.reviewPassed).map((c) => `第 ${c.index} 章「${c.title}」尚未通過章節審查（review --chapter ${c.id}）`),
+    ...(fullCurrent ? [] : [full?.passed ? "整體審查之後內容又改過了，請重新執行整體審查（review）" : "尚未通過整體審查（review）"]),
+  ];
+  return { treatmentPassed: Boolean(treatment?.passed), chapters, fullReviewPassed: fullCurrent, blockers, next: blockers[0] ?? "可以發布" };
+}
+
+async function provider() {
+  const p = providerFromEnv();
+  const status = p ? await p.available() : { ok: false, detail: "AI_PROVIDER=none" };
+  if (!p || !status.ok) fail(`AI 審查不可用：${status.detail}`);
+  return p!;
+}
+
+const readText = (gameId: string, file: string) => (existsSync(path.join(dir(gameId), file)) ? readFileSync(path.join(dir(gameId), file), "utf8") : null);
+
+async function doReviewTreatment(gameId: string): Promise<ReviewResult> {
+  const treatment = readText(gameId, "treatment.md");
+  if (!treatment || treatment.length < 400) fail(`找不到 ${path.join(dir(gameId), "treatment.md")}，或內容太短；請依規範第 5 節的格式撰寫劇本大綱`);
+  const story = readText(gameId, "story.md") ?? "";
+  const r = await reviewTreatment(await provider(), story, treatment!);
+  writeReview(gameId, r);
+  return r;
+}
+
+async function doReview(gameId: string, project: GameProject): Promise<ReviewResult> {
+  const validation = validateProject(project);
+  if (!validation.isValid) fail("專案尚未通過驗證，請先讓 check 的驗證錯誤清空再審查");
+  const story = readText(gameId, "story.md") ?? project.description;
+  const treatment = readText(gameId, "treatment.md") ?? undefined;
+  const playtest = runPlaytest(project);
+  const chapters = checkChapters(project);
+  const quality = assessQuality(project, playtest, { checkDuration: !values.demo, chapters });
+  let chapter: Parameters<typeof reviewProject>[1]["chapter"];
+  if (values.chapter) {
+    const index = project.chapters.findIndex((c) => c.id === values.chapter);
+    if (index < 0) fail(`找不到章節「${values.chapter}」`);
+    const report = chapters[index];
+    if (!report.ok) return out({ ok: false, stage: "chapter-check", chapter: report }, 2) as never;
+    // 收集這一章路線經過的地圖（專案太大時，審查摘要只保留這些地圖）
+    const { start, playtest: cp } = chapterPlaytest(project, index);
+    const mapIds = new Set<string>([start!.mapId]);
+    let st = start!;
+    for (const a of cp!.goals[0].actions ?? []) {
+      st = applyAction(project, st, a);
+      mapIds.add(st.mapId);
+    }
+    chapter = { index, route: report.route, minutes: report.minutes, mapIds: [...mapIds] };
+  } else if (!values.demo) {
+    const blocking = quality.blocking.length + (playtest.ok ? 0 : 1);
+    if (blocking > 0) return out({ ok: false, stage: "check", message: "整體審查前，check 必須全部通過", blocking: quality.blocking, playtest: playtest.issues }, 2) as never;
+  }
+  const r = await reviewProject(await provider(), { story, treatment, project, playtest, quality, revision: projectRevision(project), chapter });
+  writeReview(gameId, r);
+  return r;
+}
+
+const reviewOut = (r: ReviewResult, extra: Record<string, unknown> = {}) => out({ ok: r.passed, ...extra, ...r }, r.passed ? 0 : 2);
 
 function inspect(project: GameProject) {
   const valid = validateProject(project);
@@ -74,6 +176,24 @@ async function remote(sub: string | undefined, target: string | undefined, file:
     return { status: res.status, ok: res.ok, data };
   };
   const done = (r: { ok: boolean; data: unknown }) => out(r.data, r.ok ? 0 : 2);
+  /** 後台的審查紀錄是關卡的依據：每個目標最新一次的結果寫進 content/<id>/reviews/ */
+  const syncReviews = async (gameId: string) => {
+    const r = await api("GET", `/api/projects/${gameId}/reviews`);
+    if (!r.ok) return;
+    const seen = new Set<string>();
+    rmSync(path.join(dir(gameId), "reviews"), { recursive: true, force: true });
+    for (const rev of r.data.reviews as Array<{ target: string; data: ReviewResult }>) {
+      if (seen.has(rev.target)) continue;
+      seen.add(rev.target);
+      writeReview(gameId, rev.data);
+    }
+  };
+  const pushDocs = async (gameId: string) => {
+    for (const kind of ["story", "treatment"] as const) {
+      const text = readText(gameId, `${kind}.md`);
+      if (text) await api("PUT", `/api/projects/${gameId}/docs/${kind}`, { content: text });
+    }
+  };
   const need = (usage: string) => target || fail(`用法：npm run game -- remote ${usage}`, 1);
   switch (sub) {
     case "list":
@@ -101,6 +221,9 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       const cur = await api("GET", `/api/projects/${target}`);
       if (!cur.ok) return done(cur);
       const list = Array.isArray(ops) ? ops : [ops];
+      await syncReviews(target!);
+      const blocked = opsGate(target!, cur.data.project, list);
+      if (blocked) return out({ ok: false, stage: "gate", error: blocked }, 2);
       // 先在本機試算並驗證，回報錯誤給 agent；伺服器只套用操作
       const local = applyOps(cur.data.project, list);
       if (!local.results.every((x) => x.ok)) return out({ ok: false, stage: "local", results: local.results.filter((x) => !x.ok) }, 2);
@@ -115,6 +238,48 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       const report = runCheck(r.data.project, { demo: values.demo });
       return out({ ok: report.passed, version: r.data.version, ...report }, report.passed ? 0 : 2);
     }
+    case "story": {
+      // 讀取人在 Studio 寫給 AI 的故事（與已上傳的大綱），存到 content/<id>/
+      need("story <id>");
+      const r = await api("GET", `/api/projects/${target}/docs`);
+      if (!r.ok) return done(r);
+      mkdirSync(dir(target!), { recursive: true });
+      const written: string[] = [];
+      for (const kind of ["story", "treatment"] as const) {
+        const doc = r.data.docs[kind];
+        if (!doc) continue;
+        const file = path.join(dir(target!), `${kind}.md`);
+        if (kind === "treatment" && existsSync(file)) continue;
+        writeFileSync(file, doc.content);
+        written.push(file);
+      }
+      return out({ ok: true, written, story: r.data.docs.story?.content ?? null }, 0);
+    }
+    case "push-docs":
+      need("push-docs <id>");
+      await pushDocs(target!);
+      return out({ ok: true, pushed: ["story.md", "treatment.md"].filter((f) => readText(target!, f)) }, 0);
+    case "review-treatment": {
+      need("review-treatment <id>");
+      await pushDocs(target!);
+      const r = await doReviewTreatment(target!);
+      await api("POST", `/api/projects/${target}/reviews`, r);
+      return reviewOut(r, { uploaded: true });
+    }
+    case "review":
+    case "status": {
+      need(`${sub} <id>`);
+      const r = await api("GET", `/api/projects/${target}`);
+      if (!r.ok) return done(r);
+      mkdirSync(dir(target!), { recursive: true });
+      writeFileSync(projectFile(target!), JSON.stringify(r.data.project, null, 2) + "\n");
+      await syncReviews(target!);
+      if (sub === "status") return out({ ok: true, version: r.data.version, ...gateStatus(target!, r.data.project) }, 0);
+      await pushDocs(target!);
+      const rev = await doReview(target!, r.data.project);
+      await api("POST", `/api/projects/${target}/reviews`, rev);
+      return reviewOut(rev, { uploaded: true });
+    }
     case "versions":
       need("versions <id>");
       return done(await api("GET", `/api/projects/${target}/versions`));
@@ -124,10 +289,13 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       if (!r.ok) return done(r);
       const report = runCheck(r.data.project);
       if (!report.passed) return out({ ok: false, stage: "check", ...report }, 2);
+      await syncReviews(target!);
+      const gate = gateStatus(target!, r.data.project);
+      if (gate.blockers.length) return out({ ok: false, stage: "gate", ...gate }, 2);
       return done(await api("POST", `/api/projects/${target}/publish`, { check: publishSummary(report) }));
     }
     default:
-      fail("用法：npm run game -- remote <list|create|pull|inspect|apply|check|versions|publish> …", 1);
+      fail("用法：npm run game -- remote <list|create|story|push-docs|pull|inspect|apply|check|review-treatment|review|status|versions|publish> …", 1);
   }
 }
 
@@ -142,7 +310,7 @@ function load(gameId: string): GameProject {
 async function main() {
   if (command === "remote") return remote(id, arg, positionals[3]);
   if (command === "schema") return out(z.toJSONSchema(z.array(opSchema)), 0);
-  if (!command || !id) fail("用法：npm run game -- <schema|new|inspect|apply|check|review|publish> <id> …", 1);
+  if (!command || !id) fail("用法：npm run game -- <schema|new|inspect|apply|check|review-treatment|review|status|publish> <id> …", 1);
   if (!/^[a-z0-9-]{3,48}$/.test(id)) fail("遊戲 ID 只能用小寫英數字與連字號（3～48 字）", 1);
 
   switch (command) {
@@ -159,7 +327,11 @@ async function main() {
     case "apply": {
       if (!arg) fail("用法：npm run game -- apply <id> <ops.json>", 1);
       const ops = JSON.parse(readFileSync(arg, "utf8"));
-      const result = applyOps(load(id), Array.isArray(ops) ? ops : [ops]);
+      const list = Array.isArray(ops) ? ops : [ops];
+      const base = load(id);
+      const blocked = opsGate(id, base, list);
+      if (blocked) return out({ ok: false, stage: "gate", error: blocked }, 2);
+      const result = applyOps(base, list);
       const allOk = result.results.every((r) => r.ok);
       // 中途允許暫時不合法（例如結局還沒寫好），但每筆操作都必須成功；驗證錯誤會回報給 agent 處理
       if (allOk) writeFileSync(projectFile(id), JSON.stringify(result.project, null, 2) + "\n");
@@ -169,27 +341,19 @@ async function main() {
       const report = runCheck(load(id), { demo: values.demo });
       return out({ ok: report.passed, ...report }, report.passed ? 0 : 2);
     }
-    case "review": {
-      const project = load(id);
-      if (!validateProject(project).isValid) fail("專案尚未通過驗證，請先讓 check 通過再審查");
-      const storyFile = path.join(dir(id), "story.md");
-      const story = existsSync(storyFile) ? readFileSync(storyFile, "utf8") : project.description;
-      const playtest = runPlaytest(project);
-      const quality = assessQuality(project, playtest, { checkDuration: !values.demo });
-      const provider = providerFromEnv();
-      const status = provider ? await provider.available() : { ok: false, detail: "AI_PROVIDER=none" };
-      if (!provider || !status.ok) fail(`AI 審查不可用：${status.detail}`);
-      const review = await reviewProject(provider!, story, project, playtest, quality);
-      writeFileSync(path.join(dir(id), "review.json"), JSON.stringify(review, null, 2) + "\n");
-      return out({ ok: review.passed, ...review }, review.passed ? 0 : 2);
-    }
+    case "review-treatment":
+      return reviewOut(await doReviewTreatment(id));
+    case "review":
+      return reviewOut(await doReview(id, load(id)));
+    case "status":
+      return out({ ok: true, ...gateStatus(id, load(id)) }, 0);
     case "publish": {
       const project = load(id);
       const report = runCheck(project, { demo: values.demo });
       if (!report.passed) return out({ ok: false, stage: "check", ...report }, 2);
-      const reviewFile = path.join(dir(id), "review.json");
-      const review = existsSync(reviewFile) ? JSON.parse(readFileSync(reviewFile, "utf8")) : null;
-      if (!values.demo && !review?.passed) fail("尚未通過 AI 審查（先執行 npm run game -- review，且 review.json 的 passed 必須為 true）");
+      const gate = gateStatus(id, project);
+      if (!values.demo && gate.blockers.length) return out({ ok: false, stage: "gate", ...gate }, 2);
+      const review = readReview(id, "full");
       const target = path.join("public", "games", id);
       mkdirSync(target, { recursive: true });
       writeFileSync(path.join(target, "project.json"), JSON.stringify(project, null, 2) + "\n");

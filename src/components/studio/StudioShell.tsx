@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { studioApi } from "@/lib/studioApi";
 
 /**
- * Studio 應用程式外框：左側導覽（專案 → 專案內的各工具 → AI 協作、設定、說明），並負責登入檢查。
+ * Studio 應用程式外框：左側導覽（專案 → 專案內的各工具 → AI 協作），底部是帳號選單（帳號設定、登出），並負責登入檢查。
  * 所有後台頁面都包在這個外框裡；後台不連到前台。
  */
 
@@ -38,13 +38,11 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
         { href: `/studio/publish/?id=${projectId}`, icon: "🚀", label: "發布", hint: "檢查通過後發布到玩家網站" },
       ]
     : [];
-  const bottomNav: NavItem[] = [
-    { href: "/studio/ai/", icon: "🤖", label: "AI 協作", hint: "產生 API Token，讓 AI agent 操作 Studio" },
-    { href: "/studio/settings/", icon: "⚙", label: "設定", hint: "帳號與密碼" },
-    { href: "/studio/help/", icon: "❓", label: "說明", hint: "新手教學、名詞解釋、快捷鍵" },
-  ];
+  const bottomNav: NavItem[] = [{ href: "/studio/ai/", icon: "🤖", label: "AI 協作", hint: "讓 VS Code 的 Claude Code 製作遊戲；使用說明" }];
+  const [menu, setMenu] = useState(false);
   const isActive = (href: string) => {
     const [p, q] = href.split("?");
+    if (p === "/studio/ai/" && pathname.startsWith("/studio/help")) return true;
     if (!pathname.startsWith(p.replace(/\/$/, ""))) return false;
     if (q?.includes("db=")) return Boolean(db);
     if (p.startsWith("/studio/edit") && db) return false;
@@ -87,20 +85,29 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
         </nav>
         <nav className="shell-nav shell-bottom">
           {bottomNav.map(link)}
-          <div className="shell-user">
-            <span className="shell-icon">👤</span>
-            <span className="shell-label">
-              {user ?? "…"}
-              <button
-                className="link-button"
-                onClick={async () => {
-                  await studioApi.logout().catch(() => {});
-                  window.location.href = "/studio/login/";
-                }}
-              >
-                登出
-              </button>
-            </span>
+          <div className="shell-user-wrap">
+            <button className={`shell-user${menu ? " open" : ""}`} onClick={() => setMenu((v) => !v)} data-testid="user-menu">
+              <span className="shell-icon">👤</span>
+              <span className="shell-label">{user ?? "…"}</span>
+              <span className="shell-label shell-caret">▾</span>
+            </button>
+            {menu && (
+              <div className="shell-user-menu" role="menu">
+                <Link href="/studio/settings/" className="shell-user-item" role="menuitem">
+                  ⚙ 帳號設定
+                </Link>
+                <button
+                  className="shell-user-item"
+                  role="menuitem"
+                  onClick={async () => {
+                    await studioApi.logout().catch(() => {});
+                    window.location.href = "/studio/login/";
+                  }}
+                >
+                  ↪ 登出
+                </button>
+              </div>
+            )}
           </div>
         </nav>
       </aside>

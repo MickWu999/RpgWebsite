@@ -3,7 +3,9 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import IssueList from "@/components/IssueList";
-import { PLAYER_SITE_URL, studioApi, type CheckResult } from "@/lib/studioApi";
+import { projectRevision } from "@/game/engine";
+import type { GameProject } from "@/game/schema";
+import { PLAYER_SITE_URL, studioApi, type CheckResult, type ReviewEntry } from "@/lib/studioApi";
 import { runCheckAsync } from "@/studio/check";
 import StudioShell, { PageHeader } from "../StudioShell";
 
@@ -15,11 +17,17 @@ export default function PublishPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "info" | "err"; text: string } | null>(null);
   const [allowQuality, setAllowQuality] = useState(false);
+  const [project, setProject] = useState<GameProject | null>(null);
+  const [reviews, setReviews] = useState<ReviewEntry[]>([]);
 
   const load = () => {
+    studioApi.reviews(id).then((r) => setReviews(r.reviews)).catch(() => {});
     studioApi
       .getProject(id)
-      .then((r) => runCheckAsync(r.project))
+      .then((r) => {
+        setProject(r.project);
+        return runCheckAsync(r.project);
+      })
       .then(setCheck)
       .catch((e: Error) => setMessage({ kind: "err", text: e.message }));
     studioApi.listProjects().then((r) => {
@@ -36,10 +44,25 @@ export default function PublishPage() {
     ? [
         { ok: check.validation.errors.length === 0, label: "資料驗證", detail: check.validation.errors.length ? `${check.validation.errors.length} 個錯誤` : "引用、地圖、對話、任務都正確" },
         { ok: Boolean(check.playtest?.ok), label: "自動試玩", detail: check.playtest ? check.playtest.endings.map((e) => `${e.reachable ? "✓" : "✗"} ${e.title}`).join("　") : "需要先通過資料驗證" },
-        { ok: (check.quality?.blocking.length ?? 1) === 0, label: "品質指標", detail: check.quality ? (check.quality.blocking.length ? `${check.quality.blocking.length} 項未達標` : "規模、時長、敘事指標都達標") : "需要先通過資料驗證" },
+        { ok: (check.quality?.blocking.length ?? 1) === 0, label: "品質指標", detail: check.quality ? (check.quality.blocking.length ? `${check.quality.blocking.length} 項未達標` : "規模、時長、章節、敘事指標都達標") : "需要先通過資料驗證" },
       ]
     : [];
-  const canPublish = Boolean(check?.playtest?.ok) && (check?.quality?.blocking.length === 0 || allowQuality);
+  // 審查關卡：大綱、每一章、整體（針對目前版本）；與伺服器的判斷相同
+  const latest = (target: string) => reviews.find((r) => r.target === target);
+  const reviewItems = project
+    ? [
+        { ok: Boolean(latest("treatment")?.passed), label: "劇本大綱審查", detail: latest("treatment") ? `${latest("treatment")!.overall ?? "-"} 分` : "尚未審查" },
+        ...project.chapters.map((c, i) => ({ ok: Boolean(latest(c.id)?.passed), label: `第 ${i + 1} 章審查：${c.title}`, detail: latest(c.id) ? `${latest(c.id)!.overall ?? "-"} 分` : "尚未審查" })),
+        {
+          ok: Boolean(latest("full")?.passed && latest("full")!.revision === projectRevision(project)),
+          label: "整體審查",
+          detail: !latest("full") ? "尚未審查" : latest("full")!.revision !== projectRevision(project) ? "審查後內容又改過，需要重新審查" : `${latest("full")!.overall ?? "-"} 分`,
+        },
+      ]
+    : [];
+  const reviewsOk = reviewItems.every((r) => r.ok);
+  const needOverride = (check?.quality?.blocking.length ?? 0) > 0 || !reviewsOk;
+  const canPublish = Boolean(check?.playtest?.ok) && (!needOverride || allowQuality);
 
   return (
     <StudioShell>
@@ -58,10 +81,19 @@ export default function PublishPage() {
               </div>
             </div>
           ))}
+          {reviewItems.map((it) => (
+            <div key={it.label} className={`step${it.ok ? " done" : ""}`}>
+              <span className="step-mark">{it.ok ? "✓" : "✗"}</span>
+              <div className="grow">
+                <div>{it.label}</div>
+                <div className="small muted">{it.detail}</div>
+              </div>
+            </div>
+          ))}
           {check && <IssueList errors={[...check.validation.errors, ...(check.playtest?.issues ?? []), ...(check.quality?.blocking ?? [])].slice(0, 12)} warnings={check.quality?.suggestions ?? []} />}
-          {check?.quality && check.quality.blocking.length > 0 && check.playtest?.ok && (
+          {needOverride && check?.playtest?.ok && (
             <label className="small">
-              <input type="checkbox" checked={allowQuality} onChange={(e) => setAllowQuality(e.target.checked)} /> 我了解品質指標未達標（例如時長不足），仍要以人工判斷發布（AI 透過 API Token 無法略過這一項）
+              <input type="checkbox" checked={allowQuality} onChange={(e) => setAllowQuality(e.target.checked)} /> 我了解品質指標或審查尚未全部通過，仍要以人工判斷發布（AI 透過 API Token 無法略過這些關卡）
             </label>
           )}
           <div className="row">

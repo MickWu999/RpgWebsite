@@ -1,15 +1,19 @@
 "use client";
 
-import StudioShell, { PageHeader } from "../StudioShell";
+import AiPage from "./AiPage";
 
-/** 說明：新手教學、名詞解釋、快捷鍵、AI 協作 */
+/** /studio/help：AI 協作頁的「使用說明」分頁 */
 export default function HelpPage() {
+  return <AiPage tab="help" />;
+}
+
+/** 使用說明：手動編輯的教學、名詞解釋、快捷鍵（併在 AI 協作頁） */
+export function HelpContent() {
   return (
-    <StudioShell>
-      <div className="page help">
-        <PageHeader title="說明" subtitle="第一次使用 Studio？照著「15 分鐘做出第一款遊戲」走一遍就會了。" />
+    <>
+      <div className="help">
         <section className="card">
-          <h2>15 分鐘做出第一款遊戲</h2>
+          <h2>手動微調：15 分鐘認識編輯器</h2>
           <ol>
             <li>到「專案」按「＋ 新增專案」，選「從範本開始」（範本是一款 2 章的短篇，可以邊看邊學）。</li>
             <li>進入專案「總覽」，照著<b>製作進度清單</b>一步步做。每一步都有「前往」按鈕。</li>
@@ -59,11 +63,7 @@ export default function HelpPage() {
             </tbody>
           </table>
         </section>
-        <section className="card">
-          <h2>讓 AI 幫你做</h2>
-          <p>到「AI 協作」產生 API Token，交給 VS Code 裡的 Claude Code，輸入 <code>/rpg-new 你的故事</code>。AI 會依照開發規範：寫劇本大綱 → 一章一章製作 → 檢查與自動試玩 → 獨立 AI 審查 → 發布。你可以在 Studio 即時看到 AI 的進度，也可以隨時手動修改或還原。</p>
-        </section>
       </div>
-    </StudioShell>
+    </>
   );
 }

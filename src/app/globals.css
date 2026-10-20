@@ -562,3 +562,37 @@ kbd { background: #23273a; border: 1px solid var(--border); border-bottom-width:
 .rm-fullscreen.desktop { top: auto; bottom: 14px; right: 14px; opacity: 0.35; transition: opacity 0.2s; cursor: pointer; }
 .rm-fullscreen.desktop:hover { opacity: 1; }
 body.rm-hide-cursor .rm-stage, body.rm-hide-cursor .rm-stage * { cursor: none !important; }
+.shell-user-wrap { position: relative; }
+button.shell-user { width: 100%; background: none; border: 1px solid transparent; border-radius: 6px; cursor: pointer; font: inherit; color: var(--muted); text-align: left; }
+button.shell-user:hover, button.shell-user.open { border-color: var(--border); color: var(--text); }
+.shell-caret { margin-left: auto; }
+.shell-user-menu { position: absolute; left: 0; right: 0; bottom: calc(100% + 4px); background: #1d2131; border: 1px solid var(--border); border-radius: 8px; padding: 4px; box-shadow: 0 8px 24px #0008; z-index: 20; display: flex; flex-direction: column; }
+.shell-user-item { display: block; text-align: left; background: none; border: none; color: var(--text); padding: 8px 10px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 14px; text-decoration: none; }
+.shell-user-item:hover { background: #2a3050; }
+a.tab { text-decoration: none; display: inline-block; }
+
+/* ---------- AI 製作看板 ---------- */
+.pipeline { display: flex; flex-direction: column; gap: 8px; }
+.pipeline-track { display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+.pipeline-stage { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); }
+.pipeline-dot { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; border: 2px solid var(--border); background: #11131b; }
+.pipeline-line { width: 28px; height: 2px; background: var(--border); margin: 0 6px; }
+.pipeline-stage.done { color: var(--text); }
+.pipeline-stage.done .pipeline-dot { border-color: var(--accent-2); color: var(--accent-2); }
+.pipeline-stage.done .pipeline-line { background: var(--accent-2); }
+.pipeline-stage.active { color: var(--accent); font-weight: 600; }
+.pipeline-stage.active .pipeline-dot { border-color: var(--accent); color: var(--accent); animation: portal-pulse 2s ease-in-out infinite; }
+.pipeline-stage.failed { color: #ff8a8a; }
+.pipeline-stage.failed .pipeline-dot { border-color: #ff8a8a; color: #ff8a8a; }
+.pipeline.compact { margin-top: 10px; gap: 4px; }
+.pipeline.compact .pipeline-stage { font-size: 12px; gap: 3px; }
+.pipeline.compact .pipeline-dot { width: 16px; height: 16px; font-size: 9px; border-width: 1px; }
+.pipeline.compact .pipeline-line { width: 10px; margin: 0 3px; }
+.pipeline-next { color: var(--text); }
+.review-item { border-top: 1px solid var(--border); padding: 8px 0; }
+.review-item summary { cursor: pointer; }
+.score-grid { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; margin: 6px 0; color: var(--muted); }
+.ok-text { color: var(--accent-2); }
+.doc-text { white-space: pre-wrap; max-height: 360px; overflow: auto; background: #11131b; border: 1px solid var(--border); border-radius: 6px; padding: 10px; line-height: 1.6; margin-top: 8px; }
+details.card > summary { cursor: pointer; }
+.pipeline.compact .pipeline-line { width: 6px; margin: 0 2px; } .pipeline.compact .pipeline-track { row-gap: 4px; }

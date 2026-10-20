@@ -90,8 +90,18 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   if (path === "/api/projects" && method === "GET") {
     // ?archived=1 列出典藏區；預設只列使用中的專案
     const archived = url.searchParams.get("archived") === "1";
+    // 卡片上的 AI 製作進度：故事、大綱審查、章節審查（每章最新一次是否通過）、整體審查、最近一次修改者
+    const latest = (target: string) => `(SELECT r.passed FROM project_reviews r WHERE r.project_id = p.id AND r.target = ${target} ORDER BY r.created_at DESC LIMIT 1)`;
     const { results } = await env.DB.prepare(
-      `SELECT p.id, p.title, p.version, p.is_valid, p.updated_at, p.created_at, p.archived_at, g.version AS published_version, g.published_at FROM projects p LEFT JOIN published_games g ON g.project_id = p.id WHERE p.owner_id = ? AND p.archived_at IS ${archived ? "NOT NULL" : "NULL"} ORDER BY ${archived ? "p.archived_at" : "p.updated_at"} DESC`,
+      `SELECT p.id, p.title, p.version, p.is_valid, p.updated_at, p.created_at, p.archived_at, g.version AS published_version, g.published_at,
+        EXISTS (SELECT 1 FROM project_docs d WHERE d.project_id = p.id AND d.kind = 'story') AS has_story,
+        EXISTS (SELECT 1 FROM project_docs d WHERE d.project_id = p.id AND d.kind = 'treatment') AS has_treatment,
+        ${latest("'treatment'")} AS treatment_passed,
+        ${latest("'full'")} AS full_passed,
+        json_array_length(p.data, '$.chapters') AS chapters_total,
+        (SELECT COUNT(*) FROM json_each(p.data, '$.chapters') c WHERE ${latest("json_extract(c.value, '$.id')")} = 1) AS chapters_passed,
+        (SELECT v.actor FROM project_versions v WHERE v.project_id = p.id ORDER BY v.version DESC LIMIT 1) AS last_actor
+      FROM projects p LEFT JOIN published_games g ON g.project_id = p.id WHERE p.owner_id = ? AND p.archived_at IS ${archived ? "NOT NULL" : "NULL"} ORDER BY ${archived ? "p.archived_at" : "p.updated_at"} DESC`,
     )
       .bind(actor.userId)
       .all();
@@ -139,6 +149,34 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
         notice: "伺服器只檢查操作格式；請在本機執行 npm run game -- remote check 驗證與自動試玩",
         ...(body.includeProject ? { project: result.project } : {}),
       });
+    }
+    // 故事原文與劇本大綱（人寫故事交給 AI；AI 寫的大綱放上來給人看）
+    if (sub === "docs" && method === "GET") {
+      const { results } = await env.DB.prepare("SELECT kind, content, updated_at, updated_by FROM project_docs WHERE project_id = ?").bind(row.id).all();
+      return json({ ok: true, docs: Object.fromEntries(results.map((d) => [d.kind, d])) });
+    }
+    const dm = sub?.match(/^docs\/(story|treatment)$/);
+    if (dm && method === "PUT") {
+      const body = await readJson<{ content?: string }>(req);
+      const content = String(body.content ?? "");
+      if (content.length > 200_000) return error(413, "文件太長（上限 20 萬字）");
+      await env.DB.prepare("INSERT OR REPLACE INTO project_docs (project_id, kind, content, updated_at, updated_by) VALUES (?, ?, ?, ?, ?)").bind(row.id, dm[1], content, nowIso(), actor.label).run();
+      return json({ ok: true });
+    }
+    // 審查紀錄（審查在 AI 的本機執行，結果上傳到這裡給人看，並作為發布的關卡）
+    if (sub === "reviews" && method === "GET") {
+      const { results } = await env.DB.prepare("SELECT id, kind, target, revision, passed, overall, data, actor, created_at FROM project_reviews WHERE project_id = ? ORDER BY created_at DESC LIMIT 200").bind(row.id).all();
+      return json({ ok: true, reviews: results.map((r) => ({ ...r, passed: r.passed === 1, data: JSON.parse(String(r.data)) })) });
+    }
+    if (sub === "reviews" && method === "POST") {
+      const body = await readJson<{ kind?: string; target?: string; revision?: string; passed?: boolean; review?: { overall?: number } }>(req);
+      if (!["treatment", "chapter", "full"].includes(String(body.kind)) || !body.target || typeof body.passed !== "boolean" || !body.review) return error(400, "審查結果格式錯誤");
+      const text = JSON.stringify(body);
+      if (text.length > 100_000) return error(413, "審查結果太大");
+      await env.DB.prepare("INSERT INTO project_reviews (id, project_id, kind, target, revision, passed, overall, data, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(randomId("rev"), row.id, body.kind, String(body.target).slice(0, 64), body.revision ?? null, body.passed ? 1 : 0, Number(body.review.overall ?? 0) || null, text, actor.label, nowIso())
+        .run();
+      return json({ ok: true });
     }
     if (sub === "check") return error(410, "伺服器不執行檢查（會超過 CPU 限制）。請在 Studio 頁面或本機執行：npm run game -- remote check <id>");
     if (sub === "versions" && method === "GET") {
@@ -280,15 +318,23 @@ async function getProject(env: Env, id: string, actor: Actor): Promise<ProjectRo
 }
 
 async function createProject(req: Request, env: Env, actor: Actor) {
-  const body = await readJson<{ title?: string; template?: string; project?: unknown }>(req);
+  const body = await readJson<{ title?: string; template?: string; project?: unknown; story?: string; genre?: string }>(req);
   const title = String(body.title ?? "").trim().slice(0, 200) || "未命名專案";
   if (body.project !== undefined) {
     const parsed = gameProjectSchema.safeParse(body.project);
     if (!parsed.success) return error(400, "匯入的 project 格式錯誤", { issues: parsed.error.issues.slice(0, 20) });
     return insertProject(env, actor, { ...parsed.data, title: body.title ? title : parsed.data.title }, "匯入專案");
   }
-  const template = body.template === "demo" ? { ...(structuredClone(demoProject) as unknown as GameProject), title } : blankProject("tmp", title);
-  return insertProject(env, actor, template, body.template === "demo" ? "從 demo 範本建立" : "建立空白專案");
+  const genre = (["fantasy", "modern", "sci-fi", "mystery"].includes(String(body.genre)) ? body.genre : "fantasy") as GameProject["genre"];
+  const template = body.template === "demo" ? { ...(structuredClone(demoProject) as unknown as GameProject), title } : blankProject("tmp", title, genre);
+  const res = await insertProject(env, actor, template, body.template === "demo" ? "從 demo 範本建立" : body.story ? "建立專案（故事交給 AI）" : "建立空白專案");
+  // 「交給 AI 一個故事」：同時存下故事原文，AI 用 npm run game -- remote story <id> 讀取
+  const story = String(body.story ?? "").trim();
+  if (story) {
+    const { id } = (await res.clone().json()) as { id: string };
+    await env.DB.prepare("INSERT OR REPLACE INTO project_docs (project_id, kind, content, updated_at, updated_by) VALUES (?, 'story', ?, ?, ?)").bind(id, story.slice(0, 200_000), nowIso(), actor.label).run();
+  }
+  return res;
 }
 
 async function insertProject(env: Env, actor: Actor, project: GameProject, label: string) {
@@ -331,6 +377,9 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
   if (!check.valid || !check.playtestOk) return error(422, "專案未通過驗證或自動試玩，不能發布");
   // 品質指標（時長、規模等）未達標時，只有人在 Studio 介面明確確認才可以發布；AI（API Token）一律不行
   if ((check.qualityBlocking ?? 99) > 0 && !(body.allowQualityWarnings && actor.kind === "user")) return error(422, "品質指標未達標，不能發布");
+  // 審查關卡：大綱、每一章、整體（針對目前版本）都要通過；AI 不能略過，人可以明確確認後發布
+  const blockers = await reviewBlockers(env, row.id, project);
+  if (blockers.length && !(body.allowQualityWarnings && actor.kind === "user")) return error(422, `審查尚未全部通過：${blockers[0]}`, { blockers });
   const catalog = {
     id: row.id,
     title: project.title,
@@ -352,6 +401,23 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
   return json({ ok: true, published: row.id, version: row.version });
 }
 
+/** 審查關卡：每個目標最新一次審查是否通過 */
+async function reviewBlockers(env: Env, projectId: string, project: GameProject) {
+  const { results } = await env.DB.prepare(
+    "SELECT target, passed, revision FROM project_reviews r WHERE project_id = ? AND created_at = (SELECT MAX(created_at) FROM project_reviews r2 WHERE r2.project_id = r.project_id AND r2.target = r.target)",
+  )
+    .bind(projectId)
+    .all<{ target: string; passed: number; revision: string | null }>();
+  const latest = new Map(results.map((r) => [r.target, r]));
+  const out: string[] = [];
+  if (!latest.get("treatment")?.passed) out.push("劇本大綱尚未通過審查");
+  project.chapters.forEach((c, i) => latest.get(c.id)?.passed || out.push(`第 ${i + 1} 章「${c.title}」尚未通過章節審查`));
+  const full = latest.get("full");
+  if (!full?.passed) out.push("尚未通過整體審查");
+  else if (full.revision !== projectRevision(project)) out.push("整體審查之後內容又改過了，需要重新審查");
+  return out;
+}
+
 const API_DOCS = `# AI RPG Studio API
 
 所有請求都要帶 \`Authorization: Bearer <API Token>\`（在 Studio「設定 → API Token」產生）。修改類請求以 \`Content-Type: application/json\` 送出。
@@ -367,8 +433,11 @@ const API_DOCS = `# AI RPG Studio API
 | PUT /api/projects/:id \`{project, baseVersion?, label?}\` | 整份儲存（建議改用 ops） |
 | （檢查） | 不在伺服器執行：用 \`npm run game -- remote check <id>\` 在本機驗證＋自動試玩＋品質指標 |
 | GET /api/projects/:id/versions、GET .../versions/:v、POST .../restore \`{version}\` | 版本紀錄與還原 |
-| POST /api/projects/:id/publish \`{check}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標。建議用 \`npm run game -- remote publish <id>\` |
+| GET /api/projects/:id/docs、PUT .../docs/story\|treatment \`{content}\` | 故事原文與劇本大綱 |
+| GET /api/projects/:id/reviews、POST .../reviews \`{kind,target,revision,passed,review}\` | 審查紀錄（由 \`npm run game -- remote review…\` 自動上傳） |
+| POST /api/projects/:id/publish \`{check}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標與審查關卡。建議用 \`npm run game -- remote publish <id>\` |
 
-建議流程：GET 專案 → 小批次 POST ops（帶 baseVersion）→ remote check（本機）→ 修正 → … → remote publish。
+資料模型是 RPG Maker 式（資料庫、地圖、多頁事件、事件指令），說明見 docs/ai-development-spec.md 第 6 節。
+建議流程：remote story（讀故事）→ 寫大綱 → remote review-treatment → 一章一章 remote apply／remote check／remote review --chapter → remote review → remote publish。
 回應的 report.errors 是程式實際驗證的結果，請依它修正，不要假設已完成。
 `;

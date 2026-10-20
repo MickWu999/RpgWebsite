@@ -8,7 +8,9 @@ import IssueList from "@/components/IssueList";
 import { walkProject } from "@/game/commands";
 import { coverDataOf } from "@/game/cover";
 import type { GameProject } from "@/game/schema";
-import { studioApi, type CheckResult, type VersionEntry } from "@/lib/studioApi";
+import { projectRevision } from "@/game/engine";
+import { studioApi, type CheckResult, type ProjectDoc, type ReviewEntry, type VersionEntry } from "@/lib/studioApi";
+import Pipeline from "../Pipeline";
 import { runCheckAsync } from "@/studio/check";
 import StudioShell, { PageHeader } from "../StudioShell";
 
@@ -45,12 +47,33 @@ function steps(p: GameProject, id: string, check: CheckResult | null, published:
   ];
 }
 
+const KIND_LABEL = { treatment: "劇本大綱", chapter: "章節", full: "整體" } as const;
+const SCORE_LABEL: Record<string, string> = {
+  fidelity: "忠於原作",
+  structure: "結構",
+  choices: "選擇",
+  quests: "任務",
+  characters: "角色",
+  pacing: "節奏",
+  endings: "結局",
+  feedback: "回饋",
+  arc: "故事弧線",
+  fun: "好玩程度",
+  hook: "開場鉤子",
+  variety: "玩法變化",
+  budget: "時長預算",
+};
+const time = (iso: string) => new Date(iso).toLocaleString("zh-TW", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+
 export default function ProjectOverview() {
   const id = useSearchParams().get("id") ?? "";
   const [data, setData] = useState<{ project: GameProject; version: number } | null>(null);
   const [check, setCheck] = useState<CheckResult | null>(null);
   const [versions, setVersions] = useState<VersionEntry[]>([]);
   const [published, setPublished] = useState(false);
+  const [docs, setDocs] = useState<Partial<Record<"story" | "treatment", ProjectDoc>>>({});
+  const [reviews, setReviews] = useState<ReviewEntry[]>([]);
+  const [storyDraft, setStoryDraft] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,7 +86,9 @@ export default function ProjectOverview() {
         return runCheckAsync(r.project).then(setCheck);
       })
       .catch((e: Error) => setError(e.message));
-    studioApi.versions(id).then((r) => setVersions(r.versions.slice(0, 6))).catch(() => {});
+    studioApi.versions(id).then((r) => setVersions(r.versions.slice(0, 8))).catch(() => {});
+    studioApi.docs(id).then((r) => setDocs(r.docs)).catch(() => {});
+    studioApi.reviews(id).then((r) => setReviews(r.reviews)).catch(() => {});
     studioApi
       .listProjects()
       .then((r) => setPublished(Boolean(r.projects.find((p) => p.id === id)?.published_version)))
@@ -90,8 +115,20 @@ export default function ProjectOverview() {
   const p = data.project;
   const list = steps(p, id, check, published);
   const doneCount = list.filter((s) => s.done).length;
-  const next = list.find((s) => !s.done);
   const minutes = check?.quality?.metrics.duration?.typicalMinutes;
+  const latest = (target: string) => reviews.find((r) => r.target === target);
+  const full = latest("full");
+  const revision = projectRevision(p);
+  const pipelineInput = {
+    hasStory: Boolean(docs.story?.content.trim()),
+    hasTreatment: Boolean(docs.treatment?.content.trim()),
+    treatmentPassed: latest("treatment") ? latest("treatment")!.passed : null,
+    chapters: p.chapters.map((c) => ({ title: c.title, reviewPassed: latest(c.id) ? latest(c.id)!.passed : null })),
+    fullPassed: full ? full.passed : null,
+    fullStale: Boolean(full?.passed && full.revision !== revision),
+    published,
+  };
+  const command = `/rpg-new ${id}`;
 
   return (
     <StudioShell title={p.title}>
@@ -101,53 +138,133 @@ export default function ProjectOverview() {
           subtitle={`第 ${data.version} 版・${p.description}`}
           actions={
             <>
-              <Link className="btn primary" href={`/studio/edit/?id=${id}`} data-testid="open-editor">
-                開啟編輯器
-              </Link>
               <Link className="btn" href={`/studio/play/?id=${id}`} target="_blank">
                 ▶ 測試遊玩
+              </Link>
+              <Link className="btn" href={`/studio/edit/?id=${id}`} data-testid="open-editor">
+                編輯器
               </Link>
             </>
           }
         />
-        <div className="overview-grid">
-          <section className="card stack" data-testid="checklist">
-            <div className="row">
-              <h2 className="grow" style={{ margin: 0 }}>
-                製作進度
-              </h2>
-              <span className="badge ok">
-                {doneCount} / {list.length}
-              </span>
-            </div>
-            <div className="progress">
-              <span style={{ width: `${(doneCount / list.length) * 100}%` }} />
-            </div>
-            {next && (
-              <div className="next-step">
-                <div className="small muted">下一步</div>
-                <b>{next.title}</b>
-                <div className="small">{next.how}</div>
-                <Link className="btn small primary" href={next.href} style={{ marginTop: 8 }}>
-                  {next.cta} →
-                </Link>
+
+        <section className="card stack" data-testid="ai-board">
+          <h2 style={{ margin: 0 }}>AI 製作進度</h2>
+          <Pipeline input={pipelineInput} />
+          {!pipelineInput.hasTreatment && (
+            <div className="next-step">
+              <div className="small muted">交給 AI</div>
+              <div className="small">
+                在 VS Code 的 Claude Code 輸入下面這行，AI 會讀取這個專案的故事，寫劇本大綱並通過審查後，一章一章製作。第一次使用請先到「AI 協作」完成設定。
               </div>
-            )}
-            <div className="steps">
-              {list.map((s) => (
-                <div key={s.title} className={`step${s.done ? " done" : ""}`}>
-                  <span className="step-mark">{s.done ? "✓" : "○"}</span>
-                  <div className="grow">
-                    <div>{s.title}</div>
-                    {!s.done && <div className="small muted">{s.how}</div>}
-                  </div>
-                  <Link className="btn small" href={s.href}>
-                    {s.cta}
-                  </Link>
-                </div>
-              ))}
+              <pre className="code-block" data-testid="ai-command">
+                {command}
+              </pre>
+              <button className="btn small" onClick={() => void navigator.clipboard.writeText(command).catch(() => {})}>
+                複製指令
+              </button>
             </div>
-          </section>
+          )}
+        </section>
+
+        <div className="overview-grid">
+          <div className="stack">
+            <section className="card" data-testid="chapter-board">
+              <h2>章節</h2>
+              {p.chapters.length === 0 ? (
+                <div className="small muted">還沒有章節。AI 會在大綱審查通過後，從第 1 章開始一次做一章。</div>
+              ) : (
+                <table className="version-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>章節</th>
+                      <th>自動試玩</th>
+                      <th>審查</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {p.chapters.map((c, i) => {
+                      const cr = check?.chapters.find((x) => x.id === c.id);
+                      const rv = latest(c.id);
+                      return (
+                        <tr key={c.id}>
+                          <td className="small muted">{i + 1}</td>
+                          <td>
+                            {c.title}
+                            {c.summary && <div className="small muted">{c.summary}</div>}
+                          </td>
+                          <td className="small">
+                            {!check ? "檢查中…" : cr?.ok ? `✓ ${cr.minutes ? `${cr.minutes[0]}～${cr.minutes[1]} 分鐘` : ""}` : <span className="err-text">✗ {cr?.issues[0]?.message.slice(0, 40)}</span>}
+                          </td>
+                          <td className="small">{rv ? <span className={rv.passed ? "ok-text" : "err-text"}>{rv.passed ? "✓" : "✗"} {rv.overall ?? "-"} 分</span> : <span className="muted">尚未審查</span>}</td>
+                          <td>
+                            <Link className="btn small" href={`/studio/play/?id=${id}&chapter=${encodeURIComponent(c.id)}`} target="_blank">
+                              ▶ 從這章測試
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </section>
+
+            <section className="card" data-testid="review-board">
+              <h2>審查紀錄</h2>
+              {reviews.length === 0 && <div className="small muted">還沒有審查紀錄。AI 每次審查（大綱、章節、整體）的分數與意見都會出現在這裡。</div>}
+              {reviews.slice(0, 12).map((r) => {
+                const chapter = p.chapters.find((c) => c.id === r.target);
+                return (
+                  <details key={r.id} className="review-item">
+                    <summary>
+                      <span className={`badge ${r.passed ? "ok" : "err"}`}>{r.passed ? "通過" : "退回"}</span> <b>{KIND_LABEL[r.kind]}</b>
+                      {chapter ? `：${chapter.title}` : ""}・{r.overall ?? "-"} 分 <span className="small muted">{time(r.created_at)}</span>
+                    </summary>
+                    <p className="small">{r.data.review.summary}</p>
+                    <div className="score-grid">
+                      {Object.entries(r.data.review.scores).map(([k, v]) => (
+                        <span key={k} className={v < 6 ? "err-text" : v >= 8 ? "ok-text" : ""}>
+                          {SCORE_LABEL[k] ?? k} {v}
+                        </span>
+                      ))}
+                    </div>
+                    {r.data.review.issues.map((x, i) => (
+                      <div key={i} className={`issue ${x.severity === "minor" ? "warn" : "err"}`}>
+                        <div>
+                          [{x.severity}] {x.problem}
+                        </div>
+                        <div className="path">建議：{x.suggestion}</div>
+                      </div>
+                    ))}
+                  </details>
+                );
+              })}
+            </section>
+
+            <details className="card" data-testid="checklist">
+              <summary>
+                <b>手動製作清單</b> <span className="badge ok">{doneCount} / {list.length}</span>
+                <span className="small muted">（自己動手修改時的參考）</span>
+              </summary>
+              <div className="steps" style={{ marginTop: 10 }}>
+                {list.map((s) => (
+                  <div key={s.title} className={`step${s.done ? " done" : ""}`}>
+                    <span className="step-mark">{s.done ? "✓" : "○"}</span>
+                    <div className="grow">
+                      <div>{s.title}</div>
+                      {!s.done && <div className="small muted">{s.how}</div>}
+                    </div>
+                    <Link className="btn small" href={s.href}>
+                      {s.cta}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </details>
+          </div>
 
           <div className="stack">
             <section className="card">
@@ -167,7 +284,7 @@ export default function ProjectOverview() {
                 <div><b>{p.endings.length}</b><span>結局</span></div>
               </div>
               <div className="small muted" style={{ marginTop: 8 }}>
-                預估遊玩時間：{minutes ? `${minutes[0]}～${minutes[1]} 分鐘` : check ? "需要先通過驗證才能估算" : "在你的瀏覽器計算中…"}
+                預估遊玩時間：{minutes ? `${minutes[0]}～${minutes[1]} 分鐘` : check ? "需要先通過驗證才能估算" : "在你的瀏覽器計算中…"}（目標 60～120 分鐘）
               </div>
             </section>
             {check && check.validation.errors.length > 0 && (
@@ -176,6 +293,48 @@ export default function ProjectOverview() {
                 <IssueList errors={check.validation.errors.slice(0, 6)} warnings={[]} />
               </section>
             )}
+            {check?.quality && check.quality.blocking.length > 0 && (
+              <section className="card">
+                <h2>品質指標未達標（{check.quality.blocking.length}）</h2>
+                <IssueList errors={check.quality.blocking.slice(0, 6)} warnings={[]} />
+              </section>
+            )}
+            <section className="card stack" data-testid="story-doc">
+              <div className="row">
+                <h2 className="grow" style={{ margin: 0 }}>
+                  故事
+                </h2>
+                {storyDraft === null ? (
+                  <button className="btn small" onClick={() => setStoryDraft(docs.story?.content ?? "")}>
+                    編輯
+                  </button>
+                ) : (
+                  <button
+                    className="btn small primary"
+                    onClick={async () => {
+                      await studioApi.saveDoc(id, "story", storyDraft);
+                      setDocs({ ...docs, story: { kind: "story", content: storyDraft, updated_at: new Date().toISOString(), updated_by: "你" } });
+                      setStoryDraft(null);
+                    }}
+                  >
+                    儲存
+                  </button>
+                )}
+              </div>
+              {storyDraft !== null ? (
+                <textarea rows={8} value={storyDraft} onChange={(e) => setStoryDraft(e.target.value)} />
+              ) : docs.story ? (
+                <div className="doc-text small">{docs.story.content}</div>
+              ) : (
+                <div className="small muted">還沒有故事。按「編輯」寫下故事或題材，AI 會從這裡讀取。</div>
+              )}
+            </section>
+            <details className="card" data-testid="treatment-doc">
+              <summary>
+                <b>劇本大綱</b> {docs.treatment && <span className="small muted">（{docs.treatment.updated_by}・{time(docs.treatment.updated_at)}）</span>}
+              </summary>
+              {docs.treatment ? <div className="doc-text small">{docs.treatment.content}</div> : <div className="small muted">AI 寫好大綱並送審時，會出現在這裡。</div>}
+            </details>
             <section className="card">
               <div className="row">
                 <h2 className="grow" style={{ margin: 0 }}>

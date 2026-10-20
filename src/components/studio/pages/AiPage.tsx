@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { studioApi, type TokenEntry } from "@/lib/studioApi";
+import Link from "next/link";
 import StudioShell, { PageHeader } from "../StudioShell";
+import { HelpContent } from "./HelpPage";
 
 /**
  * AI 協作：說明「你 → VS Code 的 AI agent → Studio」的流程，並引導完成設定（產生 Token、設定 .env.local、下指令）。
@@ -46,7 +48,7 @@ function CopyBlock({ text, testId }: { text: string; testId?: string }) {
   );
 }
 
-export default function AiPage() {
+export default function AiPage({ tab = "ai" }: { tab?: "ai" | "help" }) {
   const [tokens, setTokens] = useState<TokenEntry[]>([]);
   const [name, setName] = useState("VS Code Claude Code");
   const [created, setCreated] = useState<string | null>(null);
@@ -73,6 +75,18 @@ export default function AiPage() {
           subtitle="讓你在 VS Code 裡使用的 AI agent（Claude Code）直接操作這個 Studio：寫大綱、畫地圖、放 NPC、寫對話、檢查、發布。不需要任何雲端 API key，AI 的費用由你自己的 Claude Code 帳號負擔。"
         />
 
+        <div className="tabs" role="tablist">
+          <Link href="/studio/ai/" className={`tab${tab === "ai" ? " active" : ""}`}>
+            🤖 AI 協作
+          </Link>
+          <Link href="/studio/help/" className={`tab${tab === "help" ? " active" : ""}`} data-testid="tab-help">
+            ❓ 使用說明
+          </Link>
+        </div>
+        {tab === "help" ? (
+          <HelpContent />
+        ) : (
+          <>
         <section className="card stack" data-testid="ai-flow">
           <h2>運作方式</h2>
           <div className="ai-flow">
@@ -180,12 +194,12 @@ export default function AiPage() {
 
         <section className="card stack" data-testid="ai-commands">
           <h2>開始製作：在 Claude Code 對話框下指令</h2>
-          <div className="small muted">用一句話或一段故事描述就好，AI 會自己完成其餘的事。</div>
+          <div className="small muted">用一句話或一段故事描述就好；也可以先在「專案 → ＋ 交給 AI 一個故事」寫好故事，再把專案 ID 交給 AI。</div>
           <CopyBlock text="/rpg-new 一個新兵在懇親會前，想挽回和爸爸關係的溫馨故事" />
           <table className="version-table">
             <tbody>
               <tr>
-                <td className="mono small">/rpg-new &lt;故事&gt;</td>
+                <td className="mono small">/rpg-new &lt;故事或專案 ID&gt;</td>
                 <td className="small">從零做一款新遊戲（目標 1～2 小時，一章一章製作）</td>
               </tr>
               <tr>
@@ -198,27 +212,25 @@ export default function AiPage() {
               </tr>
             </tbody>
           </table>
-          <h2 style={{ marginTop: 8 }}>AI 會依序做這些事</h2>
+          <h2 style={{ marginTop: 8 }}>AI 會依序做這些事（每一關都由程式把關）</h2>
           <ol className="ai-steps-list">
             <li>
-              擴寫故事、寫<b>劇本大綱</b>（角色動機與秘密、3 章的轉折與抉擇、結局）
+              讀取故事，擴寫成<b>劇本大綱</b>：4～6 章、每章的轉折與兩難、角色的動機與秘密、伏筆、結局
             </li>
             <li>
-              在 Studio <b>建立專案</b>（「專案」列表會出現它）
+              <b>大綱審查</b>：另一個 AI 以「RPG 前輩的設計方法」評分，沒通過就改大綱，<b>不准動工</b>
             </li>
             <li>
-              <b>一章一章送出操作</b>：畫地圖 → 建立角色 → 放事件（人物、門、寶箱、劇情）→ 任務日誌 → 章節 → 結局
+              <b>一次只做一章</b>：畫地圖 → 建立角色 → 放事件（人物、門、寶箱、劇情）→ 任務日誌 → 章節標題
             </li>
             <li>
-              每一段都在 AI 的電腦上<b>自動檢查與試玩</b>，發現錯誤就自己修
+              每章從自己的起點<b>自動試玩</b>（不卡關、時長 10～25 分鐘），再通過<b>章節審查</b>，才能開始下一章
             </li>
             <li>
-              交給另一個 AI <b>獨立審查</b>內容品質，未通過就依意見修改（最多 3 輪）
-            </li>
-            <li>
-              通過後<b>發布</b>到玩家網站；沒通過時會停下來回報原因，不會自行放寬標準
+              全部完成後<b>整體審查</b>，通過才<b>發布</b>；沒通過時會停下來回報原因，不會自行放寬標準
             </li>
           </ol>
+          <div className="small muted">每一次審查的分數與意見都會上傳到專案的「總覽」，你可以隨時看到 AI 卡在哪一關。</div>
           <details>
             <summary className="small">AI 送出的「操作」長什麼樣？</summary>
             <p className="small muted">AI 不改程式碼，而是送出和你在編輯器點按時相同的操作（RPG Maker 式的角色、事件與指令），所以你能即時看到、也能手動修改：</p>
@@ -289,6 +301,8 @@ export default function AiPage() {
             <dd>{origin}/api/docs（AI 會自己讀，你不需要看）</dd>
           </dl>
         </section>
+          </>
+        )}
       </div>
     </StudioShell>
   );

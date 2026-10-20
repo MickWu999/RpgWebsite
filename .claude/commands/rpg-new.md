@@ -1,17 +1,20 @@
 ---
-description: 依 AI 開發規範，從故事或題材製作一款 25～40 分鐘的 RPG（大綱 → 逐章實作 → 檢查 → 審查 → 發布）
-argument-hint: <故事、題材或故事檔路徑>
+description: 依 AI 開發規範，從故事或 Studio 專案製作一款 1～2 小時、分章節的 RPG（大綱審查 → 一章一章製作與審查 → 整體審查 → 發布）
+argument-hint: <故事、題材，或 Studio 專案 ID>
 ---
 
-請依照 docs/ai-development-spec.md 的流程，製作一款新的 RPG。
+請依照 docs/ai-development-spec.md 的流程製作一款新的 RPG。
 
-故事或題材：$ARGUMENTS
+輸入：$ARGUMENTS
 
-要求：
-
-1. 如果 `.env.local` 有設定 `STUDIO_TOKEN`，使用遠端模式（規範第 2 節）：先 `npm run game -- remote create <名稱>`，之後所有操作都用 `remote apply`／`remote check`。否則先決定遊戲 ID（小寫英數字加連字號），執行 `npm run game -- new <id> --title <名稱> --genre <類型>`。
-2. 依規範第 3 節，依序完成 story.md、treatment.md、世界、逐章實作、結局。
-   - 每批操作都用 `npm run game -- apply`，套用後執行 `npm run game -- check`，並修正所有錯誤。
-3. `check` 的 `ok` 為 true 之後，執行 `npm run game -- review <id>`。如果沒有通過，依審查意見修改後重新審查，最多 3 輪。
-4. 通過之後執行 `npm run game -- publish <id>`。
-5. 依規範第 9 節的格式回報。沒有通過時，不要放寬任何門檻，直接回報卡住的原因。
+1. 判斷輸入是什麼：
+   - 看起來像 Studio 專案 ID（小寫英數字加連字號，例如 `night-watch-x7k2`），而且 `.env.local` 有 `STUDIO_TOKEN`：執行 `npm run game -- remote story <id>` 讀取使用者寫的故事。
+   - 否則把輸入當成故事或題材。有 `STUDIO_TOKEN` 時先 `npm run game -- remote create <名稱>`；沒有時用本機模式 `npm run game -- new <id> --title <名稱>`。
+2. 動工前，先讀 `src/ai/designGuide.ts` 的 H（前輩方法）與 X（常見盲點），以及規範第 5、6、7 節。
+3. 依規範第 3 節的順序執行，每一關都要通過才能往下走：
+   - 寫 story.md、treatment.md → 大綱審查 `review-treatment`
+   - 骨架 → 一次一章：開章（設定 testStart）→ 內容 → `check`（看 chapters[]）→ 章節審查 `review --chapter`
+   - 收尾 → `check` 全部通過 → 整體審查 `review` → `publish`
+4. 每批操作最多約 40 筆，送出後立刻 `check`。被關卡擋下時，照錯誤訊息處理，不要嘗試繞過。
+5. 審查沒通過時，依審查意見逐條修改。同一關修改 3 輪仍不通過，就停下來回報使用者。
+6. 依規範第 9 節的格式回報。

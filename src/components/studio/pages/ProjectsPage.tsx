@@ -3,16 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { studioApi, type ProjectSummary } from "@/lib/studioApi";
+import { GENRE_LABELS } from "@/game/schema";
+import Pipeline from "../Pipeline";
 import StudioShell, { PageHeader } from "../StudioShell";
 
-/** 專案列表：新增（空白／範本）、匯入、開啟、複製、典藏（軟刪除，可還原） */
+/**
+ * 專案列表（AI 製作看板）：每張卡片顯示 AI 製作進度與下一步。
+ * 新增專案＝「交給 AI 一個故事」：寫下故事或題材，AI 在 VS Code 用 npm run game -- remote story <id> 讀取後開始製作。
+ */
 export default function ProjectsPage() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
-  const [template, setTemplate] = useState<"blank" | "demo">("demo");
+  const [template, setTemplate] = useState<"blank" | "demo">("blank");
+  const [story, setStory] = useState("");
+  const [genre, setGenre] = useState("fantasy");
   const [showArchived, setShowArchived] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -33,7 +40,7 @@ export default function ProjectsPage() {
 
   const create = async () => {
     try {
-      const { id } = await studioApi.createProject(title.trim() || "未命名專案", template);
+      const { id } = await studioApi.createProject(title.trim() || "未命名專案", template, template === "blank" ? { story, genre } : {});
       router.push(`/studio/project/?id=${id}`);
     } catch (e) {
       setError((e as Error).message);
@@ -55,14 +62,14 @@ export default function ProjectsPage() {
       <div className="page">
         <PageHeader
           title="專案"
-          subtitle="每個專案就是一款 RPG。專案存在雲端，換電腦登入也看得到；人與 AI（透過 API Token）都能編輯。"
+          subtitle="每個專案就是一款 RPG。寫下故事交給 AI，這裡會即時顯示 AI 做到哪一章、審查的結果，以及下一步。"
           actions={
             <>
               <button className="btn" onClick={() => fileRef.current?.click()}>
                 匯入 JSON
               </button>
               <button className="btn primary" onClick={() => setCreating(true)} data-testid="new-project">
-                ＋ 新增專案
+                ＋ 交給 AI 一個故事
               </button>
               <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
             </>
@@ -81,27 +88,49 @@ export default function ProjectsPage() {
 
         {creating && (
           <div className="card stack" data-testid="new-project-form">
-            <h2>新增專案</h2>
-            <label className="field">
-              遊戲名稱
-              <input type="text" value={title} autoFocus placeholder="例如：最後一班夜哨" onChange={(e) => setTitle(e.target.value)} />
-            </label>
-            <div className="template-picker">
-              <button className={`template${template === "demo" ? " active" : ""}`} onClick={() => setTemplate("demo")}>
-                <b>🌲 從範本開始（建議新手）</b>
-                <span className="small muted">複製《迷霧森林的燈火》：已有 2 張地圖、2 位 NPC、任務與 2 種結局，可以邊改邊學。</span>
-              </button>
-              <button className={`template${template === "blank" ? " active" : ""}`} onClick={() => setTemplate("blank")}>
-                <b>📄 空白專案</b>
-                <span className="small muted">只有一張空地圖與主角，適合從零設計，或交給 AI agent 製作。</span>
-              </button>
-            </div>
+            <h2>{template === "blank" ? "交給 AI 一個故事" : "從範本開始（手動學習）"}</h2>
             <div className="row">
-              <button className="btn primary" onClick={create} data-testid="create-project">
-                建立
+              <label className="field grow">
+                遊戲名稱
+                <input type="text" value={title} autoFocus placeholder="例如：最後一班夜哨" onChange={(e) => setTitle(e.target.value)} />
+              </label>
+              {template === "blank" && (
+                <label className="field">
+                  類型
+                  <select value={genre} onChange={(e) => setGenre(e.target.value)}>
+                    {Object.entries(GENRE_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+            {template === "blank" ? (
+              <label className="field">
+                故事或題材（一句話也可以；寫得越具體，AI 越能抓到你要的感覺）
+                <textarea
+                  rows={7}
+                  value={story}
+                  onChange={(e) => setStory(e.target.value)}
+                  data-testid="new-story"
+                  placeholder={"例如：\n一個新兵在懇親會前一週，想挽回和爸爸的關係。營區裡流傳著老兵的鬼故事，班長似乎藏著什麼秘密。\n希望有溫馨也有好笑的地方，結局可以因為玩家的選擇而不同。"}
+                />
+              </label>
+            ) : (
+              <div className="small muted">複製《迷霧森林的燈火》：2 章的短篇，含人物、寶箱、場所移動、多頁事件與 2 種結局，適合邊看邊學 RPG Maker 式的事件寫法。</div>
+            )}
+            <div className="row">
+              <button className="btn primary" onClick={create} data-testid="create-project" disabled={template === "blank" && !story.trim()}>
+                {template === "blank" ? "建立並交給 AI" : "建立"}
               </button>
               <button className="btn" onClick={() => setCreating(false)}>
                 取消
+              </button>
+              <span className="grow" />
+              <button className="link-button small" onClick={() => setTemplate(template === "blank" ? "demo" : "blank")} data-testid="toggle-template">
+                {template === "blank" ? "想自己動手？改用範本專案學習 →" : "← 改回交給 AI 製作"}
               </button>
             </div>
           </div>
@@ -113,9 +142,9 @@ export default function ProjectsPage() {
           <div className="empty-state">
             <div className="empty-icon">🎮</div>
             <h2>還沒有任何專案</h2>
-            <p className="muted">按「新增專案」開始做第一款 RPG。第一次使用建議選「從範本開始」，照著專案總覽的製作清單一步步完成。</p>
+            <p className="muted">寫下一段故事或題材交給 AI。AI 會先寫劇本大綱並通過審查，再一章一章製作，每一步都會顯示在這裡。</p>
             <button className="btn primary" onClick={() => setCreating(true)}>
-              ＋ 新增專案
+              ＋ 交給 AI 一個故事
             </button>
           </div>
         )}
@@ -130,8 +159,21 @@ export default function ProjectsPage() {
                   <span className="badge">第 {p.version} 版</span>
                   {p.published_version && <span className="badge ok">已發布 v{p.published_version}</span>}
                 </div>
+                {!p.archived_at && (
+                  <Pipeline
+                    compact
+                    input={{
+                      hasStory: Boolean(p.has_story),
+                      hasTreatment: Boolean(p.has_treatment),
+                      treatmentPassed: p.treatment_passed === null ? null : p.treatment_passed === 1,
+                      chapters: Array.from({ length: p.chapters_total ?? 0 }, (_, i) => ({ title: `第 ${i + 1} 章`, reviewPassed: i < p.chapters_passed ? true : null })),
+                      fullPassed: p.full_passed === null ? null : p.full_passed === 1,
+                      published: Boolean(p.published_version),
+                    }}
+                  />
+                )}
                 <div className="small muted" style={{ marginTop: 6 }}>
-                  更新於 {new Date(p.updated_at).toLocaleString("zh-TW", { hour12: false })}
+                  {p.last_actor?.includes("API Token") ? "🤖" : "👤"} {p.last_actor ?? ""}・更新於 {new Date(p.updated_at).toLocaleString("zh-TW", { hour12: false })}
                 </div>
               </button>
               <div className="row project-actions">
@@ -151,8 +193,11 @@ export default function ProjectsPage() {
                   </>
                 ) : (
                   <>
+                    <button className="btn small" onClick={() => router.push(`/studio/project/?id=${p.id}`)}>
+                      製作看板
+                    </button>
                     <button className="btn small" onClick={() => router.push(`/studio/edit/?id=${p.id}`)}>
-                      開啟編輯器
+                      編輯器
                     </button>
                     <button
                       className="btn small"

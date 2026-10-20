@@ -1,4 +1,5 @@
 import { findCatalogAsset } from "./assets";
+import type { ChapterReport } from "./chapters";
 import { allConditions, allSources, conditionAtoms, walkCommands, walkCondition } from "./commands";
 import { estimateDuration, type DurationEstimate } from "./duration";
 import { createInitialState } from "./engine";
@@ -28,6 +29,12 @@ export const QUALITY_THRESHOLDS = {
   maxTexts: 1500,
   /** 一般玩家預估時長（分鐘）的目標範圍 */
   targetMinutes: [60, 120] as [number, number],
+  /** 章節：建議 4～6 章；少於 3 章或多於 8 章退回 */
+  minChapters: 3,
+  maxChapters: 8,
+  recommendedChapters: [4, 6] as [number, number],
+  /** 每章一般玩家預估時長（分鐘）：建議 10～25，超出 8～30 退回 */
+  chapterMinutes: [8, 30] as [number, number],
 };
 
 export type QualityMetrics = {
@@ -65,8 +72,11 @@ function isCharacter(project: GameProject, assetId: string | undefined) {
   return kind === "character";
 }
 
-/** checkDuration=false：手寫的教學短篇（demo）不套用時長目標 */
-export function assessQuality(project: GameProject, playtest: PlaytestReport, options: { checkDuration?: boolean } = {}): QualityReport {
+/**
+ * checkDuration=false：手寫的教學短篇（demo）不套用時長與章節規則。
+ * chapters：章節檢查結果（見 chapters.ts），用來套用每章的時長與可玩性規則。
+ */
+export function assessQuality(project: GameProject, playtest: PlaytestReport, options: { checkDuration?: boolean; chapters?: ChapterReport[] } = {}): QualityReport {
   const t = QUALITY_THRESHOLDS;
   const blocking: ValidationIssue[] = [];
   const suggestions: ValidationIssue[] = [];
@@ -142,6 +152,20 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
   if (options.checkDuration !== false && typical) {
     need(typical[1] >= t.targetMinutes[0], "duration", `預估遊玩時間只有 ${typical[0]}～${typical[1]} 分鐘，目標是 ${t.targetMinutes[0]}～${t.targetMinutes[1]} 分鐘：請增加章節、支線與調查內容`);
     need(typical[0] <= t.targetMinutes[1], "duration", `預估遊玩時間 ${typical[0]}～${typical[1]} 分鐘超過 ${t.targetMinutes[1]} 分鐘上限，請精簡`);
+  }
+
+  // 章節（長篇以章為單位製作與把關）
+  if (options.checkDuration !== false) {
+    const n = project.chapters.length;
+    need(n >= t.minChapters && n <= t.maxChapters, "chapters", `1～2 小時的遊戲要分成 ${t.recommendedChapters[0]}～${t.recommendedChapters[1]} 章（目前 ${n} 章），並在劇情轉折處用「章節」指令進入下一章`);
+    if (n > 0 && (n < t.recommendedChapters[0] || n > t.recommendedChapters[1])) suggestions.push({ path: "chapters", message: `建議 ${t.recommendedChapters[0]}～${t.recommendedChapters[1]} 章（目前 ${n} 章）` });
+    for (const c of options.chapters ?? []) {
+      need(c.ok, `chapters.${c.id}`, `第 ${c.index + 1} 章「${c.title}」從測試起點無法順利玩到${c.index + 1 < n ? "下一章" : "結局"}：${c.issues[0]?.message ?? "請檢查章節測試起點"}`);
+      if (c.minutes) {
+        need(c.minutes[1] >= t.chapterMinutes[0], `chapters.${c.id}`, `第 ${c.index + 1} 章「${c.title}」只有 ${c.minutes[0]}～${c.minutes[1]} 分鐘，每章建議 10～25 分鐘：請加入轉折、支線、調查或謎題，不要只拉長走路`);
+        need(c.minutes[0] <= t.chapterMinutes[1], `chapters.${c.id}`, `第 ${c.index + 1} 章「${c.title}」約 ${c.minutes[0]}～${c.minutes[1]} 分鐘，太長了：請拆成兩章或精簡`);
+      }
+    }
   }
 
   for (const s of allSources(project))

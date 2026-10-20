@@ -40,6 +40,26 @@ export type ProjectSummary = {
   archived_at: string | null;
   published_version: number | null;
   published_at: string | null;
+  /** AI 製作進度 */
+  has_story: number;
+  has_treatment: number;
+  treatment_passed: number | null;
+  full_passed: number | null;
+  chapters_total: number | null;
+  chapters_passed: number;
+  last_actor: string | null;
+};
+export type ProjectDoc = { kind: "story" | "treatment"; content: string; updated_at: string; updated_by: string };
+export type ReviewEntry = {
+  id: string;
+  kind: "treatment" | "chapter" | "full";
+  target: string;
+  revision: string | null;
+  passed: boolean;
+  overall: number | null;
+  actor: string;
+  created_at: string;
+  data: { summary?: string; reasons?: string[]; review: { overall: number; summary: string; scores: Record<string, number>; issues: Array<{ severity: string; area: string; problem: string; suggestion: string }> } };
 };
 export type VersionEntry = { version: number; label: string; actor: string; created_at: string };
 export type TokenEntry = { id: string; name: string; token_prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
@@ -51,7 +71,10 @@ export const studioApi = {
   logout: () => call("POST", "/api/auth/logout", {}),
   changePassword: (current: string, next: string) => call<{ notice: string }>("POST", "/api/auth/password", { current, next }),
   listProjects: (archived = false) => call<{ projects: ProjectSummary[] }>("GET", `/api/projects${archived ? "?archived=1" : ""}`),
-  createProject: (title: string, template: "blank" | "demo") => call<{ id: string }>("POST", "/api/projects", { title, template }),
+  createProject: (title: string, template: "blank" | "demo", extra: { story?: string; genre?: string } = {}) => call<{ id: string }>("POST", "/api/projects", { title, template, ...extra }),
+  docs: (id: string) => call<{ docs: Partial<Record<"story" | "treatment", ProjectDoc>> }>("GET", `/api/projects/${id}/docs`),
+  saveDoc: (id: string, kind: "story" | "treatment", content: string) => call("PUT", `/api/projects/${id}/docs/${kind}`, { content }),
+  reviews: (id: string) => call<{ reviews: ReviewEntry[] }>("GET", `/api/projects/${id}/reviews`),
   importProject: (project: unknown, title?: string) => call<{ id: string }>("POST", "/api/projects", { project, title }),
   getProject: (id: string) => call<{ id: string; version: number; project: GameProject; updatedAt: string }>("GET", `/api/projects/${id}`),
   saveProject: (id: string, project: GameProject, baseVersion: number | undefined, label: string, isValid: boolean) =>
