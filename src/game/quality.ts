@@ -3,7 +3,7 @@ import type { ChapterReport } from "./chapters";
 import { allConditions, allSources, conditionAtoms, walkCommands, walkCondition } from "./commands";
 import { estimateDuration, type DurationEstimate } from "./duration";
 import { createInitialState } from "./engine";
-import { applyAction, type PlaytestReport } from "./playtest";
+import { applyAction, settle, type PlaytestReport } from "./playtest";
 import type { EventCommand, GameProject } from "./schema";
 import type { ValidationIssue } from "./validate";
 
@@ -105,7 +105,7 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
   const choiceSets: Array<Set<string>> = [];
   const talked = new Set<string>();
   for (const g of routes) {
-    let s = createInitialState(project);
+    let s = settle(project, createInitialState(project));
     for (const a of g.actions!) {
       if (a.kind === "event") talked.add(`${s.mapId}/${a.eventId}`);
       s = applyAction(project, s, a);

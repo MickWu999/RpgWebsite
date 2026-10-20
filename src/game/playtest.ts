@@ -42,8 +42,22 @@ function stateKey(s: PlayerState) {
   return JSON.stringify([s.mapId, s.switches, s.variables, s.selfSwitches, s.items, s.quests, s.erased, s.chapterId, s.interpreter, s.message, s.endingId]);
 }
 
-/** 依序執行行動；也用來重播自動試玩找到的路線 */
-export function applyAction(project: GameProject, input: PlayerState, action: PlaytestAction): PlayerState {
+/**
+ * 讓沒有選項的文字與章節標題自動往下播，直到遇到選項或回到可以自由行動（onText 收到每一則播過的文字）。
+ * 自動試玩只在「選項」分岔，否則每一句台詞都是一個狀態，台詞多的遊戲會狀態爆量。
+ */
+export function settle(project: GameProject, input: PlayerState, onText?: (text: string) => void): PlayerState {
+  let state = input;
+  for (let guard = 0; guard < 2000; guard++) {
+    const msg = state.message;
+    if (!msg || (msg.kind === "text" && msg.choices)) return state;
+    if (msg.kind === "text") onText?.(msg.text);
+    state = advance(project, state).state;
+  }
+  return state;
+}
+
+function applyRaw(project: GameProject, input: PlayerState, action: PlaytestAction): PlayerState {
   if (action.kind === "choose") return choose(project, input, action.index).state;
   if (action.kind === "advance") return advance(project, input).state;
   let state = input;
@@ -52,6 +66,13 @@ export function applyAction(project: GameProject, input: PlayerState, action: Pl
     if (isBusy(state)) return state;
   }
   return action.trigger === "action" ? confirm(project, state).state : state;
+}
+
+/** 依序執行行動（之後自動播完沒有選項的文字）；也用來重播自動試玩找到的路線 */
+export function applyAction(project: GameProject, input: PlayerState, action: PlaytestAction, onText?: (text: string) => void): PlayerState {
+  const state = applyRaw(project, input, action);
+  if (state.message?.kind === "text" && state.message.choices) onText?.(state.message.text);
+  return settle(project, state, onText);
 }
 
 function describe(project: GameProject, state: PlayerState, action: PlaytestAction): string {
@@ -103,7 +124,7 @@ export function runPlaytest(
   const engineErrors = new Map<string, string[]>();
   let start: PlayerState;
   try {
-    start = options.start ?? createInitialState(project);
+    start = settle(project, options.start ?? createInitialState(project));
   } catch (e) {
     return { ok: false, statesExplored: 0, truncated: false, goals: goals.map((g) => ({ id: g.id, title: g.title, reachable: false })), softlocks: [], issues: [{ path: "playtest", message: `遊戲一開始就發生錯誤：${(e as Error).message}` }] };
   }

@@ -8,7 +8,7 @@ import { ASSET_CATALOG, MUSIC, TERRAIN } from "@/game/assets";
 import { projectDigest, reviewProject, reviewTreatment, type ReviewResult } from "@/ai/review";
 import { chapterPlaytest, checkChapters } from "@/game/chapters";
 import { projectRevision } from "@/game/engine";
-import { applyAction } from "@/game/playtest";
+import { applyAction, settle } from "@/game/playtest";
 import { runPlaytest } from "@/game/playtest";
 import { assessQuality } from "@/game/quality";
 import { gameProjectSchema, type GameProject } from "@/game/schema";
@@ -140,7 +140,7 @@ async function doReview(gameId: string, project: GameProject): Promise<ReviewRes
     // 收集這一章路線經過的地圖（專案太大時，審查摘要只保留這些地圖）
     const { start, playtest: cp } = chapterPlaytest(project, index);
     const mapIds = new Set<string>([start!.mapId]);
-    let st = start!;
+    let st = settle(project, start!);
     for (const a of cp!.goals[0].actions ?? []) {
       st = applyAction(project, st, a);
       mapIds.add(st.mapId);

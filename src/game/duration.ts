@@ -1,5 +1,5 @@
 import { createInitialState, type PlayerState } from "./engine";
-import { applyAction, type PlaytestReport } from "./playtest";
+import { applyAction, settle, type PlaytestReport } from "./playtest";
 import type { GameProject } from "./schema";
 
 /**
@@ -19,18 +19,23 @@ export function routeSeconds(project: GameProject, playtest: PlaytestReport, sta
   return playtest.goals
     .filter((g) => g.reachable && g.actions)
     .map((g) => {
-      let state = start ?? createInitialState(project);
       let steps = 0;
       let chars = start ? 0 : [...(project.intro ?? "")].length;
       let choices = 0;
+      let texts = 0;
+      const onText = (t: string) => {
+        chars += [...t].length;
+        texts++;
+      };
+      let state = settle(project, start ?? createInitialState(project), onText);
       for (const action of g.actions!) {
         if (action.kind === "event") steps += action.moves.length;
         if (action.kind === "choose") choices++;
-        state = applyAction(project, state, action);
-        if (state.message?.kind === "text") chars += [...state.message.text].length;
+        state = applyAction(project, state, action, onText);
       }
       chars += [...(project.endings.find((x) => x.id === state.endingId)?.text ?? "")].length;
-      return steps * SECONDS_PER_STEP + chars / CHARS_PER_SECOND + choices * SECONDS_PER_CHOICE + g.actions!.length * SECONDS_PER_ACTION;
+      // 每則文字都要按一次「繼續」，所以也算一個操作
+      return steps * SECONDS_PER_STEP + chars / CHARS_PER_SECOND + choices * SECONDS_PER_CHOICE + (g.actions!.length + texts) * SECONDS_PER_ACTION;
     });
 }
 
