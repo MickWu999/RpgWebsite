@@ -30,6 +30,15 @@ function readSave(id: string): SaveInfo {
   }
 }
 
+/** 手機：開始遊戲的那一下順便進入全螢幕（瀏覽器規定全螢幕必須由使用者的動作觸發） */
+function enterImmersive() {
+  if (!window.matchMedia("(pointer: coarse)").matches || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+  void document.documentElement
+    .requestFullscreen()
+    .then(() => (screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> }).lock?.("landscape"))
+    .catch(() => {});
+}
+
 const formatTime = (iso: string) => new Date(iso).toLocaleString("zh-TW", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
@@ -83,7 +92,11 @@ export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
             data-pack={g.id}
             onMouseEnter={() => setActive(i)}
             onFocus={() => setActive(i)}
-            onClick={() => (i === active ? router.push(`/play/?pack=${encodeURIComponent(g.id)}`) : setActive(i))}
+            onClick={() => {
+              if (i !== active) return setActive(i);
+              enterImmersive();
+              router.push(`/play/?pack=${encodeURIComponent(g.id)}`);
+            }}
           >
             <span className="launcher-cursor">{i === active ? "▶" : ""}</span>
             <span className="launcher-item-title">{g.title}</span>
@@ -115,7 +128,7 @@ export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
         </div>
         <p className="launcher-desc">{game.description}</p>
         <div className="launcher-actions">
-          <Link className="rm-button primary" href={`/play/?pack=${encodeURIComponent(game.id)}`} data-testid="start-game">
+          <Link className="rm-button primary" href={`/play/?pack=${encodeURIComponent(game.id)}`} onClick={enterImmersive} data-testid="start-game">
             {save ? "▶ 繼續冒險" : "▶ 開始冒險"}
           </Link>
           {save && (

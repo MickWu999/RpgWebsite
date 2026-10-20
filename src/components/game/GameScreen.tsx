@@ -48,7 +48,6 @@ import {
 import CoverArt from "./CoverArt";
 import DebugPanel from "./DebugPanel";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
-import TouchControls, { type InputKey } from "./TouchControls";
 
 const GameCanvas = dynamic(() => import("../GameCanvas"), { ssr: false });
 
@@ -57,6 +56,8 @@ const GameCanvas = dynamic(() => import("../GameCanvas"), { ssr: false });
  * 遊戲來源可以是模組包（/games/<id>/project.json）或後台的雲端專案（測試遊玩）。
  * 所有 UI 都畫在 640×480 的邏輯畫面裡，整體等比縮放到視窗大小。
  * 確認：Z／Enter／空白鍵／E　取消／選單：X／Esc　移動：方向鍵／WASD
+ * 手機：直接用手指操作。點地面走過去、點人物或物件走過去對話或調查、點畫面讓對話繼續、點選項選擇，左上角「≡」開選單。
+ * 第一次觸控時自動進入全螢幕並鎖定橫向；手機的返回鍵會開關遊戲選單，不會意外離開遊戲。
  * 後台測試遊玩另有：F9 除錯（開關、變數、章節跳轉）、從某章或某個位置直接開始、編輯器存檔後立即套用修改（不用重玩）。
  */
 
@@ -106,7 +107,7 @@ const MENU_COMMANDS: Array<[MenuPage, string]> = [
 const SAVE_LABEL: Record<SaveSlot, string> = { auto: "自動存檔", "1": "存檔 1", "2": "存檔 2", "3": "存檔 3" };
 const TEXT_SPEEDS: TextSpeed[] = ["slow", "normal", "fast"];
 
-type Key = InputKey;
+type Key = Direction | "ok" | "cancel" | `digit${number}`;
 function keyOf(e: KeyboardEvent): Key | null {
   switch (e.key) {
     case "ArrowUp":
@@ -192,6 +193,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const clientTapRef = useRef<((clientX: number, clientY: number) => void) | null>(null);
   const seq = useRef(0);
   const toggleFullscreenRef = useRef<() => Promise<void>>(async () => {});
+  /** 使用者自己按了「離開全螢幕」：之後不再自動進入 */
+  const userExitedFullscreen = useRef(false);
 
   const update = useCallback((next: UI | ((u: UI) => UI)) => {
     const current = uiRef.current;
@@ -337,7 +340,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         return;
       }
       // 桌面：4:3 等比放大；手機直向（備用）：下方保留手把空間
-      const availableHeight = touch && portrait ? window.innerHeight - 210 : window.innerHeight;
+      const availableHeight = window.innerHeight;
       const scale = Math.max(0.3, Math.min(window.innerWidth / SCREEN_W, availableHeight / SCREEN_H));
       setLayout({ scale, height: SCREEN_H, touch, portrait, canFullscreen });
     };
@@ -483,6 +486,24 @@ export default function GameScreen({ source }: { source: GameSource }) {
     },
     [flash, update],
   );
+
+  // ---------- 手機的返回鍵：在遊戲中開關選單，不會意外離開（標題畫面以前照常返回上一頁） ----------
+  useEffect(() => {
+    window.history.pushState({ rpg: true }, "");
+    const onPop = () => {
+      const u = uiRef.current;
+      if (!u || u.mode === "splash" || u.mode === "cover" || u.mode === "title" || u.mode === "loading") {
+        window.history.back();
+        return;
+      }
+      if (u.mode === "menu") update({ ...u, mode: "map" });
+      else if (u.mode === "map" && !u.game.message && u.messages.length === 0 && !u.game.interpreter) update({ ...u, mode: "menu", menuPage: "root", menuCursor: 0, subCursor: 0 });
+      else if (u.mode === "ending") update({ ...u, mode: "title", titleCursor: 0 });
+      window.history.pushState({ rpg: true }, "");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [update]);
 
   // ---------- 鍵盤與觸控輸入 ----------
   useEffect(() => {
@@ -746,6 +767,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const enterFullscreen = useCallback(async () => {
     try {
       if (document.fullscreenElement) {
+        userExitedFullscreen.current = true;
         (screen.orientation as ScreenOrientation & { unlock?: () => void }).unlock?.();
         await document.exitFullscreen();
         return;
@@ -801,21 +823,15 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const journal = questJournal(project, game);
   const saves = ui.mode === "title" || ui.menuPage === "save" || ui.menuPage === "load" ? listSaves(project) : [];
   const hasSave = saves.some((s) => s.save);
-  const buttonLabels =
-    ui.mode === "splash" || ui.mode === "cover"
-      ? { a: "開始", b: "" }
-      : ui.mode === "title"
-        ? { a: "確定", b: ui.titleLoad ? "返回" : "" }
-        : ui.mode === "menu"
-          ? { a: "確定", b: "返回" }
-          : ui.mode === "ending"
-            ? { a: "標題", b: "" }
-            : ui.messages.length > 0 || msg
-              ? { a: choices.length > 0 ? "選擇" : "繼續", b: "" }
-              : { a: "調查", b: "選單" };
-
   return (
-    <div className={`rm-stage${layout.touch ? " touch" : ""}${layout.portrait ? " portrait" : ""}`} onPointerDown={() => getAudio().unlock()}>
+    <div
+      className={`rm-stage${layout.touch ? " touch" : ""}${layout.portrait ? " portrait" : ""}`}
+      onPointerDown={() => {
+        getAudio().unlock();
+        // 手機：第一次觸控就進入全螢幕（瀏覽器規定必須由使用者的動作觸發；iPhone Safari 不支援，改用加入主畫面）
+        if (layout.touch && layout.canFullscreen && !document.fullscreenElement && !userExitedFullscreen.current) void enterFullscreen();
+      }}
+    >
       <div className="rm-screen-box" style={{ width: SCREEN_W * layout.scale, height: layout.height * layout.scale }}>
         <div
           className={`rm-screen${layout.height < 400 ? " short" : ""}`}
@@ -879,7 +895,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
             <div className="rm-chapter" data-testid="chapter-card" onClick={() => act(advance)}>
               <div className="rm-chapter-title">{chapterCard.title}</div>
               {chapterCard.summary && <div className="rm-chapter-summary">{chapterCard.summary}</div>}
-              <div className="rm-hint">按確定鍵繼續</div>
+              <div className="rm-hint">{layout.touch ? "點一下繼續" : "按確定鍵繼續"}</div>
             </div>
           )}
 
@@ -941,13 +957,16 @@ export default function GameScreen({ source }: { source: GameSource }) {
                   ))}
                 </div>
               )}
-              <div className="rm-hint">方向鍵選擇・Z／Enter 確認・X／Esc 取消{isStudio ? "・F9 除錯" : ""}</div>
+              <div className="rm-hint">{layout.touch ? "點一下選擇" : `方向鍵選擇・Z／Enter 確認・X／Esc 取消${isStudio ? "・F9 除錯" : ""}`}</div>
             </div>
           )}
 
           {ui.mode === "menu" && (
             <div className="rm-menu" data-testid="menu">
               <div className="rm-window rm-menu-commands">
+                <button className="rm-item rm-menu-close" onClick={() => update((u) => ({ ...u, mode: "map" }))} data-testid="menu-close">
+                  ✕ 關閉
+                </button>
                 {MENU_COMMANDS.map(([page, label], i) => (
                   <button
                     key={page}
@@ -977,7 +996,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                     Object.entries(game.items).map(([id, count], i) => {
                       const item = project.items.find((x) => x.id === id);
                       return (
-                        <div key={id} className={`rm-item${i === ui.subCursor ? " selected" : ""}`}>
+                        <div key={id} className={`rm-item${i === ui.subCursor ? " selected" : ""}`} onClick={() => update((u) => ({ ...u, subCursor: i }))}>
                           <div className="rm-row">
                             <span>{item?.name ?? id}</span>
                             <span>×{count}</span>
@@ -1020,18 +1039,32 @@ export default function GameScreen({ source }: { source: GameSource }) {
                     ["背景音樂", ui.settings.bgm ? "開" : "關"],
                     ["對話聲音", VOICE_MODE_LABEL[ui.settings.voice]],
                   ].map(([label, value], i) => (
-                    <div key={label} className={`rm-item rm-row${i === ui.subCursor ? " selected" : ""}`}>
+                    <button
+                      key={label}
+                      className={`rm-item rm-row${i === ui.subCursor ? " selected" : ""}`}
+                      onClick={() => {
+                        update((u) => ({ ...u, subCursor: i }));
+                        inputRef.current.press("ok");
+                      }}
+                    >
                       <span>{label}</span>
                       <span>◀ {value} ▶</span>
-                    </div>
+                    </button>
                   ))}
                 {ui.menuPage === "title" && (
                   <>
                     <div style={{ marginBottom: 8 }}>要回到標題畫面嗎？（進度已自動存檔）</div>
                     {["是", "否"].map((label, i) => (
-                      <div key={label} className={`rm-item${i === ui.subCursor ? " selected" : ""}`}>
+                      <button
+                        key={label}
+                        className={`rm-item${i === ui.subCursor ? " selected" : ""}`}
+                        onClick={() => {
+                          update((u) => ({ ...u, subCursor: i }));
+                          inputRef.current.press("ok");
+                        }}
+                      >
                         {label}
-                      </div>
+                      </button>
                     ))}
                   </>
                 )}
@@ -1050,7 +1083,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
               ))}
               <div className="rm-the-end">— THE END —</div>
               <div className="rm-dim">步數 {game.steps}・完成任務 {journal.filter((q) => q.status === "completed").length}</div>
-              <div className="rm-hint">按確定鍵回到標題</div>
+              <div className="rm-hint">{layout.touch ? "點一下回到標題" : "按確定鍵回到標題"}</div>
             </div>
           )}
 
@@ -1079,21 +1112,17 @@ export default function GameScreen({ source }: { source: GameSource }) {
           onClose={() => setDebugOpen(false)}
         />
       )}
-      {layout.touch && (
-        <TouchControls
-          joystick={ui.mode === "map" && !msg && ui.messages.length === 0}
-          labels={buttonLabels}
-          onPress={(k) => inputRef.current.press(k)}
-          onRelease={(k) => inputRef.current.release(k)}
-          onTapAt={(x, y) => clientTapRef.current?.(x, y)}
-        />
+      {layout.touch && ui.mode === "map" && !msg && ui.messages.length === 0 && (
+        <button className="rm-menu-button" onClick={() => update((u) => ({ ...u, mode: "menu", menuPage: "root", menuCursor: 0, subCursor: 0 }))} aria-label="選單" data-testid="menu-button">
+          ≡
+        </button>
       )}
       {!layout.touch && (
         <button className="rm-fullscreen desktop" onClick={enterFullscreen} aria-label={isFullscreen ? "離開全螢幕" : "全螢幕"} title="全螢幕（F）">
           {isFullscreen ? "✕" : "⛶"}
         </button>
       )}
-      {layout.touch && layout.canFullscreen && !layout.portrait && (
+      {layout.touch && layout.canFullscreen && !layout.portrait && ui.mode !== "menu" && (
         <button className="rm-fullscreen" onClick={enterFullscreen} aria-label={isFullscreen ? "離開全螢幕" : "全螢幕"} data-testid="fullscreen">
           {isFullscreen ? "✕" : "⛶"}
         </button>
