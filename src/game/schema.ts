@@ -14,6 +14,8 @@ import { z } from "zod";
  *   `scene.music`：場景背景音樂的情緒標籤（對應素材庫曲目）。
  * - `cover`：封面設定（背景場景、主視覺角色、標語），由程式用素材組合成封面圖。
  * - `ending.epilogues`：結局尾聲，依玩家累積的選擇追加描述，不必增加結局數量就能回應多個選擇。
+ * - `scene.interactables`：可調查物件（門、告示、寶箱…），面向後按確認觸發對話，可依條件改變回應；
+ *   任務目標新增 `inspect`（調查指定物件）。
  * - `npc.dialogueVariants`：依條件切換 NPC 的起始對話節點。
  * - condition 新增 `quest_active`、`all`、`any`、`not`；effect 新增 `remove_item`。
  * 不在 schema 中的 effect / condition 一律拒絕（strict object + discriminated union）。
@@ -135,6 +137,22 @@ export const sceneSchema = z.strictObject({
     )
     .max(30)
     .optional(),
+  interactables: z
+    .array(
+      z.strictObject({
+        id: idSchema,
+        name: shortText,
+        x: coord,
+        y: coord,
+        dialogueNodeId: idSchema,
+        dialogueVariants: z
+          .array(z.strictObject({ condition: conditionSchema, dialogueNodeId: idSchema }))
+          .max(10)
+          .optional(),
+      }),
+    )
+    .max(30)
+    .optional(),
   pickups: z
     .array(
       z.strictObject({
@@ -189,7 +207,7 @@ export const dialogueNodeSchema = z.strictObject({
 
 export const objectiveSchema = z.strictObject({
   id: idSchema,
-  type: z.enum(["talk_to_npc", "collect_item", "reach_location", "make_choice"]),
+  type: z.enum(["talk_to_npc", "collect_item", "reach_location", "make_choice", "inspect"]),
   targetId: idSchema,
   description: z.string().min(1).max(300),
   requiredCount: z.number().int().min(1).max(999).optional(),

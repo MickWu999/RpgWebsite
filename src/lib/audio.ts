@@ -14,8 +14,14 @@ import type { GameProject, NPCDefinition } from "@/game/schema";
 const MUTE_KEY = "rpg:audio-muted";
 type Voice = NonNullable<NPCDefinition["voice"]>;
 const DEFAULT_VOICE: Voice = { pitch: "mid", speed: "normal", timbre: "soft" };
-const PITCH_HZ = { low: 140, mid: 260, high: 420 };
-const WAVE = { soft: "sine", bright: "triangle", buzzy: "square" } as const;
+// 講話嗶嗶聲（RPG 常見做法）：音色依角色設定，音量要大到筆電喇叭也聽得到
+const PITCH_HZ = { low: 180, mid: 320, high: 520 };
+const WAVE = { soft: "triangle", bright: "square", buzzy: "sawtooth" } as const;
+const BLIP_GAIN = { soft: 0.22, bright: 0.11, buzzy: 0.09 };
+const MIN_BLIP_GAP = 0.045;
+// 語音朗讀（Web Speech API）的音高與語速，對應 npc.voice
+const TTS_PITCH = { low: 0.6, mid: 1, high: 1.45 };
+const TTS_RATE = { slow: 0.85, normal: 1.05, fast: 1.25 };
 export const CHAR_INTERVAL_MS = { slow: 55, normal: 35, fast: 22 };
 
 class AudioManager {
@@ -24,6 +30,9 @@ class AudioManager {
   private stepIndex = 0;
   private music: { src: string; source: AudioBufferSourceNode; gain: GainNode } | null = null;
   private wantedMusic: string | null = null;
+  private lastBlip = 0;
+  /** 已播放的講話音節數（供自動化驗證） */
+  blipCount = 0;
   muted = false;
 
   constructor() {
@@ -118,21 +127,48 @@ class AudioManager {
     });
   }
 
-  /** 合成一個講話音節（逐字顯示時每隔幾個字呼叫一次） */
+  /** 合成一個講話音節（逐字顯示時每個字呼叫一次，間隔太短會略過） */
   blip(voice: Voice = DEFAULT_VOICE) {
     if (this.muted || !this.ctx) return;
     const ctx = this.ctx;
+    const now = ctx.currentTime;
+    if (now - this.lastBlip < MIN_BLIP_GAP) return;
+    this.lastBlip = now;
+    this.blipCount++;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    const now = ctx.currentTime;
     osc.type = WAVE[voice.timbre];
-    osc.frequency.value = PITCH_HZ[voice.pitch] * (0.92 + Math.random() * 0.16);
+    osc.frequency.value = PITCH_HZ[voice.pitch] * (0.9 + Math.random() * 0.2);
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(voice.timbre === "buzzy" ? 0.04 : 0.08, now + 0.005);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+    gain.gain.linearRampToValueAtTime(BLIP_GAIN[voice.timbre], now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
     osc.connect(gain).connect(ctx.destination);
     osc.start(now);
-    osc.stop(now + 0.07);
+    osc.stop(now + 0.06);
+  }
+
+  /** 是否支援語音朗讀（瀏覽器內建語音合成，品質依裝置而定） */
+  get canSpeak() {
+    return typeof window !== "undefined" && "speechSynthesis" in window;
+  }
+
+  /** 用瀏覽器語音合成唸出台詞，音高與語速依 npc.voice（AI 設計） */
+  speak(text: string, voice: Voice = DEFAULT_VOICE) {
+    if (this.muted || !this.canSpeak) return;
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "zh-TW";
+    const zh = synth.getVoices().find((v) => v.lang === "zh-TW") ?? synth.getVoices().find((v) => v.lang.startsWith("zh"));
+    if (zh) utterance.voice = zh;
+    utterance.pitch = TTS_PITCH[voice.pitch];
+    utterance.rate = TTS_RATE[voice.speed];
+    utterance.volume = 0.9;
+    synth.speak(utterance);
+  }
+
+  stopSpeaking() {
+    if (this.canSpeak) window.speechSynthesis.cancel();
   }
 
   /** 依遊戲事件播放對應音效 */

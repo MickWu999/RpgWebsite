@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import IssueList from "@/components/IssueList";
-import CoverArt from "@/components/game/CoverArt";
+import GameCarousel from "@/components/GameCarousel";
 import { InstallPrompt } from "@/components/PwaSupport";
 import { projectFromFixture } from "@/game/fixtureProject";
 import { GENRE_LABELS, type GameProject } from "@/game/schema";
@@ -47,7 +47,7 @@ export default function Home() {
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [failedRaw, setFailedRaw] = useState<unknown>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const shelfRef = useRef<HTMLDivElement>(null);
+  const createRef = useRef<HTMLElement>(null);
   const [library, setLibrary] = useState<CatalogEntry[] | null>(null);
   const [libraryError, setLibraryError] = useState<string | null>(null);
 
@@ -122,59 +122,24 @@ export default function Home() {
   return (
     <div className="container">
       <section className="hero">
-        <h1>AI RPG Builder</h1>
-        <p className="muted" style={{ maxWidth: 680 }}>
-          把故事、世界觀與角色設定轉換成可以在瀏覽器遊玩的 2D RPG。故事轉成結構化遊戲資料，再由固定的 RPG Runtime 執行；AI 只是其中一種產生資料的方式，
-          你也可以直接在 Studio 編輯或匯入 JSON。
-        </p>
         <div className="row">
-          <Link className="btn primary" href={`/play/?pack=${DEMO_PROJECT_ID}`} data-testid="play-demo">
-            ▶ 試玩 demo：迷霧森林的燈火
-          </Link>
-          <Link className="btn" href={`/studio/?id=${DEMO_PROJECT_ID}`}>
-            在 Studio 檢視 demo
-          </Link>
+          <h1 className="grow" style={{ margin: 0 }}>
+            AI RPG Builder
+          </h1>
           <InstallPrompt />
         </div>
+        <p className="muted" style={{ maxWidth: 680 }}>選一款遊戲開始冒險，或貼上你的故事，讓 AI 把它變成可以玩到結局的 2D RPG。</p>
       </section>
 
       <section className="library" aria-label="遊戲庫">
-        <div className="row">
-          <h2 className="grow" style={{ margin: 0 }}>
-            遊戲庫
-          </h2>
-          <button className="btn small" aria-label="往左捲動" onClick={() => shelfRef.current?.scrollBy({ left: -320, behavior: "smooth" })}>
-            ◀
-          </button>
-          <button className="btn small" aria-label="往右捲動" onClick={() => shelfRef.current?.scrollBy({ left: 320, behavior: "smooth" })}>
-            ▶
-          </button>
-        </div>
+        <h2 style={{ margin: 0 }}>選擇遊戲</h2>
         {libraryError && <div className="notice err">{libraryError}</div>}
         {library === null && !libraryError && <div className="muted small">載入遊戲目錄中…</div>}
-        <div className="shelf" ref={shelfRef} data-testid="library">
-          {library?.map((g) => (
-            <Link key={g.id} className="game-card" href={`/play/?pack=${encodeURIComponent(g.id)}`} data-pack={g.id}>
-              <div className="game-card-cover">
-                <CoverArt cover={g.cover} />
-                <div className="game-card-title">{g.title}</div>
-              </div>
-              <div className="game-card-body">
-                <div className="row small">
-                  <span className="badge">{GENRE_LABELS[g.genre]}</span>
-                  {g.typicalMinutes && <span className="badge">約 {g.typicalMinutes[0]}～{g.typicalMinutes[1]} 分鐘</span>}
-                  <span className="badge">{g.endings} 種結局</span>
-                  {g.status === "approved" && <span className="badge ok">AI 生成・審查通過</span>}
-                </div>
-                <p className="small muted game-card-desc">{g.description}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+        {library && <GameCarousel games={library} onCreate={() => createRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })} />}
       </section>
 
       <div className="grid-2">
-        <section className="panel stack">
+        <section className="panel stack" ref={createRef}>
           <h2>建立新遊戲</h2>
           <label className="field">
             專案名稱

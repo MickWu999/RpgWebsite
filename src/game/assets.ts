@@ -122,7 +122,8 @@ export const DUNGEON_SHEET = "/assets/kenney/tiny-dungeon/tilemap_packed.png";
 export const SHEET_FRAME_SIZE = 16;
 
 /** 地形字元 → 圖塊。`overlay` 的圖塊有透明背景，會疊在草地上繪製。 */
-export type TerrainDef = { name: string; frame: number; walkable: boolean; overlay?: boolean };
+/** examine：面對該地形按確認、而且沒有特別設計的調查點時，顯示的預設回應（減少「按了沒反應」的迷失感） */
+export type TerrainDef = { name: string; frame: number; walkable: boolean; overlay?: boolean; examine?: string };
 
 export const TERRAIN: Record<string, TerrainDef> = {
   ".": { name: "草地", frame: 0, walkable: true },
@@ -131,18 +132,18 @@ export const TERRAIN: Record<string, TerrainDef> = {
   "=": { name: "泥土路", frame: 25, walkable: true },
   C: { name: "石板廣場", frame: 43, walkable: true },
   M: { name: "蘑菇", frame: 29, walkable: true, overlay: true },
-  T: { name: "闊葉樹", frame: 16, walkable: false, overlay: true },
-  P: { name: "針葉樹", frame: 28, walkable: false, overlay: true },
-  Y: { name: "秋天的樹", frame: 15, walkable: false, overlay: true },
-  B: { name: "灌木", frame: 5, walkable: false, overlay: true },
-  F: { name: "木圍籬", frame: 81, walkable: false, overlay: true },
-  R: { name: "紅屋頂", frame: 53, walkable: false },
-  G: { name: "灰屋頂", frame: 49, walkable: false },
-  H: { name: "木屋牆", frame: 72, walkable: false },
-  D: { name: "木門", frame: 85, walkable: false },
-  S: { name: "石牆", frame: 76, walkable: false },
-  W: { name: "水井", frame: 104, walkable: false, overlay: true },
-  X: { name: "告示牌", frame: 83, walkable: false, overlay: true },
+  T: { name: "闊葉樹", frame: 16, walkable: false, overlay: true, examine: "茂密的樹木擋住了去路。" },
+  P: { name: "針葉樹", frame: 28, walkable: false, overlay: true, examine: "高大的針葉樹，樹皮上結著霜。" },
+  Y: { name: "秋天的樹", frame: 15, walkable: false, overlay: true, examine: "葉子轉紅的樹，風一吹就沙沙作響。" },
+  B: { name: "灌木", frame: 5, walkable: false, overlay: true, examine: "一叢灌木，枝葉很密，過不去。" },
+  F: { name: "木圍籬", frame: 81, walkable: false, overlay: true, examine: "木頭圍籬，看起來有人細心照顧。" },
+  R: { name: "紅屋頂", frame: 53, walkable: false, examine: "紅色的屋頂。" },
+  G: { name: "灰屋頂", frame: 49, walkable: false, examine: "灰色的屋頂，石板上長了青苔。" },
+  H: { name: "木屋牆", frame: 72, walkable: false, examine: "木造的牆壁。" },
+  D: { name: "木門", frame: 85, walkable: false, examine: "門關著，裡面靜悄悄的。" },
+  S: { name: "石牆", frame: 76, walkable: false, examine: "堅固的石牆。" },
+  W: { name: "水井", frame: 104, walkable: false, overlay: true, examine: "一口古井，井水清澈見底。" },
+  X: { name: "告示牌", frame: 83, walkable: false, overlay: true, examine: "告示牌上的字被風雨磨得模糊不清。" },
 };
 
 export const TERRAIN_BASE_FRAME = 0;

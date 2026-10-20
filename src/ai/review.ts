@@ -22,6 +22,7 @@ export const reviewSchema = z.strictObject({
     characters: z.number().int().min(1).max(10),
     pacing: z.number().int().min(1).max(10),
     endings: z.number().int().min(1).max(10),
+    feedback: z.number().int().min(1).max(10),
   }),
   overall: z.number().int().min(1).max(10),
   summary: z.string().max(600),
@@ -63,6 +64,10 @@ export function projectDigest(project: GameProject, playtest: PlaytestReport): s
     const pickups = (s.pickups ?? []).map((p) => `${project.items.find((i) => i.id === p.itemId)?.name ?? p.itemId}${p.condition ? `（出現條件：${describeCondition(project, p.condition)}）` : ""}`);
     const exits = s.exits.map((e) => `往 ${e.targetSceneId}`);
     lines.push(`- ${s.name}（${s.id}）：NPC ${s.npcIds.join("、") || "無"}；地點 ${(s.locations ?? []).map((l) => l.name).join("、") || "無"}；地上可撿 ${pickups.join("、") || "無"}；出口 ${exits.join("、") || "無"}`);
+    for (const o of s.interactables ?? []) {
+      lines.push(`  - 調查點「${o.name}」（${o.id}）：預設 ${o.dialogueNodeId}`);
+      for (const v of o.dialogueVariants ?? []) lines.push(`    - 若 ${describeCondition(project, v.condition)} → ${v.dialogueNodeId}`);
+    }
   }
   lines.push("", "## NPC");
   for (const n of project.npcs) {

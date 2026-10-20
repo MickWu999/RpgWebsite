@@ -23,6 +23,8 @@ export const QUALITY_THRESHOLDS = {
   maxEndings: 4,
   maxNpcs: 6,
   maxDialogueNodes: 50,
+  // E3／互動回饋：至少 2 個可調查物件，讓環境分擔說明、降低迷失感
+  minInteractables: 2,
 };
 
 export type QualityMetrics = {
@@ -41,6 +43,8 @@ export type QualityMetrics = {
   endingsHaveDistinctChoices: boolean;
   /** 至少在一條結局路線上被對話過的 NPC 比例 */
   npcCoverage: number;
+  /** 可調查物件數 */
+  interactables: number;
   /** 預估遊玩時長（分鐘） */
   duration: DurationEstimate | null;
 };
@@ -77,6 +81,7 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport): Q
     stepsToEnding,
     endingsHaveDistinctChoices,
     npcCoverage: Math.round(npcCoverage * 100) / 100,
+    interactables: project.scenes.reduce((n, s) => n + (s.interactables?.length ?? 0), 0),
     duration: estimateDuration(project, playtest),
   };
 
@@ -92,6 +97,7 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport): Q
   need(metrics.endings <= t.maxEndings, "endings", `結局最多 ${t.maxEndings} 種（目前 ${metrics.endings}），規模太大容易讓結局文字與玩家路線矛盾`);
   need(metrics.npcs <= t.maxNpcs, "npcs", `NPC 最多 ${t.maxNpcs} 位（目前 ${metrics.npcs}），請合併或刪減次要角色`);
   need(metrics.dialogueNodes <= t.maxDialogueNodes, "dialogues", `對話節點最多 ${t.maxDialogueNodes} 個（目前 ${metrics.dialogueNodes}），超出 10 分鐘的遊玩預算`);
+  need(metrics.interactables >= t.minInteractables, "scenes.interactables", `可調查物件至少 ${t.minInteractables} 個（目前 ${metrics.interactables}），例如門、告示、寶箱，讓玩家按確認鍵時有回應`);
   need(endingsHaveDistinctChoices, "endings", "不同結局的通關路線沒有任何不同的選擇，結局分支沒有意義");
   for (const [id, steps] of Object.entries(stepsToEnding)) {
     need(steps >= t.minStepsToEnding, "endings", `結局「${id}」只要 ${steps} 個行動就能達成，流程太短（至少 ${t.minStepsToEnding}）`);
@@ -120,6 +126,7 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport): Q
     e.epilogues?.forEach((x) => collectReads(x.condition));
   });
   project.scenes.forEach((sc) => sc.pickups?.forEach((pk) => collectReads(pk.condition)));
+  project.scenes.forEach((sc) => sc.interactables?.forEach((o) => o.dialogueVariants?.forEach((v) => collectReads(v.condition))));
   const effects = [...choices.flatMap((c) => c.effects ?? []), ...project.quests.flatMap((q) => q.rewards ?? [])];
   const setFlags = new Set(effects.flatMap((e) => (e.type === "set_flag" ? [e.flag] : [])));
   for (const flag of setFlags) if (!readFlags.has(flag)) blocking.push({ path: "flags", message: `旗標「${flag}」被設定但從未被任何條件讀取（死旗標，選擇沒有後果）` });
@@ -139,6 +146,7 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport): Q
     if (c.type === "not") collectItems(c.condition);
   };
   project.npcs.forEach((n) => n.dialogueVariants?.forEach((v) => collectItems(v.condition)));
+  project.scenes.forEach((sc) => sc.interactables?.forEach((o) => o.dialogueVariants?.forEach((v) => collectItems(v.condition))));
   project.dialogues.forEach((d) => d.choices?.forEach((c) => collectItems(c.condition)));
   project.endings.forEach((e) => collectItems(e.condition));
   project.quests.forEach((q) => q.objectives.forEach((o) => o.type === "collect_item" && usedItems.add(o.targetId)));

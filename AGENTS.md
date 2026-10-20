@@ -16,6 +16,7 @@ npm run validate -- <project.json|demo> --json   # 結束碼 0 表示全部通�
 npm run generate -- <story.txt> --json           # 結束碼 0=approved, 3=needs_human_review, 2=失敗
 npm run review -- <project.json> --story <story.txt> --json
 npm run generate -- <story.txt> --publish        # 只有 approved 才會自動寫入 public/games/ 並重建目錄
+npm run generate -- <story.txt> --from <project.json> --publish   # 從既有遊戲改進（規則更新後補齊內容）
 npm run catalog                                  # 重建遊戲目錄
 npm run check                                    # 修改程式後必須跑：lint、typecheck、build
 ```
@@ -49,6 +50,7 @@ npm run check                                    # 修改程式後必須跑：li
 - `dialogueVariants` 由上往下取第一個條件成立的分支，所以條件越嚴格的要放越前面。
 - 每位 NPC 都要設定 `voice`，每個場景都要設定 `music`，每個結局都要設定 `mood`，專案要設定 `cover`。
 - 用 `ending.epilogues`（結局尾聲）回應其他主要選擇，不要為了回應選擇而增加結局數量。
+- 每款遊戲至少要有 2 個 `scene.interactables`（調查點）。被鎖住的東西一定要給回饋並提示解法（例如「門鎖著，需要鑰匙」）。沒有設計調查點的地形，runtime 會用 `TERRAIN[].examine` 給預設回應。
 - 規模上限：結局最多 4 個、NPC 最多 6 位、對話節點最多 50 個。超過上限會被品質指標擋下。
 - 敘事規則見 `src/ai/designGuide.ts`，其中可以由程式判斷的部分已經寫進 `quality.ts`。
 

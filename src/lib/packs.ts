@@ -40,12 +40,19 @@ export class PackError extends Error {
   }
 }
 
-/** 下載並驗證一款遊戲；驗證失敗的資料不會進入遊戲 */
-export async function fetchPack(id: string): Promise<GameProject> {
+/** 下載並驗證一款遊戲；驗證失敗的資料不會進入遊戲。同時回傳目錄中的資訊（例如預估時長） */
+export async function fetchPack(id: string): Promise<{ project: GameProject; bytes: number; entry: CatalogEntry | null }> {
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new PackError(`遊戲 ID「${id}」格式不正確`);
-  const res = await fetch(`/games/${id}/project.json`, { cache: "no-cache" });
+  const [res, catalog] = await Promise.all([fetch(`/games/${id}/project.json`, { cache: "no-cache" }), fetchCatalog().catch(() => null)]);
   if (!res.ok) throw new PackError(`找不到遊戲「${id}」（HTTP ${res.status}）`);
-  const result = validateProject(await res.json());
+  const text = await res.text();
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new PackError(`遊戲「${id}」的資料不是有效的 JSON`);
+  }
+  const result = validateProject(data);
   if (!result.project) throw new PackError(`遊戲「${id}」的資料未通過驗證`, result.errors);
-  return result.project;
+  return { project: result.project, bytes: new Blob([text]).size, entry: catalog?.games.find((g) => g.id === id) ?? null };
 }

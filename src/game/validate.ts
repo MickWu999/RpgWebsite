@@ -99,6 +99,7 @@ export function validateLogic(project: GameProject): ValidationReport {
   const choiceIds = uniq("對話選項", "dialogues.choices", project.dialogues.flatMap((d) => (d.choices ?? []).map((c) => c.id)));
   const locationIds = uniq("地點", "scenes.locations", project.scenes.flatMap((s) => (s.locations ?? []).map((l) => l.id)));
   uniq("撿取物", "scenes.pickups", project.scenes.flatMap((s) => (s.pickups ?? []).map((p) => p.id)));
+  const interactableIds = uniq("調查點", "scenes.interactables", project.scenes.flatMap((s) => (s.interactables ?? []).map((o) => o.id)));
   project.quests.forEach((q, qi) => uniq("任務目標", `quests[${qi}].objectives`, q.objectives.map((o) => o.id)));
 
   const sceneById = new Map(project.scenes.map((s) => [s.id, s]));
@@ -184,6 +185,17 @@ export function validateLogic(project: GameProject): ValidationReport {
         err(`${p}.locations[${li}]`, `地點「${loc.id}」超出地圖`);
       }
     });
+    (scene.interactables ?? []).forEach((o, oi) => {
+      const op = `${p}.interactables[${oi}]`;
+      if (!inBounds(scene, o.x, o.y)) err(op, `調查點「${o.name}」超出地圖`);
+      if (!nodeIds.has(o.dialogueNodeId)) err(`${op}.dialogueNodeId`, `調查點「${o.name}」的對話節點「${o.dialogueNodeId}」不存在`);
+      (o.dialogueVariants ?? []).forEach((v, vi) => {
+        if (!nodeIds.has(v.dialogueNodeId)) err(`${op}.dialogueVariants[${vi}]`, `調查點的分支節點「${v.dialogueNodeId}」不存在`);
+        checkCondition(`${op}.dialogueVariants[${vi}].condition`, v.condition);
+      });
+      if (project.npcs.some((n) => n.sceneId === scene.id && n.position.x === o.x && n.position.y === o.y)) err(op, `調查點「${o.name}」與 NPC 重疊`);
+      if (scene.exits.some((e) => e.x === o.x && e.y === o.y)) err(op, `調查點「${o.name}」與出口重疊`);
+    });
     (scene.pickups ?? []).forEach((pk, pi) => {
       if (!walkableAt(scene, pk.x, pk.y)) err(`${p}.pickups[${pi}]`, `撿取物「${pk.id}」超出地圖或位於不可行走區域`);
       if (!itemIds.has(pk.itemId)) err(`${p}.pickups[${pi}]`, `撿取物引用了不存在的物品「${pk.itemId}」`);
@@ -214,6 +226,7 @@ export function validateLogic(project: GameProject): ValidationReport {
   const occupied = new Set(project.npcs.map((n) => `${n.sceneId}:${n.position.x},${n.position.y}`));
   if (occupied.size !== project.npcs.length) warn("npcs", "有多個 NPC 站在同一格");
   if (occupied.has(`${start.sceneId}:${start.x},${start.y}`)) err("player.startPosition", "玩家起始位置與 NPC 重疊");
+  if (startScene?.interactables?.some((o) => o.x === start.x && o.y === start.y)) err("player.startPosition", "玩家起始位置與調查點重疊");
 
   // --- 對話 ---
   const referencedNodes = new Set<string>();
@@ -221,6 +234,12 @@ export function validateLogic(project: GameProject): ValidationReport {
     referencedNodes.add(n.dialogueNodeId);
     n.dialogueVariants?.forEach((v) => referencedNodes.add(v.dialogueNodeId));
   });
+  project.scenes.forEach((sc) =>
+    sc.interactables?.forEach((o) => {
+      referencedNodes.add(o.dialogueNodeId);
+      o.dialogueVariants?.forEach((v) => referencedNodes.add(v.dialogueNodeId));
+    }),
+  );
   project.dialogues.forEach((node, di) => {
     (node.choices ?? []).forEach((choice, ci) => {
       const p = `dialogues[${di}].choices[${ci}]`;
@@ -247,8 +266,9 @@ export function validateLogic(project: GameProject): ValidationReport {
         (o.type === "talk_to_npc" && npcIds.has(o.targetId)) ||
         (o.type === "collect_item" && itemIds.has(o.targetId)) ||
         (o.type === "reach_location" && locationIds.has(o.targetId)) ||
-        (o.type === "make_choice" && choiceIds.has(o.targetId));
-      if (!ok) err(op, `任務目標「${o.description}」指向不存在的${{ talk_to_npc: " NPC", collect_item: "物品", reach_location: "地點", make_choice: "對話選項" }[o.type]}「${o.targetId}」`);
+        (o.type === "make_choice" && choiceIds.has(o.targetId)) ||
+        (o.type === "inspect" && interactableIds.has(o.targetId));
+      if (!ok) err(op, `任務目標「${o.description}」指向不存在的${{ talk_to_npc: " NPC", collect_item: "物品", reach_location: "地點", make_choice: "對話選項", inspect: "調查點" }[o.type]}「${o.targetId}」`);
     });
   });
 
@@ -293,7 +313,10 @@ export function validateLogic(project: GameProject): ValidationReport {
 /** 從玩家起點出發，跨出口做 BFS，確認 NPC、撿取物與任務地點都走得到 */
 function checkReachability(project: GameProject, err: (path: string, message: string) => void) {
   const sceneById = new Map(project.scenes.map((s) => [s.id, s]));
-  const blocked = new Set(project.npcs.map((n) => `${n.sceneId}:${n.position.x},${n.position.y}`));
+  const blocked = new Set([
+    ...project.npcs.map((n) => `${n.sceneId}:${n.position.x},${n.position.y}`),
+    ...project.scenes.flatMap((sc) => (sc.interactables ?? []).map((o) => `${sc.id}:${o.x},${o.y}`)),
+  ]);
   const reached = new Set<string>();
   const start = project.player.startPosition;
   const queue: Array<[string, number, number]> = [[start.sceneId, start.x, start.y]];
@@ -325,6 +348,10 @@ function checkReachability(project: GameProject, err: (path: string, message: st
     if (!near) err(`npcs[${i}]`, `從玩家起點走不到 NPC「${npc.name}」旁邊，無法對話`);
   });
   project.scenes.forEach((scene, si) => {
+    (scene.interactables ?? []).forEach((o, oi) => {
+      const near = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => isReached(scene.id, o.x + dx, o.y + dy));
+      if (!near) err(`scenes[${si}].interactables[${oi}]`, `從玩家起點走不到調查點「${o.name}」的正前方，無法調查`);
+    });
     (scene.pickups ?? []).forEach((pk, pi) => {
       if (!isReached(scene.id, pk.x, pk.y)) err(`scenes[${si}].pickups[${pi}]`, `從玩家起點走不到撿取物「${pk.id}」`);
     });
@@ -397,6 +424,14 @@ function checkObtainability(
         if (e.type === "remove_item" && !obtainableItems.has(e.itemId)) {
           err(`dialogues[${di}].choices[${ci}].effects[${ei}]`, `移除物品「${e.itemId}」，但這個物品沒有任何取得方式（台詞與道具狀態不一致）`);
         }
+      }),
+    ),
+  );
+  project.scenes.forEach((sc, si) =>
+    (sc.interactables ?? []).forEach((o, oi) =>
+      (o.dialogueVariants ?? []).forEach((v, vi) => {
+        const problems = unmet(v.condition);
+        if (problems.length) warn(`scenes[${si}].interactables[${oi}].dialogueVariants[${vi}]`, `調查點分支可能永遠不會出現：${problems.join("；")}`);
       }),
     ),
   );

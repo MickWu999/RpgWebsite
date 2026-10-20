@@ -3,13 +3,15 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { generateProject, providerFromEnv } from "@/ai/pipeline";
+import { validateProject } from "@/game/validate";
 import { loadLocalEnv } from "./env";
 
 /**
- * 命令列生成：npm run generate -- <故事檔.txt> [--title 名稱] [--genre fantasy|modern|sci-fi|mystery] [--style 冒險] [--out 檔案] [--json] [--no-review] [--publish]
+ * 命令列生成：npm run generate -- <故事檔.txt> [--title 名稱] [--genre fantasy|modern|sci-fi|mystery] [--style 冒險] [--out 檔案] [--json] [--no-review] [--publish] [--from 既有遊戲.json]
  * 流程：本機 Claude Code 生成 → 驗證 → 自動試玩 → 修復 → 品質指標 → 獨立 AI 審查 → 依意見修改，全程不需人工介入。
  * 結束碼：0 = approved（可直接發布）；3 = needs_human_review／unreviewed（能玩但未通過品質審查）；2 = 失敗。
  * --json 會在 stdout 輸出完整結果（含驗證報告、試玩路線與每次嘗試的錯誤），進度訊息改輸出到 stderr。
+ * --from：從既有遊戲開始改進（例如規則更新後補齊缺少的內容），保留原本的專案 ID。
  * --publish：只有 approved 的結果會寫成模組包 public/games/<id>/ 並重建遊戲目錄（needs_human_review 不會發布）。
  * 產出的 JSON 也可在網站首頁「匯入 JSON」載入試玩。
  */
@@ -25,6 +27,7 @@ const { values, positionals } = parseArgs({
     json: { type: "boolean" },
     "no-review": { type: "boolean" },
     publish: { type: "boolean" },
+    from: { type: "string" },
   },
 });
 if (positionals.length === 0) {
@@ -34,13 +37,15 @@ if (positionals.length === 0) {
 
 async function main() {
   const story = readFileSync(positionals[0], "utf8");
-  const projectId = `rpg-${Date.now().toString(36)}`;
+  const from = values.from ? validateProject(JSON.parse(readFileSync(values.from, "utf8"))).project : undefined;
+  if (values.from && !from) throw new Error(`--from 指定的檔案未通過驗證：${values.from}`);
+  const projectId = from?.id ?? `rpg-${Date.now().toString(36)}`;
   const log = values.json ? (m: string) => console.error(m) : (m: string) => console.log(m);
   const result = await generateProject(
     providerFromEnv(),
     { story, projectId, title: values.title, genre: values.genre, style: values.style },
     (m) => log(`… ${m}`),
-    { review: !values["no-review"] },
+    { review: !values["no-review"], from },
   );
   const exitCode = result.status === "approved" || result.status === "fixture" ? 0 : result.project ? 3 : 2;
   const out = values.out ?? path.join("generated", `${projectId}.json`);

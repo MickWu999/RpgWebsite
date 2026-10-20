@@ -59,9 +59,12 @@ export function findPath(
 /** 走到 NPC 正旁邊並面向它所需的方向序列（最後一步是「撞向 NPC」以轉向） */
 export function pathToNpc(project: GameProject, state: PlayerState, npcId: string): Direction[] | null {
   const npc = project.npcs.find((n) => n.id === npcId);
-  if (!npc) return null;
-  const { x: nx, y: ny } = npc.position;
-  const path = findPath(project, state, (s, x, y) => s === npc.sceneId && Math.abs(x - nx) + Math.abs(y - ny) === 1);
+  return npc ? pathToFace(project, state, npc.sceneId, npc.position.x, npc.position.y) : null;
+}
+
+/** 走到某格（NPC、調查點）正前方並面向它 */
+export function pathToFace(project: GameProject, state: PlayerState, targetScene: string, nx: number, ny: number): Direction[] | null {
+  const path = findPath(project, state, (s, x, y) => s === targetScene && Math.abs(x - nx) + Math.abs(y - ny) === 1);
   if (!path) return null;
   // 推算終點以決定面向
   let { sceneId, x, y } = state;

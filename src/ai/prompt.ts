@@ -41,6 +41,8 @@ export function runtimeContext(): string {
 ${terrain}
 - 場景之間用 exits 連接：玩家踩到 (x,y) 會傳送到 targetSceneId 的 (targetX,targetY)，目標格必須可行走且不是另一個出口。雙向通行需要在兩個場景各放一個出口。
 - locations 定義 reach_location 任務目標的區域；pickups 是地圖上可撿取的物品（可用 condition 控制何時出現）。
+- interactables 是可調查物件（門、告示、寶箱、古井…）：玩家面向它按確認會開啟 dialogueNodeId 的對話，dialogueVariants 依條件改變回應（例如有鑰匙時改成開門並 give_item／set_flag）。它和 NPC 一樣會擋路，請放在不可行走的裝飾地形上（例如 X 告示牌、W 水井、D 門），且正前方要有可行走的格子。任務目標可用 inspect 指定調查某物件。
+- 沒有特別設計的地形，runtime 也會給預設回應（例如樹木「擋住了去路」）；但劇情相關的東西請一定設計成 interactables。
 - NPC 必須站在可行走格上、不可重疊、不可擋住唯一通道，且旁邊至少有一格玩家走得到。
 - scene.npcIds 必須列出所有 sceneId 為該場景的 NPC。
 

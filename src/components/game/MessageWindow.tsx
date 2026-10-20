@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type RefObject } from "react";
 import type { AssetDefinition, DialogueChoice, NPCDefinition } from "@/game/schema";
 import { CHAR_INTERVAL_MS, getAudio } from "@/lib/audio";
+import type { VoiceMode } from "@/lib/settings";
 import Portrait from "./Portrait";
 
 export type TypingControl = { typing: boolean; finish: () => void };
@@ -20,6 +21,7 @@ export default function MessageWindow({
   portrait,
   portraitSize = 72,
   speedFactor,
+  voiceMode = "blip",
   choices,
   cursor,
   controlRef,
@@ -32,6 +34,7 @@ export default function MessageWindow({
   portrait?: AssetDefinition;
   portraitSize?: number;
   speedFactor: number;
+  voiceMode?: VoiceMode;
   choices: DialogueChoice[];
   cursor: number;
   controlRef: RefObject<TypingControl>;
@@ -53,11 +56,18 @@ export default function MessageWindow({
     return () => window.clearInterval(timer);
   }, [typing, chars.length, voice?.speed, speedFactor]);
 
-  // 每兩個字發一個音節，標點與空白不發聲；系統訊息（沒有說話者）不發聲
+  // 嗶嗶聲：每個字一個音節（標點與空白不發聲）；系統訊息（沒有說話者）不發聲
   useEffect(() => {
-    if (!speaker || shown === 0 || shown >= chars.length || shown % 2 !== 0 || SILENT.test(chars[shown - 1])) return;
+    if (voiceMode !== "blip" || !speaker || shown === 0 || shown > chars.length || SILENT.test(chars[shown - 1])) return;
     getAudio().blip(voice);
-  }, [shown, chars, voice, speaker]);
+  }, [shown, chars, voice, speaker, voiceMode]);
+
+  // 語音朗讀：每則台詞出現時唸一次，換下一則或關閉時停止
+  useEffect(() => {
+    if (voiceMode !== "tts" || !speaker) return;
+    getAudio().speak(text, voice);
+    return () => getAudio().stopSpeaking();
+  }, [voiceMode, speaker, text, voice]);
 
   return (
     <>

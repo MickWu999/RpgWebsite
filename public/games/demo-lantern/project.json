@@ -299,7 +299,63 @@
         }
       ],
       "pickups": [],
-      "music": "peaceful"
+      "music": "peaceful",
+      "interactables": [
+        {
+          "id": "obj_lighthouse",
+          "name": "守望燈塔",
+          "x": 10,
+          "y": 3,
+          "dialogueNodeId": "obj_lighthouse_locked",
+          "dialogueVariants": [
+            {
+              "condition": {
+                "type": "has_item",
+                "itemId": "item_wick"
+              },
+              "dialogueNodeId": "obj_lighthouse_wick"
+            },
+            {
+              "condition": {
+                "type": "quest_active",
+                "questId": "q_main"
+              },
+              "dialogueNodeId": "obj_lighthouse_empty"
+            }
+          ]
+        },
+        {
+          "id": "obj_sign",
+          "name": "告示牌",
+          "x": 13,
+          "y": 5,
+          "dialogueNodeId": "obj_sign",
+          "dialogueVariants": [
+            {
+              "condition": {
+                "type": "flag_equals",
+                "flag": "karl_told",
+                "value": true
+              },
+              "dialogueNodeId": "obj_sign_hint"
+            }
+          ]
+        },
+        {
+          "id": "obj_house",
+          "name": "民宅的門",
+          "x": 3,
+          "y": 3,
+          "dialogueNodeId": "obj_house"
+        },
+        {
+          "id": "obj_well",
+          "name": "古井",
+          "x": 5,
+          "y": 7,
+          "dialogueNodeId": "obj_well"
+        }
+      ]
     },
     {
       "id": "forest",
@@ -572,7 +628,26 @@
           }
         }
       ],
-      "music": "mysterious"
+      "music": "mysterious",
+      "interactables": [
+        {
+          "id": "obj_old_tree",
+          "name": "古樹",
+          "x": 13,
+          "y": 8,
+          "dialogueNodeId": "obj_tree_fog",
+          "dialogueVariants": [
+            {
+              "condition": {
+                "type": "flag_equals",
+                "flag": "karl_told",
+                "value": true
+              },
+              "dialogueNodeId": "obj_tree_glow"
+            }
+          ]
+        }
+      ]
     }
   ],
   "npcs": [
@@ -811,6 +886,51 @@
       "id": "karl_after",
       "speaker": "守林人卡爾",
       "text": "燈芯在東南角的古樹根下。記住你的承諾，旅人。"
+    },
+    {
+      "id": "obj_lighthouse_locked",
+      "speaker": "守望燈塔",
+      "text": "燈塔一片漆黑，門上貼著一張告示：「燈芯遺失，路過的旅人請洽村長艾琳。」"
+    },
+    {
+      "id": "obj_lighthouse_empty",
+      "speaker": "守望燈塔",
+      "text": "燈座空蕩蕩的。少了星光燈芯，這座燈塔什麼也點不亮。卡爾應該在東邊的森林裡。"
+    },
+    {
+      "id": "obj_lighthouse_wick",
+      "speaker": "守望燈塔",
+      "text": "懷裡的星光燈芯微微發亮，像是在回應燈塔。該把它交給艾琳，由你決定它的去向了。"
+    },
+    {
+      "id": "obj_sign",
+      "speaker": "告示牌",
+      "text": "「往東——迷霧森林。守林人卡爾住在林中，非請勿入。」"
+    },
+    {
+      "id": "obj_sign_hint",
+      "speaker": "告示牌",
+      "text": "告示牌下方多了一行潦草的字：「東南角古樹下，有光。」看起來像是卡爾的筆跡。"
+    },
+    {
+      "id": "obj_house",
+      "speaker": "民宅的門",
+      "text": "門鎖得緊緊的。屋裡傳來幾聲咳嗽，村民們都躲在家裡，避開越來越濃的迷霧。"
+    },
+    {
+      "id": "obj_well",
+      "speaker": "古井",
+      "text": "井水清澈見底。井邊的石頭上刻著一行舊字：「燈火與森林，本是同一條根。」"
+    },
+    {
+      "id": "obj_tree_fog",
+      "speaker": "古樹",
+      "text": "一棵巨大的古樹，樹根盤根錯節，像是藏著什麼。但迷霧太濃，什麼也看不清楚。"
+    },
+    {
+      "id": "obj_tree_glow",
+      "speaker": "古樹",
+      "text": "古樹的根部透出淡淡的星光——燈芯就在這附近！"
     }
   ],
   "quests": [

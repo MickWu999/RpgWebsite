@@ -241,7 +241,7 @@ function completeQuest(project: GameProject, state: PlayerState, questId: string
 export function progressObjective(
   project: GameProject,
   state: PlayerState,
-  type: "talk_to_npc" | "collect_item" | "reach_location" | "make_choice",
+  type: "talk_to_npc" | "collect_item" | "reach_location" | "make_choice" | "inspect",
   targetId: string,
   events: GameEvent[],
   amount = 1,
@@ -336,9 +336,15 @@ export function visiblePickups(project: GameProject, state: PlayerState, sceneId
   );
 }
 
+export function interactableAt(project: GameProject, sceneId: string, x: number, y: number) {
+  return getScene(project, sceneId).interactables?.find((o) => o.x === x && o.y === y) ?? null;
+}
+
 export function canMoveTo(project: GameProject, sceneId: string, x: number, y: number): boolean {
   const scene = getScene(project, sceneId);
   if (!isWalkable(scene, x, y)) return false;
+  // 可調查物件和 NPC 一樣會擋路（RPG Maker 的「與角色相同」優先度）
+  if (interactableAt(project, sceneId, x, y)) return false;
   return !npcsInScene(project, sceneId).some((n) => n.position.x === x && n.position.y === y);
 }
 
@@ -395,7 +401,19 @@ export function findNearbyNpc(project: GameProject, state: PlayerState): NPCDefi
   return npcs.find((n) => n.position.x === state.x + dx && n.position.y === state.y + dy) ?? npcs[0];
 }
 
-export function resolveDialogueStart(npc: NPCDefinition, state: PlayerState): string {
+/** 玩家正面對的可調查物件（RPG Maker 式：要面向它才能調查） */
+export function facedInteractable(project: GameProject, state: PlayerState) {
+  const [dx, dy] = DELTA[state.facing];
+  return interactableAt(project, state.sceneId, state.x + dx, state.y + dy);
+}
+
+/** 玩家正面對的格子（給「地形預設回應」使用） */
+export function facedTile(state: PlayerState) {
+  const [dx, dy] = DELTA[state.facing];
+  return { x: state.x + dx, y: state.y + dy };
+}
+
+export function resolveDialogueStart(npc: Pick<NPCDefinition, "dialogueNodeId" | "dialogueVariants">, state: PlayerState): string {
   const variant = npc.dialogueVariants?.find((v) => evaluateCondition(state, v.condition));
   return variant?.dialogueNodeId ?? npc.dialogueNodeId;
 }
@@ -407,7 +425,18 @@ export function interact(project: GameProject, input: PlayerState): ActionResult
   const events: GameEvent[] = [];
   if (isInputLocked(input)) return { state: input, events };
   const npc = findNearbyNpc(project, input);
-  if (!npc) return { state: input, events };
+  if (!npc) {
+    // 沒有 NPC 時，調查正面對的物件；dialogue.npcId 存物件 ID（物件沒有頭像與講話聲）
+    const object = facedInteractable(project, input);
+    if (!object) return { state: input, events };
+    let state = progressObjective(project, input, "inspect", object.id, events);
+    state = refresh(project, state, events).state;
+    if (state.endingId) return { state, events };
+    const nodeId = resolveDialogueStart(object, state);
+    state = { ...state, dialogue: { npcId: object.id, nodeId } };
+    events.push({ type: "dialogue_opened", npcId: object.id, nodeId });
+    return { state, events };
+  }
   let state = progressObjective(project, input, "talk_to_npc", npc.id, events);
   state = refresh(project, state, events).state;
   if (state.endingId) return { state, events };

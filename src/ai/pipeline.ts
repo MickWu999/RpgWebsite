@@ -110,7 +110,7 @@ export async function generateProject(
   provider: StoryProvider | null,
   req: GenerateRequest,
   onProgress?: Progress,
-  options: { review?: boolean } = {},
+  options: { review?: boolean; from?: GameProject } = {},
 ): Promise<GenerateResponse> {
   const story = checkStory(req.story);
   if (!provider) return fixtureResponse(req, "未設定 AI provider，");
@@ -119,7 +119,16 @@ export async function generateProject(
 
   const attempts: AttemptLog[] = [];
   const base = { source: "ai" as const, provider: provider.name, attempts };
-  let best = await produce(provider, req.projectId, generationPrompt(story, req), "generate", MAX_REPAIR_ATTEMPTS, attempts, onProgress);
+  // --from：從既有、已通過驗證的遊戲開始改進（保留內容，只依品質指標與審查意見修改）
+  let best: Produced;
+  if (options.from) {
+    const fromProject = { ...options.from, id: req.projectId };
+    const playtest = runPlaytest(fromProject);
+    best = { project: fromProject, raw: fromProject, report: validateProject(fromProject), playtest };
+    onProgress?.("從既有遊戲開始改進…");
+  } else {
+    best = await produce(provider, req.projectId, generationPrompt(story, req), "generate", MAX_REPAIR_ATTEMPTS, attempts, onProgress);
+  }
   if (!best.project) {
     return {
       ...base,

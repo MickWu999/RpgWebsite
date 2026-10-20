@@ -3,7 +3,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import type * as PhaserNS from "phaser";
 import { TERRAIN, TERRAIN_BASE_FRAME } from "@/game/assets";
-import { findNearbyNpc, getScene, npcsInScene, visiblePickups, type PlayerState } from "@/game/engine";
+import { facedInteractable, findNearbyNpc, getScene, npcsInScene, visiblePickups, type PlayerState } from "@/game/engine";
 import type { AssetDefinition, GameProject } from "@/game/schema";
 
 /**
@@ -215,9 +215,12 @@ function createWorldScene(
 
       const nearby = state.dialogue || state.endingId ? null : findNearbyNpc(project, state);
       for (const [id, label] of this.npcLabels) label.setColor(nearby?.id === id ? "#f2b84b" : "#ffffff");
+      // 「！」提示：可對話的 NPC，或正面對的調查點
+      const object = !nearby && !state.dialogue && !state.endingId ? facedInteractable(project, state) : null;
+      const target = nearby ? nearby.position : object;
       if (this.marker) {
-        this.marker.setVisible(Boolean(nearby));
-        if (nearby) this.marker.setPosition(nearby.position.x * ts + ts / 2, nearby.position.y * ts - ts * 0.7);
+        this.marker.setVisible(Boolean(target));
+        if (target) this.marker.setPosition(target.x * ts + ts / 2, target.y * ts - ts * 0.15);
       }
     }
   };

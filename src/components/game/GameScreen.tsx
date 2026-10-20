@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_MUSIC, MUSIC, SOUNDS } from "@/game/assets";
+import { DEFAULT_MUSIC, MUSIC, SOUNDS, TERRAIN } from "@/game/assets";
 import {
   availableChoices,
   choose,
@@ -12,6 +12,8 @@ import {
   createInitialState,
   currentDialogueNode,
   endingEpilogues,
+  facedTile,
+  interactableAt,
   getScene,
   interact,
   move,
@@ -22,13 +24,24 @@ import {
   type GameEvent,
   type PlayerState,
 } from "@/game/engine";
-import { findPath, pathToNpc } from "@/game/pathfinding";
+import { findPath, pathToFace, pathToNpc } from "@/game/pathfinding";
 import type { GameProject } from "@/game/schema";
 import { coverDataOf } from "@/game/cover";
 import { listSaves, loadProject, savePlayerState, type SaveSlot } from "@/game/storage";
+import { estimateDuration } from "@/game/duration";
+import { runPlaytest } from "@/game/playtest";
 import { fetchPack } from "@/lib/packs";
 import { getAudio } from "@/lib/audio";
-import { loadSettings, saveSettings, TEXT_SPEED_FACTOR, TEXT_SPEED_LABEL, type Settings, type TextSpeed } from "@/lib/settings";
+import {
+  loadSettings,
+  saveSettings,
+  TEXT_SPEED_FACTOR,
+  TEXT_SPEED_LABEL,
+  VOICE_MODE_LABEL,
+  VOICE_MODES,
+  type Settings,
+  type TextSpeed,
+} from "@/lib/settings";
 import CoverArt from "./CoverArt";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
 import TouchControls, { type InputKey } from "./TouchControls";
@@ -69,6 +82,8 @@ type UI = {
   fadeId: number;
   toasts: Toast[];
   notice: string | null;
+  /** 自動存檔提示（重要事件後短暫顯示） */
+  savedFlash: number;
   settings: Settings;
 };
 
@@ -151,6 +166,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const projectId = source.id;
   const [project, setProject] = useState<GameProject | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** 載入資訊：模組包下載大小、預估遊玩時長（顯示在 Logo 與封面上） */
+  const [loadInfo, setLoadInfo] = useState<{ bytes?: number; minutes: [number, number] | null }>({ minutes: null });
   const [ui, setUi] = useState<UI | null>(null);
   const [layout, setLayout] = useState({ scale: 1, height: SCREEN_H, touch: false, portrait: false, canFullscreen: false });
   const [portraitOk, setPortraitOk] = useState(false);
@@ -199,6 +216,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         fadeId: 0,
         toasts: [],
         notice: null,
+        savedFlash: 0,
         settings: loadSettings(),
       };
       uiRef.current = initial;
@@ -214,11 +232,20 @@ export default function GameScreen({ source }: { source: GameSource }) {
     };
     if (source.kind === "pack") {
       fetchPack(source.id)
-        .then(start)
+        .then(({ project, bytes, entry }) => {
+          if (cancelled) return;
+          setLoadInfo({ bytes, minutes: entry?.typicalMinutes ?? null });
+          start(project);
+        })
         .catch((e: Error) => !cancelled && setLoadError(e.message));
     } else {
       const loaded = loadProject(source.id);
-      Promise.resolve().then(() => (loaded ? start(loaded.project) : !cancelled && setLoadError(`找不到專案「${source.id}」。專案只存在建立它的瀏覽器中。`)));
+      Promise.resolve().then(() => {
+        if (!loaded) return !cancelled && setLoadError(`找不到專案「${source.id}」。專案只存在建立它的瀏覽器中。`);
+        // 本機專案沒有目錄資訊，用自動試玩即時估算時長
+        setLoadInfo({ minutes: estimateDuration(loaded.project, runPlaytest(loaded.project, { maxStates: 1500 }))?.typicalMinutes ?? null });
+        start(loaded.project);
+      });
     }
     return () => {
       cancelled = true;
@@ -226,6 +253,28 @@ export default function GameScreen({ source }: { source: GameSource }) {
   }, [source.kind, source.id]);
 
   const cover = useMemo(() => (project ? coverDataOf(project) : null), [project]);
+
+  // 網頁很容易被直接關掉：切到背景、關閉分頁時再強制存一次，並要求瀏覽器不要自動清除存檔
+  useEffect(() => {
+    const flush = () => {
+      const u = uiRef.current;
+      if (u && (u.mode === "map" || u.mode === "menu" || u.mode === "ending")) {
+        try {
+          savePlayerState(u.game, "auto");
+        } catch {
+          // 儲存空間不足時已在遊戲中提示過
+        }
+      }
+    };
+    const onVisibility = () => document.visibilityState === "hidden" && flush();
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    void navigator.storage?.persist?.().catch(() => false);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   // ---------- 縮放 ----------
   useEffect(() => {
@@ -260,6 +309,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       getMode: () => uiRef.current?.mode,
       getMessages: () => uiRef.current?.messages.length ?? 0,
       getMusic: () => getAudio().currentMusic,
+      getBlips: () => getAudio().blipCount,
     };
   }, [projectId]);
 
@@ -311,6 +361,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       const nodeChanged = result.state.dialogue?.nodeId !== u.game.dialogue?.nodeId || result.state.choicesMade.length !== u.game.choicesMade.length;
       const toasts = result.events.map((e) => eventToast(p, e)).filter((t): t is string => Boolean(t)).map((text) => ({ id: ++seq.current, text }));
       const sceneChanged = result.events.some((e) => e.type === "scene_changed");
+      const important = result.events.some((e) => /^(item_|quest_|objective_|scene_changed|ending_|level_up)/.test(e.type));
       const fadeId = sceneChanged ? ++seq.current : u.fadeId;
       update({
         ...u,
@@ -319,6 +370,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         choiceCursor: nodeChanged ? 0 : u.choiceCursor,
         toasts: [...u.toasts, ...toasts].slice(-4),
         fadeId,
+        savedFlash: important ? ++seq.current : u.savedFlash,
       });
       if (sceneChanged) flash({ banner: { text: getScene(p, result.state.sceneId).name, id: fadeId } });
       for (const t of toasts) window.setTimeout(() => update((x) => ({ ...x, toasts: x.toasts.filter((y) => y.id !== t.id) })), 2600);
@@ -451,7 +503,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         }
         return;
       }
-      if (key === "ok") act(interact);
+      if (key === "ok") examineFront();
       else if (key === "cancel") {
         sfx(SOUNDS.dialogueOpen);
         update({ ...u, mode: "menu", menuPage: "root", menuCursor: 0, subCursor: 0 });
@@ -477,7 +529,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         update({ ...u, menuPage: "root" });
         return;
       }
-      const count = { items: Object.keys(u.game.inventory).length, quests: questTracker(p, u.game).length, status: 0, save: 3, load: 4, options: 3, title: 2 }[u.menuPage];
+      const count = { items: Object.keys(u.game.inventory).length, quests: questTracker(p, u.game).length, status: 0, save: 3, load: 4, options: 4, title: 2 }[u.menuPage];
       if (vertical) {
         update({ ...u, subCursor: wrap(u.subCursor + delta, count) });
         return;
@@ -491,6 +543,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         if (u.subCursor === 0) s.textSpeed = TEXT_SPEEDS[wrap(TEXT_SPEEDS.indexOf(s.textSpeed) + (key === "left" ? -1 : 1), 3)];
         if (u.subCursor === 1) getAudio().setMuted(!getAudio().muted);
         if (u.subCursor === 2) s.bgm = !s.bgm;
+        if (u.subCursor === 3) s.voice = VOICE_MODES[wrap(VOICE_MODES.indexOf(s.voice) + (key === "left" ? -1 : 1), VOICE_MODES.length)];
         saveSettings(s);
         sfx(SOUNDS.select);
         update({ ...u, settings: s });
@@ -498,6 +551,19 @@ export default function GameScreen({ source }: { source: GameSource }) {
         if (u.subCursor === 0) update({ ...u, mode: "title", titleCursor: 1, titleLoad: false });
         else update({ ...u, menuPage: "root" });
       }
+    };
+
+    /** 按確認鍵：與 NPC 或面前的調查點互動；什麼都沒有時，給面前地形的預設回應 */
+    const examineFront = () => {
+      const before = uiRef.current?.game;
+      const p = projectRef.current;
+      if (!before || !p) return;
+      act(interact);
+      if (uiRef.current?.game !== before) return;
+      const { x, y } = facedTile(before);
+      const row = getScene(p, before.sceneId).terrain?.[y];
+      const text = row ? TERRAIN[[...row][x]]?.examine : undefined;
+      if (text) update((u) => ({ ...u, messages: [text], messageSeq: ++seq.current }));
     };
 
     const tap = (x: number, y: number) => {
@@ -510,10 +576,17 @@ export default function GameScreen({ source }: { source: GameSource }) {
         if (u.mode === "map") handle("ok");
         return;
       }
+      // 點 NPC、調查點或不可行走的地形：走到正前方再調查；點地面：走過去
       const npc = p.npcs.find((n) => n.sceneId === u.game.sceneId && n.position.x === x && n.position.y === y);
-      const path = npc ? pathToNpc(p, u.game, npc.id) : findPath(p, u.game, (sid, px, py) => sid === u.game.sceneId && px === x && py === y);
+      const scene = getScene(p, u.game.sceneId);
+      const target = npc || interactableAt(p, u.game.sceneId, x, y) || (scene.walkable[y]?.[x] === false && scene.terrain);
+      const path = npc
+        ? pathToNpc(p, u.game, npc.id)
+        : target
+          ? pathToFace(p, u.game, u.game.sceneId, x, y)
+          : findPath(p, u.game, (sid, px, py) => sid === u.game.sceneId && px === x && py === y);
       walkQueue = path ?? [];
-      talkAfterWalk = Boolean(npc && path);
+      talkAfterWalk = Boolean(target && path);
     };
 
     const press = (key: Key, repeat = false) => {
@@ -557,7 +630,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
           if (next) step(next);
           else {
             talkAfterWalk = false;
-            act(interact);
+            examineFront();
           }
         }
         return;
@@ -600,7 +673,15 @@ export default function GameScreen({ source }: { source: GameSource }) {
       </div>
     );
   }
-  if (!project || !ui) return <div className="rm-stage" />;
+  if (!project || !ui) {
+    return (
+      <div className="rm-stage">
+        <div className="rm-loading" data-testid="loading">
+          {source.kind === "pack" ? "下載遊戲資料中…" : "載入中…"}
+        </div>
+      </div>
+    );
+  }
 
   const game = ui.game;
   const node = ui.mode !== "title" ? currentDialogueNode(project, game) : null;
@@ -676,6 +757,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
             portrait={asset(npc?.spriteAssetId)}
             portraitSize={layout.height < 400 ? 52 : 72}
             speedFactor={speed}
+            voiceMode={ui.settings.voice}
             choices={choices}
             cursor={ui.choiceCursor}
             controlRef={typingRef}
@@ -690,6 +772,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
           <div className="rm-splash" data-testid="splash" onClick={() => update((u) => ({ ...u, mode: "cover" }))}>
             <div className="rm-splash-logo">AI RPG Builder</div>
             <div className="rm-splash-sub">presents</div>
+            {loadInfo.bytes !== undefined && <div className="rm-splash-status">✓ 遊戲資料已下載（{Math.max(1, Math.round(loadInfo.bytes / 1024))} KB）</div>}
           </div>
         )}
 
@@ -697,6 +780,14 @@ export default function GameScreen({ source }: { source: GameSource }) {
           <div className="rm-cover" data-testid="cover-screen" onClick={() => update((u) => ({ ...u, mode: "title" }))}>
             <h1 className="rm-game-title">{project.title}</h1>
             {project.cover?.tagline && <p className="rm-tagline">{project.cover.tagline}</p>}
+            <div className="rm-cover-meta" data-testid="cover-meta">
+              {loadInfo.minutes && (
+                <span>
+                  ⏱ 預計遊玩 {loadInfo.minutes[0]}～{loadInfo.minutes[1]} 分鐘
+                </span>
+              )}
+              <span>🏁 {project.endings.length} 種結局</span>
+            </div>
             <div className="rm-press-start">{layout.touch ? "點擊畫面開始" : "按任意鍵開始"}</div>
           </div>
         )}
@@ -821,6 +912,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                   ["文字速度", TEXT_SPEED_LABEL[ui.settings.textSpeed]],
                   ["音效", getAudio().muted ? "關" : "開"],
                   ["背景音樂", ui.settings.bgm ? "開" : "關"],
+                  ["對話聲音", VOICE_MODE_LABEL[ui.settings.voice]],
                 ].map(([label, value], i) => (
                   <div key={label} className={`rm-item rm-row${i === ui.subCursor ? " selected" : ""}`}>
                     <span>{label}</span>
@@ -857,6 +949,11 @@ export default function GameScreen({ source }: { source: GameSource }) {
         )}
 
         {ui.notice && <div className="rm-window rm-notice">{ui.notice}</div>}
+        {ui.savedFlash > 0 && ui.mode === "map" && (
+          <div key={ui.savedFlash} className="rm-autosave" data-testid="autosave">
+            💾 已自動存檔
+          </div>
+        )}
       </div>
       </div>
       {layout.touch && (

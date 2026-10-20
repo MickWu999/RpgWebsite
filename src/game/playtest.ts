@@ -10,7 +10,7 @@ import {
   type Direction,
   type PlayerState,
 } from "./engine";
-import { findPath, pathToNpc } from "./pathfinding";
+import { findPath, pathToFace, pathToNpc } from "./pathfinding";
 import type { GameProject } from "./schema";
 import type { ValidationIssue } from "./validate";
 
@@ -25,6 +25,7 @@ export type PlaytestAction =
   | { kind: "talk"; npcId: string; moves: Direction[] }
   | { kind: "pickup"; pickupId: string; moves: Direction[] }
   | { kind: "location"; locationId: string; moves: Direction[] }
+  | { kind: "inspect"; interactableId: string; moves: Direction[] }
   | { kind: "choose"; choiceId: string }
   | { kind: "close" };
 
@@ -66,7 +67,7 @@ export function applyAction(project: GameProject, input: PlayerState, action: Pl
         if (state.endingId) return state;
         state = move(project, state, dir).state;
       }
-      return action.kind === "talk" && !state.endingId ? interact(project, state).state : state;
+      return (action.kind === "talk" || action.kind === "inspect") && !state.endingId ? interact(project, state).state : state;
   }
 }
 
@@ -80,6 +81,8 @@ function describe(project: GameProject, state: PlayerState, action: PlaytestActi
     }
     case "location":
       return `前往「${project.scenes.flatMap((s) => s.locations ?? []).find((l) => l.id === action.locationId)?.name}」`;
+    case "inspect":
+      return `調查「${project.scenes.flatMap((s) => s.interactables ?? []).find((o) => o.id === action.interactableId)?.name}」`;
     case "choose": {
       const choice = availableChoices(project, state).find((c) => c.id === action.choiceId);
       return `選擇「${choice?.text ?? action.choiceId}」`;
@@ -101,6 +104,10 @@ function candidateActions(project: GameProject, state: PlayerState): PlaytestAct
     if (moves) actions.push({ kind: "talk", npcId: npc.id, moves });
   }
   for (const scene of project.scenes) {
+    for (const o of scene.interactables ?? []) {
+      const moves = pathToFace(project, state, scene.id, o.x, o.y);
+      if (moves) actions.push({ kind: "inspect", interactableId: o.id, moves });
+    }
     for (const pickup of visiblePickups(project, state, scene.id)) {
       const moves = findPath(project, state, (s, x, y) => s === scene.id && x === pickup.x && y === pickup.y);
       if (moves) actions.push({ kind: "pickup", pickupId: pickup.id, moves });
@@ -117,7 +124,8 @@ function candidateActions(project: GameProject, state: PlayerState): PlaytestAct
 }
 
 export function runPlaytest(project: GameProject, options: { maxStates?: number } = {}): PlaytestReport {
-  const maxStates = options.maxStates ?? 4000;
+  // 中型遊戲約 1 萬個狀態、0.5 秒內可探索完；上限設高一點，避免卡死偵測被截斷
+  const maxStates = options.maxStates ?? 30000;
   const nodes: Node[] = [{ state: createInitialState(project), parent: -1, action: null, children: [] }];
   const index = new Map<string, number>([[stateKey(nodes[0].state), 0]]);
   const firstEnding = new Map<string, number>();
