@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { TERRAIN, TERRAIN_BASE_FRAME } from "@/game/assets";
+import { TERRAIN, terrainSheet, terrainUnder } from "@/game/assets";
 import type { CoverData } from "@/game/cover";
 
 /**
@@ -9,7 +9,6 @@ import type { CoverData } from "@/game/cover";
  * 同一個元件用在遊戲內封面與遊戲庫卡片。
  */
 
-const SHEET_COLUMNS = 12;
 const images = new Map<string, Promise<HTMLImageElement>>();
 function loadImage(src: string) {
   let p = images.get(src);
@@ -26,7 +25,8 @@ function loadImage(src: string) {
 }
 
 function drawFrame(ctx: CanvasRenderingContext2D, img: HTMLImageElement, frame: number, size: number, x: number, y: number, w: number, h: number) {
-  ctx.drawImage(img, (frame % SHEET_COLUMNS) * size, Math.floor(frame / SHEET_COLUMNS) * size, size, size, x, y, w, h);
+  const cols = Math.max(1, Math.round(img.width / size));
+  ctx.drawImage(img, (frame % cols) * size, Math.floor(frame / cols) * size, size, size, x, y, w, h);
 }
 
 export default function CoverArt({ cover, className }: { cover: CoverData; className?: string }) {
@@ -56,9 +56,11 @@ export default function CoverArt({ cover, className }: { cover: CoverData; class
       const offsetY = (H - Math.max(rows.length, 12) * tile) / 2;
       ctx.fillStyle = cover.colors?.floor ?? "#2d4a3a";
       ctx.fillRect(0, 0, W, H);
-      if (cover.tilesetSrc && rows.length) {
+      if (rows.length) {
         try {
-          const sheet = await loadImage(cover.tilesetSrc);
+          const srcs = new Set(rows.join("").split("").flatMap((ch) => (TERRAIN[ch] ? [terrainSheet(TERRAIN[ch]), terrainSheet(terrainUnder(TERRAIN[ch]))] : [])));
+          const sheets = new Map<string, HTMLImageElement>();
+          for (const src of srcs) sheets.set(src, await loadImage(src));
           if (cancelled) return;
           rows.forEach((row, y) =>
             [...row].forEach((ch, x) => {
@@ -66,8 +68,11 @@ export default function CoverArt({ cover, className }: { cover: CoverData; class
               if (!def) return;
               const px = offsetX + x * tile;
               const py = offsetY + y * tile;
-              if (def.overlay) drawFrame(ctx, sheet, TERRAIN_BASE_FRAME, 16, px, py, tile + 1, tile + 1);
-              drawFrame(ctx, sheet, def.frame, 16, px, py, tile + 1, tile + 1);
+              if (def.overlay) {
+                const under = terrainUnder(def);
+                drawFrame(ctx, sheets.get(terrainSheet(under))!, under.frame, 16, px, py, tile + 1, tile + 1);
+              }
+              drawFrame(ctx, sheets.get(terrainSheet(def))!, def.frame, 16, px, py, tile + 1, tile + 1);
             }),
           );
         } catch {

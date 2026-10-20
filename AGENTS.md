@@ -17,6 +17,7 @@
 
 ```bash
 npm run game -- schema                       # 操作 API 的 JSON Schema
+npm run game -- assets                       # 可用素材：地形字元、角色圖、圖示、音樂
 npm run game -- inspect <id>                 # 以 RPG Maker 事件清單的形式輸出遊戲內容
 npm run game -- check <id>                   # 驗證＋自動試玩＋品質指標；結束碼 0 表示通過
 npm run game -- remote <list|pull|apply|check|publish> …   # 操作線上 Studio（需要 STUDIO_TOKEN）

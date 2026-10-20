@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { findCatalogAsset, manifestEntry, TERRAIN, walkableFromTerrain } from "@/game/assets";
+import { findCatalogAsset, manifestEntry, SHEET_TILESET_ID, TERRAIN, terrainSheet, terrainUnder, walkableFromTerrain } from "@/game/assets";
 import { allConditions, walkCondition, walkProject } from "@/game/commands";
 import {
   actorSchema,
@@ -200,6 +200,12 @@ function normalize(p: GameProject) {
   const used = new Set<string>();
   p.maps.forEach((m) => {
     if (m.tilesetId) used.add(m.tilesetId);
+    // 地形用到的圖塊表（城市、室內）也要列入素材清單
+    for (const ch of new Set(m.terrain.join(""))) {
+      const def = TERRAIN[ch];
+      if (!def) continue;
+      for (const src of [terrainSheet(def), terrainSheet(terrainUnder(def))]) if (SHEET_TILESET_ID[src]) used.add(SHEET_TILESET_ID[src]);
+    }
     m.events.forEach((e) => e.pages.forEach((pg) => pg.graphic && used.add(pg.graphic.assetId)));
   });
   p.actors.forEach((a) => a.spriteAssetId && used.add(a.spriteAssetId));

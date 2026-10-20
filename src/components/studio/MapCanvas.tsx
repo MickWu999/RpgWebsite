@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { TERRAIN, TERRAIN_BASE_FRAME } from "@/game/assets";
+import { sheetColumns, TERRAIN, terrainSheet, terrainUnder, type TerrainDef, type TerrainGroup } from "@/game/assets";
 import type { GameProject, MapDefinition } from "@/game/schema";
 
 /**
@@ -11,7 +11,6 @@ import type { GameProject, MapDefinition } from "@/game/schema";
  * 事件以第 1 頁的圖像顯示（與 RPG Maker 相同），透明事件畫成方框，場所移動畫成 ⇄，玩家起點畫成 S。
  */
 
-const SHEET_COLUMNS = 12;
 const images = new Map<string, Promise<HTMLImageElement>>();
 function loadImage(src: string) {
   let p = images.get(src);
@@ -71,11 +70,27 @@ export default function MapCanvas({
       canvas.width = scene.width * ts;
       canvas.height = scene.height * ts;
       ctx.imageSmoothingEnabled = false;
-      const tileset = project.assetManifest.assets.find((a) => a.id === scene.tilesetId);
-      const sheet = tileset ? await loadImage(tileset.src).catch(() => null) : null;
+      // 地形可能來自多張圖塊表（村莊、城市、室內）
+      const srcs = new Set([...scene.terrain.join(""), ...preview.values()].flatMap((ch) => (TERRAIN[ch] ? [terrainSheet(TERRAIN[ch]), terrainSheet(terrainUnder(TERRAIN[ch]))] : [])));
+      const sheets = new Map<string, HTMLImageElement>();
+      await Promise.all([...srcs].map(async (src) => sheets.set(src, await loadImage(src).catch(() => null as unknown as HTMLImageElement))));
       if (cancelled) return;
-      const frame = (img: HTMLImageElement, f: number, size: number, x: number, y: number, w = ts, h = ts) =>
-        ctx.drawImage(img, (f % SHEET_COLUMNS) * size, Math.floor(f / SHEET_COLUMNS) * size, size, size, x, y, w, h);
+      // 每列幾格由圖片寬度推算（不同圖塊表欄數不同）
+      const frame = (img: HTMLImageElement, f: number, size: number, x: number, y: number, w = ts, h = ts) => {
+        const cols = Math.max(1, Math.round(img.width / size));
+        ctx.drawImage(img, (f % cols) * size, Math.floor(f / cols) * size, size, size, x, y, w, h);
+      };
+      const tile = (def: TerrainDef, x: number, y: number) => {
+        const img = sheets.get(terrainSheet(def));
+        if (!img) return false;
+        if (def.overlay) {
+          const under = terrainUnder(def);
+          const uimg = sheets.get(terrainSheet(under));
+          if (uimg) frame(uimg, under.frame, 16, x * ts, y * ts);
+        }
+        frame(img, def.frame, 16, x * ts, y * ts);
+        return true;
+      };
 
       // 地形
       for (let y = 0; y < scene.height; y++) {
@@ -83,10 +98,7 @@ export default function MapCanvas({
         for (let x = 0; x < scene.width; x++) {
           const ch = preview.get(`${x},${y}`) ?? row[x];
           const def = ch ? TERRAIN[ch] : undefined;
-          if (sheet && def) {
-            if (def.overlay) frame(sheet, TERRAIN_BASE_FRAME, 16, x * ts, y * ts);
-            frame(sheet, def.frame, 16, x * ts, y * ts);
-          } else {
+          if (!(def && tile(def, x, y))) {
             ctx.fillStyle = scene.walkable[y]?.[x] ? "#7fa36a" : "#3a4630";
             ctx.fillRect(x * ts, y * ts, ts, ts);
           }
@@ -235,30 +247,37 @@ export default function MapCanvas({
   );
 }
 
-/** 圖塊調色盤：直接從圖塊表裁出每種地形的樣子 */
-export function TilePalette({ tilesetSrc, value, onChange }: { tilesetSrc: string; value: string; onChange: (ch: string) => void }) {
+const GROUP_LABEL: Record<TerrainGroup, string> = { village: "村莊", urban: "城市／營區", indoor: "室內" };
+
+function tileStyle(def: TerrainDef) {
+  const layer = (d: TerrainDef) => {
+    const src = terrainSheet(d);
+    const cols = sheetColumns(src);
+    return { image: `url(${src})`, pos: `-${(d.frame % cols) * 32}px -${Math.floor(d.frame / cols) * 32}px`, size: `${cols * 32}px auto` };
+  };
+  const layers = def.overlay ? [layer(def), layer(terrainUnder(def))] : [layer(def)];
+  return { backgroundImage: layers.map((l) => l.image).join(", "), backgroundPosition: layers.map((l) => l.pos).join(", "), backgroundSize: layers.map((l) => l.size).join(", ") };
+}
+
+/** 圖塊調色盤：依村莊／城市／室內分組，直接從圖塊表裁出每種地形的樣子 */
+export function TilePalette({ value, onChange }: { value: string; onChange: (ch: string) => void }) {
+  const groups = (["village", "urban", "indoor"] as TerrainGroup[]).map((g) => [g, Object.entries(TERRAIN).filter(([, d]) => (d.group ?? "village") === g)] as const);
   return (
-    <div className="tile-palette" data-testid="tile-palette">
-      {Object.entries(TERRAIN).map(([ch, def]) => (
-        <button
-          key={ch}
-          className={`tile-swatch${ch === value ? " active" : ""}`}
-          title={`${def.name}（${ch}）${def.walkable ? "" : "・不可通行"}`}
-          data-tile={ch}
-          onClick={() => onChange(ch)}
-        >
-          <span
-            className="tile-img"
-            style={{
-              backgroundImage: def.overlay ? `url(${tilesetSrc}), url(${tilesetSrc})` : `url(${tilesetSrc})`,
-              backgroundPosition: def.overlay
-                ? `-${(def.frame % SHEET_COLUMNS) * 32}px -${Math.floor(def.frame / SHEET_COLUMNS) * 32}px, -${(TERRAIN_BASE_FRAME % SHEET_COLUMNS) * 32}px -${Math.floor(TERRAIN_BASE_FRAME / SHEET_COLUMNS) * 32}px`
-                : `-${(def.frame % SHEET_COLUMNS) * 32}px -${Math.floor(def.frame / SHEET_COLUMNS) * 32}px`,
-              backgroundSize: def.overlay ? `${SHEET_COLUMNS * 32}px auto, ${SHEET_COLUMNS * 32}px auto` : `${SHEET_COLUMNS * 32}px auto`,
-            }}
-          />
-          {!def.walkable && <span className="tile-block">✕</span>}
-        </button>
+    <div data-testid="tile-palette">
+      {groups.map(([g, list]) => (
+        <div key={g}>
+          <div className="small muted" style={{ margin: "6px 0 4px" }}>
+            {GROUP_LABEL[g]}
+          </div>
+          <div className="tile-palette">
+            {list.map(([ch, def]) => (
+              <button key={ch} className={`tile-swatch${ch === value ? " active" : ""}`} title={`${def.name}（${ch}）${def.walkable ? "" : "・不可通行"}`} data-tile={ch} onClick={() => onChange(ch)}>
+                <span className="tile-img" style={tileStyle(def)} />
+                {!def.walkable && <span className="tile-block">✕</span>}
+              </button>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );

@@ -115,15 +115,61 @@ export const LICENSES: Record<string, LicenseRecord> = {
     downloadedAt: "2026-10-20",
     localLicenseFile: "/assets/kenney/audio/music-jingles/License.txt",
   },
+  "kenney-rpg-urban": {
+    packId: "kenney-rpg-urban",
+    packName: "RPG Urban Pack 1.0",
+    sourceUrl: "https://kenney.nl/assets/rpg-urban-pack",
+    author: "Kenney (www.kenney.nl)",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    commercialUse: true,
+    attributionRequired: false,
+    modificationAllowed: true,
+    redistributionWithGeneratedWorks: true,
+    attributionText: "RPG Urban Pack by Kenney (www.kenney.nl), CC0",
+    downloadedAt: "2026-10-21",
+    localLicenseFile: "/assets/kenney/rpg-urban/License.txt",
+  },
+  "kenney-roguelike-indoors": {
+    packId: "kenney-roguelike-indoors",
+    packName: "Roguelike Indoors（已移除圖塊間距重新打包）",
+    sourceUrl: "https://kenney.nl/assets/roguelike-indoors",
+    author: "Kenney Vleugels (www.kenney.nl)",
+    license: "CC0-1.0",
+    licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
+    commercialUse: true,
+    attributionRequired: false,
+    modificationAllowed: true,
+    redistributionWithGeneratedWorks: true,
+    attributionText: "Roguelike Indoors by Kenney (www.kenney.nl), CC0",
+    downloadedAt: "2026-10-21",
+    localLicenseFile: "/assets/kenney/roguelike-indoors/License.txt",
+  },
 };
 
 export const TOWN_SHEET = "/assets/kenney/tiny-town/tilemap_packed.png";
 export const DUNGEON_SHEET = "/assets/kenney/tiny-dungeon/tilemap_packed.png";
+export const URBAN_SHEET = "/assets/kenney/rpg-urban/tilemap_packed.png";
+export const INDOOR_SHEET = "/assets/kenney/roguelike-indoors/tilemap_packed.png";
 export const SHEET_FRAME_SIZE = 16;
 
-/** 地形字元 → 圖塊。`overlay` 的圖塊有透明背景，會疊在草地上繪製。 */
-/** examine：面對該地形按確認、而且沒有特別設計的調查點時，顯示的預設回應（減少「按了沒反應」的迷失感） */
-export type TerrainDef = { name: string; frame: number; walkable: boolean; overlay?: boolean; examine?: string };
+/** 每張圖塊表一列幾格（畫面用來換算 frame 編號的位置） */
+const SHEET_COLUMNS: Record<string, number> = { [TOWN_SHEET]: 12, [DUNGEON_SHEET]: 12, [URBAN_SHEET]: 27, [INDOOR_SHEET]: 27 };
+export function sheetColumns(src: string) {
+  return SHEET_COLUMNS[src] ?? 12;
+}
+
+/**
+ * 地形字元 → 圖塊。
+ * - sheet：圖塊來自哪張圖塊表（預設 Tiny Town）；group：給 AI 與 Studio 分類用（村莊／城市／室內）。
+ * - overlay：圖塊有透明背景，會疊在 under 指定的地形上（預設草地）。
+ * - examine：面對該地形按確認、而且沒有事件時，顯示的預設回應（減少「按了沒反應」的迷失感）。
+ */
+export type TerrainGroup = "village" | "urban" | "indoor";
+export type TerrainDef = { name: string; frame: number; walkable: boolean; overlay?: boolean; under?: string; examine?: string; sheet?: string; group?: TerrainGroup };
+
+const urban = (name: string, frame: number, walkable: boolean, extra: Partial<TerrainDef> = {}): TerrainDef => ({ name, frame, walkable, sheet: URBAN_SHEET, group: "urban", ...extra });
+const indoor = (name: string, frame: number, walkable: boolean, extra: Partial<TerrainDef> = {}): TerrainDef => ({ name, frame, walkable, sheet: INDOOR_SHEET, group: "indoor", ...extra });
 
 export const TERRAIN: Record<string, TerrainDef> = {
   ".": { name: "草地", frame: 0, walkable: true },
@@ -144,9 +190,47 @@ export const TERRAIN: Record<string, TerrainDef> = {
   S: { name: "石牆", frame: 76, walkable: false, examine: "堅固的石牆。" },
   W: { name: "水井", frame: 104, walkable: false, overlay: true, examine: "一口古井，井水清澈見底。" },
   X: { name: "告示牌", frame: 83, walkable: false, overlay: true, examine: "告示牌上的字被風雨磨得模糊不清。" },
+  // ---------- 城市（RPG Urban Pack）：現代街道、營區、校園 ----------
+  a: urban("水泥地", 36, true),
+  r: urban("柏油路", 406, true),
+  l: urban("車道線", 433, true),
+  q: urban("米色磁磚地板", 109, true),
+  b: urban("紅磚牆", 72, false, { examine: "紅磚牆。上面有人用粉筆寫過字，已經被雨水糊掉了。" }),
+  w: urban("窗戶", 336, false, { overlay: true, under: "b", examine: "窗戶。玻璃上映出你的倒影。" }),
+  d: urban("鐵門", 283, false, { examine: "門關著。" }),
+  v: urban("自動販賣機", 282, false, { overlay: true, under: "a", examine: "自動販賣機，飲料一罐 20 元。" }),
+  f: urban("鐵絲網圍籬", 356, false, { overlay: true, under: "a", examine: "鐵絲網圍籬，頂端纏著帶刺的鐵絲。" }),
+  x: urban("路障", 221, false, { overlay: true, under: "a", examine: "紅白相間的路障，禁止通行。" }),
+  n: urban("長椅", 270, false, { overlay: true, under: "a", examine: "長椅。坐起來有點涼。" }),
+  t: urban("垃圾桶", 279, false, { overlay: true, under: "a", examine: "垃圾桶，裡面塞滿了空飲料罐。" }),
+  m: urban("郵筒", 305, false, { overlay: true, under: "a", examine: "藍色的郵筒，寄限時信用的。" }),
+  k: urban("行道樹", 260, false, { overlay: true, under: "a", examine: "修剪整齊的行道樹。" }),
+  // ---------- 室內（Roguelike Indoors）：家、寢室、辦公室 ----------
+  o: indoor("木地板", 51, true),
+  c: indoor("綠地毯", 159, true),
+  h: indoor("椅子", 55, false, { overlay: true, under: "o", examine: "一張木椅。" }),
+  j: indoor("桌子", 59, false, { overlay: true, under: "o", examine: "桌上有幾道刮痕。" }),
+  p: indoor("盆栽", 16, false, { overlay: true, under: "o", examine: "盆栽的葉子有點乾了。" }),
+  y: indoor("抽屜櫃", 325, false, { overlay: true, under: "o", examine: "抽屜櫃，拉不太開。" }),
+  u: indoor("流理臺", 329, false, { overlay: true, under: "o", examine: "流理臺，水龍頭在滴水。" }),
+  e: indoor("床（上半，枕頭）", 13, false, { overlay: true, under: "o", examine: "床鋪得很整齊。" }),
+  E: indoor("床（下半）", 40, false, { overlay: true, under: "o", examine: "床鋪得很整齊。" }),
 };
 
 export const TERRAIN_BASE_FRAME = 0;
+
+/** 地形實際使用的圖塊表 */
+export function terrainSheet(def: TerrainDef) {
+  return def.sheet ?? TOWN_SHEET;
+}
+
+/** 疊圖用的底圖（overlay 的地形畫在這個地形上面） */
+export function terrainUnder(def: TerrainDef): TerrainDef {
+  return TERRAIN[def.under ?? "."] ?? TERRAIN["."];
+}
+
+/** 圖塊表網址 → 素材 ID（讓素材清單自動包含地形用到的圖塊表） */
+export const SHEET_TILESET_ID: Record<string, string> = { [TOWN_SHEET]: "tileset_tiny_town", [URBAN_SHEET]: "tileset_urban", [INDOOR_SHEET]: "tileset_indoor" };
 
 export type CatalogAsset = {
   id: string;
@@ -169,6 +253,10 @@ const character = (id: string, frame: number, name: string, tags: string[]): Cat
   frameSize: SHEET_FRAME_SIZE,
   packId: "kenney-tiny-dungeon",
 });
+
+function urbanCharacter(id: string, frame: number, name: string, tags: string[]): CatalogAsset {
+  return { id, kind: "character", name, tags, src: URBAN_SHEET, frame, frameSize: SHEET_FRAME_SIZE, packId: "kenney-rpg-urban" };
+}
 
 const icon = (id: string, src: string, frame: number, name: string, tags: string[], packId: CatalogAsset["packId"]): CatalogAsset => ({
   id,
@@ -215,6 +303,21 @@ export const ASSET_CATALOG: CatalogAsset[] = [
   icon("icon_potion_blue", DUNGEON_SHEET, 116, "藍色藥水", ["potion", "magic", "light"], "kenney-tiny-dungeon"),
   icon("icon_staff", DUNGEON_SHEET, 130, "法杖", ["staff", "magic", "relic"], "kenney-tiny-dungeon"),
   icon("icon_chest", DUNGEON_SHEET, 89, "寶箱", ["chest", "treasure", "container"], "kenney-tiny-dungeon"),
+  // 城市與室內的圖塊表（地形用）
+  { id: "tileset_urban", kind: "tileset", name: "RPG Urban 城市圖塊", tags: ["city", "modern", "camp", "street", "school"], src: URBAN_SHEET, frameSize: SHEET_FRAME_SIZE, packId: "kenney-rpg-urban" },
+  { id: "tileset_indoor", kind: "tileset", name: "Roguelike Indoors 室內圖塊", tags: ["indoor", "room", "house", "dorm", "office"], src: INDOOR_SHEET, frameSize: SHEET_FRAME_SIZE, packId: "kenney-roguelike-indoors" },
+  // 現代人物（RPG Urban Pack，正面）
+  urbanCharacter("char_modern_boy", 24, "綠衣少年", ["modern", "youth", "student", "recruit", "player"]),
+  urbanCharacter("char_modern_girl", 105, "紅衣少女", ["modern", "girl", "student", "sister"]),
+  urbanCharacter("char_modern_elder", 186, "白髮老人", ["modern", "elder", "grandpa", "veteran"]),
+  urbanCharacter("char_modern_worker", 267, "工人", ["modern", "worker", "soldier", "builder"]),
+  urbanCharacter("char_modern_man", 348, "光頭男子", ["modern", "man", "father", "sergeant", "officer"]),
+  urbanCharacter("char_modern_woman", 429, "綁頭帶的女子", ["modern", "woman", "mother", "nurse"]),
+  // 城市與室內的物品圖示
+  icon("icon_letter", URBAN_SHEET, 305, "郵筒／信件", ["letter", "mail", "message"], "kenney-rpg-urban"),
+  icon("icon_can", URBAN_SHEET, 279, "罐子", ["can", "drink", "trash"], "kenney-rpg-urban"),
+  icon("icon_plant", INDOOR_SHEET, 16, "盆栽", ["plant", "gift", "home"], "kenney-roguelike-indoors"),
+  icon("icon_candle", INDOOR_SHEET, 178, "蠟燭", ["candle", "light", "memorial"], "kenney-roguelike-indoors"),
 ];
 
 export const DEFAULT_PLAYER_SPRITE = "char_hero";

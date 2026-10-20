@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type RefObject } from "react";
 import type * as PhaserNS from "phaser";
-import { TERRAIN, TERRAIN_BASE_FRAME } from "@/game/assets";
+import { TERRAIN, terrainSheet, terrainUnder } from "@/game/assets";
 import { facedTile, getMap, isBusy, visibleEvents, type PlayerState } from "@/game/engine";
 import type { AssetDefinition, GameProject } from "@/game/schema";
 
@@ -45,6 +45,8 @@ function createWorldScene(
         if (asset.kind === "audio") continue;
         sheets.set(asset.src, asset.frameSize ?? 16);
       }
+      // 地形用到的圖塊表（村莊、城市、室內）
+      for (const map of project.maps) for (const ch of new Set(map.terrain.join(""))) if (TERRAIN[ch]) sheets.set(terrainSheet(TERRAIN[ch]), 16);
       for (const [src, size] of sheets) this.load.spritesheet(src, src, { frameWidth: size, frameHeight: size });
     }
 
@@ -105,17 +107,18 @@ function createWorldScene(
       const scene = getMap(project, state.mapId);
       const ts = scene.tileSize;
       this.layer.removeAll(true);
-      const tileset = scene.tilesetId ? assets.get(scene.tilesetId) : undefined;
-      const useTiles = Boolean(tileset && this.textures.exists(tileset.src));
 
       for (let y = 0; y < scene.height; y++) {
         for (let x = 0; x < scene.width; x++) {
           const cx = x * ts + ts / 2;
           const cy = y * ts + ts / 2;
           const def = TERRAIN[[...scene.terrain[y]][x]];
-          if (useTiles && def && tileset) {
-            if (def.overlay) this.layer.add(this.add.image(cx, cy, tileset.src, TERRAIN_BASE_FRAME).setDisplaySize(ts, ts));
-            this.layer.add(this.add.image(cx, cy, tileset.src, def.frame).setDisplaySize(ts, ts));
+          if (def && this.textures.exists(terrainSheet(def))) {
+            if (def.overlay) {
+              const under = terrainUnder(def);
+              this.layer.add(this.add.image(cx, cy, terrainSheet(under), under.frame).setDisplaySize(ts, ts));
+            }
+            this.layer.add(this.add.image(cx, cy, terrainSheet(def), def.frame).setDisplaySize(ts, ts));
           } else {
             const color = scene.walkable[y]?.[x] ? 0x7fa36a : 0x3a4630;
             this.layer.add(this.add.rectangle(cx, cy, ts, ts, color).setStrokeStyle(1, 0x000000, 0.08));

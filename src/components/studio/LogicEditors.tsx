@@ -1,6 +1,6 @@
 "use client";
 
-import { ASSET_CATALOG } from "@/game/assets";
+import { ASSET_CATALOG, sheetColumns } from "@/game/assets";
 import { COMPARE_OPS, QUEST_STATUSES, SELF_SWITCHES, type GameCondition, type GameProject } from "@/game/schema";
 
 /**
@@ -104,7 +104,7 @@ export function AssetPicker({ kind, value, onChange, allowNone }: { kind: "chara
 }
 
 export function AssetThumb({ src, frame, size = 32 }: { src: string; frame: number; size?: number }) {
-  const cols = 12;
+  const cols = sheetColumns(src);
   return (
     <span
       className="asset-thumb"

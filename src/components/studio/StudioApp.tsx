@@ -271,7 +271,6 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
   }
   if (!project || !report) return <div className="container muted">載入中…</div>;
   const map = project.maps.find((m) => m.id === mapId) ?? project.maps[0];
-  const tileset = project.assetManifest.assets.find((a) => a.id === map.tilesetId);
   const cellEvents = selected ? map.events.filter((e) => e.x === selected.x && e.y === selected.y) : [];
 
   const paint = (x: number, y: number) => {
@@ -409,7 +408,7 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
           {mode === "map" ? (
             <div className="panel-section">
               <div className="section-title">圖塊</div>
-              {tileset && <TilePalette tilesetSrc={tileset.src} value={brush} onChange={setBrush} />}
+              <TilePalette value={brush} onChange={setBrush} />
               <div className="small muted" style={{ marginTop: 6 }}>
                 目前：{TERRAIN[brush]?.name}（{TERRAIN[brush]?.walkable ? "可通行" : "不可通行"}）
               </div>

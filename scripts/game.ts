@@ -4,6 +4,7 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { z } from "zod";
 import { providerFromEnv } from "@/ai/claudeCodeProvider";
+import { ASSET_CATALOG, MUSIC, TERRAIN } from "@/game/assets";
 import { projectDigest, reviewProject, reviewTreatment, type ReviewResult } from "@/ai/review";
 import { chapterPlaytest, checkChapters } from "@/game/chapters";
 import { projectRevision } from "@/game/engine";
@@ -21,6 +22,7 @@ import { loadLocalEnv } from "./env";
  * 遊戲原始檔放在 content/<id>/：story.md（故事）、treatment.md（劇本大綱）、project.json（遊戲資料）、review.json（審查結果）。
  *
  *   npm run game -- schema                                       輸出操作 API 的 JSON Schema
+ *   npm run game -- assets                                       列出可用素材（地形字元、角色圖、圖示、音樂）
  *   npm run game -- new <id> --title <名稱> [--genre fantasy]   建立空白專案（一張起始地圖、主角、一個佔位結局）
  *   npm run game -- inspect <id>                                 以 RPG Maker 事件清單的形式輸出目前內容
  *   npm run game -- apply <id> <ops.json>                        套用操作（每筆都成功才寫檔）
@@ -310,6 +312,12 @@ function load(gameId: string): GameProject {
 async function main() {
   if (command === "remote") return remote(id, arg, positionals[3]);
   if (command === "schema") return out(z.toJSONSchema(z.array(opSchema)), 0);
+  if (command === "assets") {
+    // 給 AI 挑選素材：地形字元（依村莊／城市／室內分組）、角色圖、物品圖示、背景音樂
+    const terrain = Object.entries(TERRAIN).map(([ch, d]) => ({ ch, name: d.name, group: d.group ?? "village", walkable: d.walkable, ...(d.examine ? { examine: d.examine } : {}) }));
+    const pick = (kind: string) => ASSET_CATALOG.filter((a) => a.kind === kind).map((a) => ({ id: a.id, name: a.name, tags: a.tags }));
+    return out({ terrain, characters: pick("character"), icons: pick("icon"), music: Object.entries(MUSIC).map(([mood, m]) => ({ mood, title: m.title })), note: "地形字元用在 map.terrain／map.paint；角色圖用在 actor.spriteAssetId 與事件頁 graphic；圖示用在 item.iconAssetId；音樂情緒用在 map.music 與 music 指令" }, 0);
+  }
   if (!command || !id) fail("用法：npm run game -- <schema|new|inspect|apply|check|review-treatment|review|status|publish> <id> …", 1);
   if (!/^[a-z0-9-]{3,48}$/.test(id)) fail("遊戲 ID 只能用小寫英數字與連字號（3～48 字）", 1);
 
