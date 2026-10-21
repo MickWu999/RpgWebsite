@@ -56,7 +56,34 @@ export const SAVE_SLOTS: SaveSlot[] = ["auto", "1", "2", "3"];
 export type SaveFile = { savedAt: string; state: PlayerState };
 export type LoadSaveResult = { save: SaveFile | null; notice?: string };
 
-const saveKey = (projectId: string, slot: SaveSlot) => `${SAVE_PREFIX}${projectId}:${slot}`;
+const saveKey = (projectId: string, slot: SaveSlot | Checkpoint) => `${SAVE_PREFIX}${projectId}:${slot}`;
+
+/**
+ * 自動存檔點（不佔玩家的存檔欄位）：讓玩家回頭走另一條分支。
+ * - `ch_<章節ID>`：每一章開頭（章節標題卡出現時）的狀態，標題畫面的「章節選擇」用
+ * - `choice`：最近一次出現選項時的狀態，結局畫面的「回到最後的抉擇」用
+ */
+export type Checkpoint = "choice" | `ch_${string}`;
+
+export function saveCheckpoint(state: PlayerState, key: Checkpoint) {
+  try {
+    writeJson(saveKey(state.projectId, key), { savedAt: new Date().toISOString(), state } satisfies SaveFile);
+  } catch {
+    // 存不了存檔點不影響遊玩
+  }
+}
+
+export function loadCheckpoint(project: GameProject, key: Checkpoint): SaveFile | null {
+  const data = readJson(saveKey(project.id, key)) as { savedAt?: unknown; state?: unknown } | null;
+  const parsed = data ? playerStateSchema.safeParse(data.state) : null;
+  if (!parsed?.success || parsed.data.projectId !== project.id) return null;
+  return { savedAt: String(data!.savedAt ?? ""), state: reconcileState(project, parsed.data as unknown as PlayerState) };
+}
+
+/** 每一章的開頭存檔點（沒玩到的章節是 null） */
+export function listChapterCheckpoints(project: GameProject) {
+  return project.chapters.map((chapter) => ({ chapter, save: loadCheckpoint(project, `ch_${chapter.id}`) }));
+}
 
 export function savePlayerState(state: PlayerState, slot: SaveSlot = "auto"): string {
   const savedAt = new Date().toISOString();

@@ -30,7 +30,7 @@ import { currentLocator } from "@/game/refs";
 import { achievementList, loadUnlocked, newlyUnlocked, saveUnlocked } from "@/game/achievements";
 import type { GameProject } from "@/game/schema";
 import { coverDataOf } from "@/game/cover";
-import { listSaves, savePlayerState, type SaveSlot } from "@/game/storage";
+import { listChapterCheckpoints, listSaves, loadCheckpoint, saveCheckpoint, savePlayerState, type SaveSlot } from "@/game/storage";
 import { estimateDuration } from "@/game/duration";
 import { runPlaytest } from "@/game/playtest";
 import { validateProject } from "@/game/validate";
@@ -88,6 +88,8 @@ type UI = {
   game: PlayerState;
   titleCursor: number;
   titleLoad: boolean;
+  /** 標題畫面的「章節選擇」清單 */
+  titleChapters: boolean;
   slotCursor: number;
   /** 系統訊息（開場文字、地形的預設回應） */
   messages: string[];
@@ -109,7 +111,9 @@ type UI = {
   achievements: Record<string, string>;
 };
 
-const TITLE_COMMANDS = ["新遊戲", "繼續", "讀取存檔", "離開"] as const;
+type TitleCommand = "新遊戲" | "繼續" | "章節選擇" | "讀取存檔" | "離開";
+/** 分章節的遊戲多一個「章節選擇」：從玩過的任何一章開頭重玩，走另一條分支 */
+const titleCommands = (p: GameProject): TitleCommand[] => (p.chapters.length > 1 ? ["新遊戲", "繼續", "章節選擇", "讀取存檔", "離開"] : ["新遊戲", "繼續", "讀取存檔", "離開"]);
 const MENU_COMMANDS: Array<[MenuPage, string]> = [
   ["items", "道具"],
   ["quests", "任務"],
@@ -257,6 +261,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         game,
         titleCursor: latest ? 1 : 0,
         titleLoad: false,
+        titleChapters: false,
         slotCursor: 0,
         messages: [],
         messageSeq: 0,
@@ -442,7 +447,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
     (game: PlayerState, messages: string[] = []) => {
       const p = projectRef.current!;
       const id = ++seq.current;
-      update((u) => ({ ...u, game, mode: game.endingId ? "ending" : "map", messages, messageSeq: id, fadeId: id, choiceCursor: 0, menuPage: "root", titleLoad: false }));
+      update((u) => ({ ...u, game, mode: game.endingId ? "ending" : "map", messages, messageSeq: id, fadeId: id, choiceCursor: 0, menuPage: "root", titleLoad: false, titleChapters: false }));
       flash({ banner: { text: getMap(p, game.mapId).name, id } });
     },
     [update, flash],
@@ -565,6 +570,33 @@ export default function GameScreen({ source }: { source: GameSource }) {
     [enterMap, flash, source.kind],
   );
 
+  /** 章節選擇：從某一章的開頭重玩（帶著當時的選擇）；之後的自動存檔會改成這次的進度 */
+  const openChapter = useCallback(
+    (chapterId: string) => {
+      const p = projectRef.current!;
+      const save = loadCheckpoint(p, `ch_${chapterId}`);
+      if (!save) {
+        flash({ notice: "還沒玩到這一章" }, 2200, "notice");
+        return false;
+      }
+      enterMap(save.state);
+      flash({ notice: "從這一章的開頭重玩。自動存檔會改成這次的進度" }, 3200, "notice");
+      if (source.kind === "pack") trackPlay(p.id, "load_save", { chapterId, ref: `ch_${chapterId}` });
+      return true;
+    },
+    [enterMap, flash, source.kind],
+  );
+
+  /** 結局後回到最後一次出現選項的地方，看另一個結局 */
+  const backToChoice = useCallback(() => {
+    const p = projectRef.current!;
+    const save = loadCheckpoint(p, "choice");
+    if (!save) return false;
+    enterMap(save.state);
+    if (source.kind === "pack") trackPlay(p.id, "load_save", { chapterId: save.state.chapterId, ref: "choice" });
+    return true;
+  }, [enterMap, source.kind]);
+
   const saveToSlot = useCallback(
     (slot: SaveSlot) => {
       const u = uiRef.current;
@@ -577,6 +609,15 @@ export default function GameScreen({ source }: { source: GameSource }) {
     },
     [flash, update, source.kind],
   );
+
+  // ---------- 分支的存檔點：章節標題卡出現時記住這一章的開頭；出現選項時記住這個抉擇（不佔玩家的存檔欄位） ----------
+  const checkpointGame = ui?.game;
+  useEffect(() => {
+    const msg = checkpointGame?.message;
+    if (!checkpointGame || !msg) return;
+    if (msg.kind === "chapter") saveCheckpoint(checkpointGame, `ch_${msg.chapterId}`);
+    else if (msg.kind === "text" && msg.choices?.length) saveCheckpoint(checkpointGame, "choice");
+  }, [checkpointGame]);
 
   // ---------- 手機的返回鍵：在遊戲中開關選單，不會意外離開（標題畫面以前照常返回上一頁） ----------
   useEffect(() => {
@@ -623,28 +664,41 @@ export default function GameScreen({ source }: { source: GameSource }) {
         return;
       }
       if (u.mode === "title") {
+        if (u.titleChapters) {
+          if (key === "up" || key === "down") update({ ...u, slotCursor: wrap(u.slotCursor + (key === "up" ? -1 : 1), p.chapters.length) });
+          else if (key === "cancel") update({ ...u, titleChapters: false });
+          else if (key === "ok" && openChapter(p.chapters[u.slotCursor].id)) sfx(SOUNDS.select);
+          return;
+        }
         if (u.titleLoad) {
           if (key === "up" || key === "down") update({ ...u, slotCursor: wrap(u.slotCursor + (key === "up" ? -1 : 1), 4) });
           else if (key === "cancel") update({ ...u, titleLoad: false });
           else if (key === "ok" && loadSlot((["auto", "1", "2", "3"] as SaveSlot[])[u.slotCursor])) sfx(SOUNDS.select);
           return;
         }
-        if (key === "up" || key === "down") update({ ...u, titleCursor: wrap(u.titleCursor + (key === "up" ? -1 : 1), TITLE_COMMANDS.length) });
+        const commands = titleCommands(p);
+        if (key === "up" || key === "down") update({ ...u, titleCursor: wrap(u.titleCursor + (key === "up" ? -1 : 1), commands.length) });
         else if (key === "ok") {
           sfx(SOUNDS.select);
-          const command = TITLE_COMMANDS[u.titleCursor];
+          const command = commands[u.titleCursor];
           if (command === "新遊戲") newGame();
           else if (command === "繼續") {
             const latest = listSaves(p).filter((s) => s.save).sort((a, b) => b.save!.savedAt.localeCompare(a.save!.savedAt))[0];
             if (latest) enterMap(continueFromEnding(p, latest.save!.state) ?? latest.save!.state);
             else flash({ notice: "沒有可以繼續的存檔" }, 2200, "notice");
           } else if (command === "讀取存檔") update({ ...u, titleLoad: true, slotCursor: 0 });
+          else if (command === "章節選擇") update({ ...u, titleChapters: true, slotCursor: 0 });
           else router.push(isStudio ? `/studio/project/?id=${source.id}` : "/");
         }
         return;
       }
 
       if (u.mode === "ending") {
+        // 真正的結局（不是「未完待續」）：B／Esc 回到最後的抉擇，看另一個結局
+        if (key === "cancel" && !p.endings.find((e) => e.id === u.game.endingId)?.nextChapterId && backToChoice()) {
+          sfx(SOUNDS.select);
+          return;
+        }
         if (key === "ok") {
           // 連載：下一章已經推出時，確定鍵直接接著玩；否則回到標題
           const next = continueFromEnding(p, u.game);
@@ -872,7 +926,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       document.body.classList.remove("rm-hide-cursor");
       window.clearInterval(timer);
     };
-  }, [act, update, flash, newGame, enterMap, loadSlot, saveToSlot, router, isStudio, source.id, source.kind]);
+  }, [act, update, flash, newGame, enterMap, loadSlot, saveToSlot, openChapter, backToChoice, router, isStudio, source.id, source.kind]);
 
   /** Android 等支援的瀏覽器：切換全螢幕（進入時鎖定橫向，再按一次離開）；iPhone Safari 不支援，按鈕不顯示 */
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1005,6 +1059,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const journal = questJournal(project, game);
   const saves = ui.mode === "title" || ui.menuPage === "save" || ui.menuPage === "load" ? listSaves(project) : [];
   const hasSave = saves.some((s) => s.save);
+  const chapterSaves = ui.mode === "title" ? listChapterCheckpoints(project) : [];
+  const choicePoint = ui.mode === "ending" && ending && !ending.nextChapterId ? loadCheckpoint(project, "choice") : null;
   return (
     <div
       className={`rm-stage${layout.touch ? " touch" : ""}${layout.portrait ? " portrait" : ""}`}
@@ -1025,18 +1081,18 @@ export default function GameScreen({ source }: { source: GameSource }) {
         >
           <GameCanvas project={project} state={game} viewHeight={layout.height} onTileTap={(x, y) => inputRef.current.tap(x, y)} clientTapRef={clientTapRef} />
 
-          {ui.mode !== "title" && <div key={ui.fadeId} className="rm-fade" />}
+          {ui.mode !== "title" && <div key={`fade-${ui.fadeId}`} className="rm-fade" />}
 
           {ui.mode !== "title" && ui.mode !== "cover" && ui.mode !== "splash" && <div className="rm-vignette" aria-hidden />}
 
           {ui.banner && ui.mode === "map" && !chapterCard && (
-            <div key={ui.banner.id} className="rm-window rm-banner" data-testid="map-name">
+            <div key={`banner-${ui.banner.id}`} className="rm-window rm-banner" data-testid="map-name">
               {ui.banner.text}
             </div>
           )}
 
           {ui.achievementPop && (
-            <div key={ui.achievementPop.id} className="rm-achv-pop" role="status" data-testid="achievement-pop">
+            <div key={`achv-${ui.achievementPop.id}`} className="rm-achv-pop" role="status" data-testid="achievement-pop">
               <span className="rm-achv-pop-icon">🏆</span>
               <div>
                 <div className="rm-achv-pop-label">解鎖成就</div>
@@ -1129,7 +1185,16 @@ export default function GameScreen({ source }: { source: GameSource }) {
                   {NOTICE_ICON[titleNotice.kind]} {titleNotice.title}
                 </div>
               )}
-              {ui.titleLoad ? (
+              {ui.titleChapters ? (
+                <div className="rm-window rm-title-slots" data-testid="chapter-select">
+                  {chapterSaves.map(({ chapter, save }, i) => (
+                    <button key={chapter.id} className={`rm-item rm-slot${i === ui.slotCursor ? " selected" : ""}${save ? "" : " disabled"}`} onClick={() => openChapter(chapter.id)} data-chapter={chapter.id}>
+                      <span className="rm-slot-name">{chapter.title}</span>
+                      {save ? <span className="rm-dim">上次玩到這裡：{formatTime(save.savedAt)}</span> : <span className="rm-dim">還沒玩到</span>}
+                    </button>
+                  ))}
+                </div>
+              ) : ui.titleLoad ? (
                 <div className="rm-window rm-title-slots">
                   {(["auto", "1", "2", "3"] as SaveSlot[]).map((slot, i) => (
                     <SlotRow key={slot} project={project} slot={slot} entry={saves.find((x) => x.slot === slot)} selected={i === ui.slotCursor} onSelect={loadSlot} />
@@ -1137,10 +1202,10 @@ export default function GameScreen({ source }: { source: GameSource }) {
                 </div>
               ) : (
                 <div className="rm-window rm-title-commands">
-                  {TITLE_COMMANDS.map((c, i) => (
+                  {titleCommands(project).map((c, i) => (
                     <button
                       key={c}
-                      className={`rm-item${i === ui.titleCursor ? " selected" : ""}${(c === "繼續" || c === "讀取存檔") && !hasSave ? " disabled" : ""}`}
+                      className={`rm-item${i === ui.titleCursor ? " selected" : ""}${((c === "繼續" || c === "讀取存檔") && !hasSave) || (c === "章節選擇" && !chapterSaves.some((x) => x.save)) ? " disabled" : ""}`}
                       onClick={() => {
                         update((u) => ({ ...u, titleCursor: i }));
                         if (c === "新遊戲") newGame();
@@ -1148,6 +1213,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                           const latest = saves.filter((s) => s.save).sort((a, b) => b.save!.savedAt.localeCompare(a.save!.savedAt))[0];
                           if (latest) enterMap(continueFromEnding(project, latest.save!.state) ?? latest.save!.state);
                         } else if (c === "讀取存檔") update((u) => ({ ...u, titleLoad: true, slotCursor: 0 }));
+                        else if (c === "章節選擇") update((u) => ({ ...u, titleChapters: true, slotCursor: 0 }));
                         else router.push(isStudio ? `/studio/project/?id=${source.id}` : "/");
                       }}
                     >
@@ -1307,16 +1373,42 @@ export default function GameScreen({ source }: { source: GameSource }) {
                   </div>
                 )
               ) : (
-                <div className="rm-the-end">— THE END —</div>
+                <>
+                  <div className="rm-the-end">— THE END —</div>
+                  {choicePoint && (
+                    <button
+                      className="rm-button"
+                      data-testid="back-to-choice"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        backToChoice();
+                      }}
+                    >
+                      ↩ 回到最後的抉擇
+                    </button>
+                  )}
+                </>
               )}
               <div className="rm-dim">步數 {game.steps}・完成任務 {journal.filter((q) => q.status === "completed").length}</div>
-              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 繼續" : "點一下回到標題") : "按確定鍵回到標題"}</div>
+              <div className="rm-hint">
+                {choicePoint
+                  ? layout.touch
+                    ? ui.settings.touch === "pad"
+                      ? "A 回到標題・B 回到最後的抉擇"
+                      : "點一下回到標題"
+                    : "確定鍵回到標題・X／Esc 回到最後的抉擇"
+                  : layout.touch
+                    ? ui.settings.touch === "pad"
+                      ? "按 A 繼續"
+                      : "點一下回到標題"
+                    : "按確定鍵回到標題"}
+              </div>
             </div>
           )}
 
           {ui.notice && <div className="rm-window rm-notice">{ui.notice}</div>}
           {ui.savedFlash > 0 && ui.mode === "map" && (
-            <div key={ui.savedFlash} className="rm-autosave" data-testid="autosave">
+            <div key={`saved-${ui.savedFlash}`} className="rm-autosave" data-testid="autosave">
               💾 已自動存檔
             </div>
           )}

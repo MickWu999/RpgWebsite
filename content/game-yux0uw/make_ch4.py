@@ -99,7 +99,8 @@ db = [
             "items": {"photo": 1, "letters": 1, "score_book": 1, "order_book": 1, "obit_book": 1},
             "quests": {"q_itsuki": {"status": "completed", "step": 2}, "q_hikari": {"status": "completed", "step": 2}, "q_night": {"status": "completed", "step": 3}}}}},
 ]
-switches = [("c4_start", "第 4 章開場結束"), ("c4_umbrella", "修好了小夜的傘"), ("c4_whale", "鯨魚回到了海裡"), ("sho_confessed", "小翔在燈籠流水的夜晚向美雪坦白")]
+switches = [("c4_want_return", "跟美雪說想把悲傷還回去"), ("c4_proof", "跟周防說悲傷是證據"), ("c4_burn", "讓魚店大叔燒了分數本"),
+            ("lantern_sayo", "燈籠上寫了小夜"), ("lantern_itsuki", "燈籠上寫了阿樹"), ("c4_start", "第 4 章開場結束"), ("c4_umbrella", "修好了小夜的傘"), ("c4_whale", "鯨魚回到了海裡"), ("sho_confessed", "小翔在燈籠流水的夜晚向美雪坦白")]
 db += [{"op": "switch.upsert", "switch": {"id": i, "name": n}} for i, n in switches]
 db += [{"op": "variable.upsert", "variable": {"id": "c4_talked", "name": "在港口說過話的人數"}},
        {"op": "variable.upsert", "variable": {"id": "returned", "name": "被晴生找回悲傷的人數（美雪、福田、美柑）"}}]
@@ -111,15 +112,15 @@ iwa_reply = lambda line: [
 ]
 endings = [
     {"id": "end_carry", "title": "繼續扛著", "mood": "somber",
-     "text": "潮見町的夏天照常過去。大家照常生活，不太痛，也不太記得。\n雨宮傘店的燈每晚都亮到很晚。晴生還是動不動就哭。\n不同的是，他現在會在一本筆記本上，寫下每一滴眼淚是誰的。\n阿梅婆婆每天傍晚經過傘店，都會敲敲玻璃：「路上小心喔，孩子。」",
+     "text": "潮見町的夏天照常過去。大家照常生活，不太痛，也不太記得。\n雨宮傘店的燈每晚都亮到很晚。晴生還是動不動就哭。\n不同的是，他現在會在一本筆記本上，寫下每一滴眼淚是誰的。筆記本寫滿了別人的名字，只有一頁，一直空著。\n阿梅婆婆每天傍晚經過傘店，都會敲敲玻璃：「路上小心喔，孩子。」",
      "epilogues": [
         {"condition": s("miyuki_cried"), "text": "美雪每年都帶一根醋昆布去阿樹的墓。她的悲傷，在告別式那天就回到她身上了。她說，她很感謝。"},
         {"condition": s("miyuki_cried", False), "text": "美雪每年都帶一根醋昆布去阿樹的墓。她還是哭不出來，可是她會在墓前站很久。"},
-        {"condition": s("c3_decided"), "text": "周防博士留在鎮上，繼續記錄晴生的眼淚。她說，她想看看一個人能扛多久。"},
+        {"condition": PUBLIC, "text": "周防博士的論文在全國吵了一陣子，後來大家就忘了。她留在鎮上，繼續記錄晴生的眼淚。"},
+        {"condition": s("research_public", False), "text": "周防博士留在鎮上，繼續記錄晴生的眼淚。她說，她想看看一個人能扛多久。這件事，還是只有他們兩個知道。"},
         *iwa_reply("燈塔不寂寞。因為有人在看。"),
         {"condition": s("mikan_partner"), "text": "美柑去了東京。她寄回一張明信片：「見到了。她說她不知道怎麼難過，所以我替她記著。」"},
-        {"condition": s("mikan_stopped"), "text": "美柑的店面改成了一間小小的文具店，專賣色紙。她說，是給想摺紙鶴的人。"},
-        {"condition": ALL(s("mikan_partner", False), s("mikan_stopped", False)), "text": "美柑的淚水還在賣。瓶子上的標籤改了：「晴生先生的眼淚（其實是您的）」。"},
+        {"condition": s("mikan_partner", False), "text": "美柑沒有去東京。她的店面改成了一間小小的文具店，專賣色紙。她說，是給想摺紙鶴的人。"},
         {"condition": s("fukuda_cried"), "text": "福壽堂的業績表改了欄位：「哭泣人數」被劃掉，改成「說了幾個故事」。"},
         {"condition": s("fukuda_cried", False), "text": "福田社長的業績表，滿意度一直停在九成。他說，剩下的一成，他還在找。"},
         {"condition": s("c4_whale"), "text": "小翔把空了的水桶放回學校屋頂。桶邊多了一行字：「鯨魚，路上小心」。"},
@@ -143,16 +144,17 @@ endings = [
     {"id": "end_together", "title": "一起慢慢還", "mood": "bittersweet",
      "text": "從那一天起，雨宮傘店的門口，每天晚上都擺著幾張折疊椅。\n有人來說一個故人的故事，悲傷就回到一個人身上。一個晚上，還一個人。\n這會花上很多年。晴生不再一個人扛了。\n每晚散場的時候，阿梅婆婆都對排班的人說：「路上小心喔。」",
      "epilogues": [
-        {"condition": s("c4_start"), "text": "排班表上第一個名字，是森下美雪。她說阿樹的事，說一百次也不膩。"},
+        {"condition": s("miyuki_cried"), "text": "排班表上第一個名字，是森下美雪。她說阿樹的事，說一百次也不膩。"},
+        {"condition": s("miyuki_cried", False), "text": "美雪也來排班了。第一次輪到她的時候，她說不出口。第二次，她說了醋昆布的事。"},
         {"condition": s("c3_decided"), "text": "周防博士把研究題目改成：「人怎麼一起悲傷」。她負責排班表。"},
         {"condition": s("fukuda_cried"), "text": "福壽堂的會場每個月借出來一次，不收錢。社長說：「這是業務。」"},
         {"condition": s("fukuda_cried", False), "text": "福田社長每次都坐在最後一排。他說，等輪到他的時候，他要說小光的事。"},
         {"condition": s("mikan_stopped"), "text": "美柑改賣「故事集點卡」：聽滿十個故事，送一根醋昆布。"},
-        {"condition": s("mikan_partner"), "text": "美柑從東京打電話回來，預約了排班：她要說她媽媽的事，說給她媽媽聽。"},
-        {"condition": ALL(s("mikan_partner", False), s("mikan_stopped", False)), "text": "美柑把剩下的淚水，全部倒進了海裡。她說，這些本來就不是本店的。"},
+        {"condition": s("mikan_stopped", False), "text": "美柑也預約了排班。她說，等她存夠了勇氣，要說她媽媽的事。"},
         *iwa_reply("燈塔以後有人輪班了。"),
         {"condition": s("c4_whale"), "text": "小翔每個禮拜都來排班。他說的，都是阿樹的事。"},
         {"condition": s("sho_confessed"), "text": "排班表上，美雪和小翔的名字總是排在同一天。"},
+        {"condition": s("c4_burn"), "text": "魚店大叔開了第三十三本分數本。這一次，他記的是每晚說了誰的故事。"},
      ]},
 ]
 db += [{"op": "ending.upsert", "ending": e} for e in endings]
@@ -255,9 +257,15 @@ add("harbor", ev("miyuki_h", "森下美雪", 5, 5, [
         IF(PUBLIC, [
             T("周防博士的論文，我讀了。原來我哭不出來，是因為我的悲傷在您那裡。", MIYUKI),
             T("……我不知道該謝謝您，還是該跟您要回來。這種事，本來不該讓大家知道的吧。", MIYUKI),
+            T("雨宮先生，您想還嗎？", MIYUKI),
         ], [
             T("您今天好像揹著很重的東西。……不說也沒關係。我也有一句話，揹了很久。", MIYUKI),
+            T("雨宮先生，如果有一樣東西不是您的，您會想還回去嗎？", MIYUKI),
         ]),
+        CH(
+            OPT("想。", [T("……想。", HARUO), T("是嗎。那您一定也有一樣東西，一直沒拿回來吧。", MIYUKI), SW("c4_want_return")]),
+            OPT("我還不知道。", [T("……我還不知道。", HARUO), T("嗯。不知道也沒關係。我也花了三個月，才敢聽天氣預報。", MIYUKI)]),
+        ),
         *TALKED(),
     ], cond=C4, graphic="char_modern_woman"),
     page([T("（美雪蹲在堤岸邊，用手指在燈籠上寫字。）")], cond={"switches": ["c4_start"], "selfSwitch": "A"}, graphic="char_modern_woman"),
@@ -310,6 +318,11 @@ add("harbor", ev("suou_h", "周防博士", 20, 5, [
             T("我會在旁邊看著。這是我能做的。……老實說，我也不知道哪一個是對的。", SUOU),
         ]),
         T("（她把溫度計收進口袋。今晚，她沒有量任何東西。）"),
+        T("最後問你一件事，不是研究。你覺得悲傷是負擔，還是證據？", SUOU),
+        CH(
+            OPT("負擔。", [T("……負擔。所以才有人願意替別人扛。", HARUO), T("嗯。扛得動的人，也會累。", SUOU)]),
+            OPT("證據。", [T("……證據。愛過一個人的證據。", HARUO), T("那這十年，你手上有好多別人的證據。", SUOU), SW("c4_proof")]),
+        ),
         *TALKED(),
     ], cond=C4, graphic="char_long_hair"),
     page([T("你決定吧。我只負責記住。", SUOU)], cond={"switches": ["c4_start"], "selfSwitch": "A"}, graphic="char_long_hair"),
@@ -320,7 +333,7 @@ add("harbor", ev("fish_h", "魚店大叔", 11, 7, [
         T("修傘的！我說過今晚不打分數。……可是我帶了分數本來。", FISH),
         T("十年、三十二本。我想把它燒成燈籠的火。……你說，可以嗎？", FISH),
         CH(
-            OPT("可以。", [T("好！那今晚的火，就是十年份的一百分！", FISH)]),
+            OPT("可以。", [T("好！那今晚的火，就是十年份的一百分！", FISH), SW("c4_burn")]),
             OPT("留著吧。", [T("……也是。哪天你哭出一百分，我還要記下來。", FISH)]),
         ),
         *TALKED(),
@@ -338,7 +351,9 @@ whale = [
         T("（美雪蹲下來，和小翔一起扶著水桶。）"),
     ], [
         T("……那條金魚是？", MIYUKI),
-        T("（小翔看了晴生一眼。晴生守了約定，什麼都沒說。小翔深吸一口氣。）"),
+        IF(s("promise_sho"), [T("（小翔看了晴生一眼。晴生守了約定，什麼都沒說。小翔深吸一口氣。）")],
+           [IF(s("clue_whale"), [T("（告別式上，晴生沒來得及講到鯨魚。小翔看了他一眼，深吸一口氣。）")],
+               [T("（晴生不知道那條金魚的事。小翔低著頭，深吸一口氣。）")])]),
         T("阿、阿樹的媽媽……對不起。鯨魚是我帶回家的。阿樹去港口，是去找牠……", SHO),
         IF(s("miyuki_cried"), [
             T("（美雪蹲下來，抱住了小翔。她在哭。）"),
@@ -363,7 +378,8 @@ add("harbor", ev("sho_whale", "小翔", 13, 7, [
 choose_carry = [
     T("我來扛。", HARUO),
     T("大家已經習慣不痛了。這十年，有人因為不痛活了下來。我不能替他們決定要不要痛。", HARUO),
-    T("（他在燈籠上寫下「小夜」，放進海裡。燈籠慢慢漂遠了。）"),
+    T("（他把燈籠放進海裡。）"),
+    IF(s("lantern_sayo"), [T("（寫著「小夜」的燈籠，慢慢漂遠了。）")], [IF(s("lantern_itsuki"), [T("（寫著「阿樹」的燈籠，漂向阿樹找鯨魚的那片海。）")], [T("（沒有寫名字的燈籠，慢慢漂遠了。它會替誰回家，他也不知道。）")])]),
     T("（他在哭。這些眼淚還是大家的。可是現在，他知道每一滴是誰的。）"),
     T("我會記得。每一滴是誰的，我都會記下來。", HARUO),
     WAIT(800), QUEST("q_lantern", "complete"),
@@ -384,7 +400,8 @@ choose_return = [
     T("（晴生的眼淚停了一下。然後，又掉了下來。）"),
     T("（這一次，他知道。這是他自己的。只屬於她的。）"),
     T("……小夜。", HARUO),
-    T("（他在燈籠上寫下她的名字，放進海裡。）"),
+    T("（他把燈籠放進海裡。）"),
+    IF(s("lantern_sayo"), [T("（寫著「小夜」的燈籠，慢慢漂遠了。）")], [IF(s("lantern_itsuki"), [T("（寫著「阿樹」的燈籠，漂向阿樹找鯨魚的那片海。）")], [T("（沒有寫名字的燈籠，慢慢漂遠了。它會替誰回家，他也不知道。）")])]),
     WAIT(800), QUEST("q_lantern", "complete"),
     END("end_return"),
 ]
@@ -401,7 +418,8 @@ choose_together = [
     T("她說她先生很愛哭，看電影也哭，看到落葉也哭。她說，她最喜歡他這一點。", UME),
     T("（晴生的眼淚掉了下來。這一次，他知道。這是他自己的。只屬於她的。）"),
     T("……小夜。", HARUO),
-    T("（他在燈籠上寫下她的名字，放進海裡。燈籠旁邊，大家的燈籠一盞一盞跟了上去。）"),
+    IF(s("lantern_sayo"), [T("（寫著「小夜」的燈籠，慢慢漂遠了。）")], [IF(s("lantern_itsuki"), [T("（寫著「阿樹」的燈籠，漂向阿樹找鯨魚的那片海。）")], [T("（沒有寫名字的燈籠，慢慢漂遠了。它會替誰回家，他也不知道。）")])]),
+    T("（燈籠旁邊，大家的燈籠一盞一盞跟了上去。）"),
     WAIT(800), QUEST("q_lantern", "complete"),
     END("end_together"),
 ]
@@ -410,6 +428,19 @@ final = [
     IF(PUBLIC, [T("（身後排著長長的人龍。他們都知道，自己的悲傷就在這裡。）")],
        [T("（身後只有幾個人。他們不知道，自己的悲傷就站在這裡。）")]),
     T("（他手上有兩樣東西：阿梅婆婆的燈籠，和小夜的傘。）"),
+    IF(s("c4_burn"), [T("（堤岸的另一頭，魚店大叔的分數本在火裡燒著。十年份的一百分。）")]),
+    IF(s("c4_want_return"), [T("（美雪問他想不想還。他說了「想」。）")], [T("（美雪問他想不想還。他說還不知道。現在，也還是。）")]),
+    IF(s("c4_proof"), [T("（悲傷是愛過的證據，他跟周防博士這樣說。那他自己的證據，在哪裡？）")],
+       [T("（悲傷是負擔，他跟周防博士這樣說。那他扛的，有多少是他自己的？）")]),
+    T("（燈籠上還沒有名字。）"),
+    CH(
+        OPT("寫「小夜」。", [T("（他寫下她的名字。筆畫很慢。）"), SW("lantern_sayo")]),
+        OPT("寫「阿樹」。", [T("（他寫下阿樹的名字。這個夏天，是從那個孩子開始的。）"), SW("lantern_itsuki")]),
+        OPT("先空著。", [T("（他把筆收起來。還不知道該寫誰。）")]),
+    ),
+    T("（扛著，大家就不痛。可是他永遠找不到只屬於小夜的那一滴。）"),
+    IF(PUBLIC, [T("（還回去，有人會崩潰。不過，至少他們知道為什麼。）")],
+       [T("（還回去，有人會崩潰。而且，沒有人知道為什麼。）")]),
     VAR("returned", 0, "set"),
     IF(s("miyuki_cried"), [VAR("returned")]),
     IF(s("fukuda_cried"), [VAR("returned")]),

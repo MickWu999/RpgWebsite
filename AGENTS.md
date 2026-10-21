@@ -63,3 +63,13 @@ npm run check                                # 修改程式後必須跑：lint�
 - React 19 的 lint 規則很嚴格：render 階段不能讀寫 ref，effect 裡不能直接呼叫 setState。
 - 網站採靜態輸出（`output: "export"`），所以不能使用 Next.js 的 API routes。需要伺服器的功能請放在 `scripts/`，在本機執行。
 - 前台（`npm run deploy`）與後台（`npm run deploy:studio`）分開部署，互相不連結；前台不能出現任何開發者工具或用語。
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
