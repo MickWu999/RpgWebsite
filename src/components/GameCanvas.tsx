@@ -167,7 +167,14 @@ function createWorldScene(
       this.tweens.add({ targets: this.marker, scale: 1.25, yoyo: true, repeat: -1, duration: 350 });
 
       const cam = this.cameras.main;
-      cam.setBounds(0, 0, Math.max(scene.width * ts, this.scale.width), Math.max(scene.height * ts, this.scale.height));
+      // 地圖比畫面小（例如室內小房間）時放大（最多 1.5 倍）並置中，手機上才不會小小一塊擠在角落
+      const mw = scene.width * ts;
+      const mh = scene.height * ts;
+      const zoom = Math.max(1, Math.min(1.5, this.scale.width / mw, this.scale.height / mh));
+      cam.setZoom(zoom);
+      const vw = this.scale.width / zoom;
+      const vh = this.scale.height / zoom;
+      cam.setBounds(mw < vw ? (mw - vw) / 2 : 0, mh < vh ? (mh - vh) / 2 : 0, Math.max(mw, vw), Math.max(mh, vh));
       cam.startFollow(this.player, true, 0.2, 0.2);
       cam.centerOn(px, py);
       for (const n of this.nameLabels) n.label.setVisible(Math.abs(n.x - state.x) + Math.abs(n.y - state.y) <= 2);

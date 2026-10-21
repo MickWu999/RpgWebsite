@@ -79,12 +79,18 @@ export default function AudioTest() {
     setPlaying(key);
   };
 
-  const tests: Array<{ key: string; title: string; desc: string; run: () => void }> = [
-    { key: "silent", title: "1. 無聲測試", desc: "打開音訊輸出，但不播任何聲音。這時聽到沙沙聲，是耳機或手機本身的底噪（藍牙耳機常見），不是音樂的問題。", run: () => void playWebAudio("silent", "silent") },
-    { key: "element", title: "2. 一般播放器播 MP3", desc: "用手機內建的播放器直接播音樂檔。這裡就有雜音，代表是音樂檔本身的問題。", run: () => playElement("element", MP3) },
-    { key: "old", title: "3. 遊戲原本的播放方式", desc: "低延遲模式＋限幅器、音量 0.3（上一版遊戲的做法）。", run: () => void playWebAudio("old", "old") },
-    { key: "new", title: "4. 調整後的播放方式", desc: "播放模式（較大的緩衝）、不經過限幅器、音量 0.5（這一版遊戲的做法）。3 有雜音、4 沒有，代表原因是播放方式。", run: () => void playWebAudio("new", "new") },
-    { key: "ogg", title: "5. 轉檔前的原始檔（OGG）", desc: "和 2 比較，判斷轉檔有沒有加入雜音。部分 iPhone 不支援 OGG，播不出來是正常的。", run: () => playElement("ogg", OGG) },
+  const run = (key: string) => {
+    if (key === "element") playElement(key, MP3);
+    else if (key === "ogg") playElement(key, OGG);
+    else void playWebAudio(key, key as "silent" | "old" | "new");
+  };
+
+  const tests: Array<{ key: string; title: string; desc: string }> = [
+    { key: "silent", title: "1. 無聲測試", desc: "打開音訊輸出，但不播任何聲音。這時聽到沙沙聲，是耳機或手機本身的底噪（藍牙耳機常見），不是音樂的問題。" },
+    { key: "element", title: "2. 一般播放器播 MP3", desc: "用手機內建的播放器直接播音樂檔。這裡就有雜音，代表是音樂檔本身的問題。" },
+    { key: "old", title: "3. 遊戲原本的播放方式", desc: "低延遲模式＋限幅器、音量 0.3（上一版遊戲的做法）。" },
+    { key: "new", title: "4. 調整後的播放方式", desc: "播放模式（較大的緩衝）、不經過限幅器、音量 0.5（這一版遊戲的做法）。3 有雜音、4 沒有，代表原因是播放方式。" },
+    { key: "ogg", title: "5. 轉檔前的原始檔（OGG）", desc: "和 2 比較，判斷轉檔有沒有加入雜音。部分 iPhone 不支援 OGG，播不出來是正常的。" },
   ];
 
   return (
@@ -95,7 +101,7 @@ export default function AudioTest() {
         <section key={t.key} style={{ border: "1px solid #363b55", borderRadius: 10, padding: 12, margin: "12px 0", background: playing === t.key ? "#20284a" : "#151826" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
             <b>{t.title}</b>
-            <button onClick={() => (playing === t.key ? stop() : t.run())} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #6c8cff", background: playing === t.key ? "#6c8cff" : "transparent", color: "#fff", fontSize: 15 }}>
+            <button onClick={() => (playing === t.key ? stop() : run(t.key))} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #6c8cff", background: playing === t.key ? "#6c8cff" : "transparent", color: "#fff", fontSize: 15 }}>
               {playing === t.key ? "■ 停止" : "▶ 播放"}
             </button>
           </div>

@@ -120,6 +120,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #f2b84b55; border
 @keyframes rm-banner { 0% { opacity: 0; transform: translateX(-12px); } 12%, 80% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 .rm-toasts { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; z-index: 5; pointer-events: none; }
 .rm-toast { position: static; padding: 4px 14px; font-size: 14px; }
+/* 手機：右上角有全螢幕／關閉按鈕，提示往下移，避免蓋住按鈕 */
+.rm-stage.touch .rm-toasts { top: 64px; }
 .rm-notice { left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 20; }
 .rm-fade { position: absolute; inset: 0; background: #000; pointer-events: none; animation: rm-fade 0.45s ease forwards; z-index: 4; }
 @keyframes rm-fade { from { opacity: 1; } to { opacity: 0; } }

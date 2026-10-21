@@ -345,7 +345,6 @@ export default function GameScreen({ source }: { source: GameSource }) {
   }, [source.test]);
 
   // ---------- 縮放 ----------
-  const padMode = ui?.settings.touch === "pad";
   useEffect(() => {
     const resize = () => {
       const touch = window.matchMedia("(pointer: coarse)").matches;
@@ -353,9 +352,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
       const canFullscreen = touch && Boolean(document.documentElement.requestFullscreen);
       if (touch && !portrait) {
         // 手機橫向：畫面寬度填滿螢幕，高度依螢幕比例決定，鏡頭跟著角色捲動。
-        // 「方向鍵＋A」模式像掌機一樣左右各留一條按鍵區，按鍵不會蓋住對話框
-        const side = padMode ? Math.min(170, Math.round(window.innerWidth * 0.17)) : 0;
-        const width = window.innerWidth - side * 2;
+        // 虛擬按鍵疊在畫面上，依情境自動隱藏（對話時隱藏），不另外縮小畫面
+        const width = window.innerWidth;
         const height = Math.round(Math.min(SCREEN_H, Math.max(MIN_SCREEN_H, (SCREEN_W * window.innerHeight) / width)));
         const scale = Math.min(width / SCREEN_W, window.innerHeight / height);
         setLayout({ scale, height, touch, portrait, canFullscreen });
@@ -372,7 +370,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
     };
-  }, [padMode]);
+  }, []);
 
   useEffect(() => {
     (window as unknown as { __RPG_DEBUG__?: unknown }).__RPG_DEBUG__ = {
