@@ -49,7 +49,7 @@ export default function PublishPage() {
         { ok: (check.quality?.blocking.length ?? 1) === 0, label: "品質指標", detail: check.quality ? (check.quality.blocking.length ? `${check.quality.blocking.length} 項未達標` : "規模、時長、章節、敘事指標都達標") : "需要先通過資料驗證" },
       ]
     : [];
-  // 審查關卡：大綱、每一章、整體（針對目前版本）；與伺服器的判斷相同
+  // AI 審查只是參考（選用），不擋發布；能不能發布看程式檢查（驗證、自動試玩、品質指標）
   const latest = (target: string) => reviews.find((r) => r.target === target);
   const reviewItems = project
     ? [
@@ -64,8 +64,7 @@ export default function PublishPage() {
             },
       ]
     : [];
-  const reviewsOk = reviewItems.every((r) => r.ok);
-  const needOverride = (check?.quality?.blocking.length ?? 0) > 0 || !reviewsOk;
+  const needOverride = (check?.quality?.blocking.length ?? 0) > 0;
   const canPublish = Boolean(check?.playtest?.ok) && (!needOverride || allowQuality);
 
   return (
@@ -85,9 +84,10 @@ export default function PublishPage() {
               </div>
             </div>
           ))}
+          {reviewItems.length > 0 && <div className="small muted">AI 審查（選用，僅供參考，不影響發布）：</div>}
           {reviewItems.map((it) => (
             <div key={it.label} className={`step${it.ok ? " done" : ""}`}>
-              <span className="step-mark">{it.ok ? "✓" : "✗"}</span>
+              <span className="step-mark">{it.ok ? "✓" : "・"}</span>
               <div className="grow">
                 <div>{it.label}</div>
                 <div className="small muted">{it.detail}</div>
@@ -97,7 +97,7 @@ export default function PublishPage() {
           {check && <IssueList errors={[...check.validation.errors, ...(check.playtest?.issues ?? []), ...(check.quality?.blocking ?? [])].slice(0, 12)} warnings={check.quality?.suggestions ?? []} />}
           {needOverride && check?.playtest?.ok && (
             <label className="small">
-              <input type="checkbox" checked={allowQuality} onChange={(e) => setAllowQuality(e.target.checked)} /> 我了解品質指標或審查尚未全部通過，仍要以人工判斷發布（AI 透過 API Token 無法略過這些關卡）
+              <input type="checkbox" checked={allowQuality} onChange={(e) => setAllowQuality(e.target.checked)} /> 我了解品質指標尚未全部達標，仍要以人工判斷發布（AI 透過 API Token 無法略過這一關）
             </label>
           )}
           {state.published && (

@@ -33,12 +33,13 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- refs <id> <ID 或文字>                        找出所有用到某個開關／物品／角色／地圖…的地方，或搜尋台詞（回傳位置代碼）
  *   npm run game -- apply <id> <ops.json>                        套用操作（每筆都成功才寫檔）
  *   npm run game -- check <id>                                   驗證＋自動試玩＋品質指標
- *   npm run game -- review-treatment <id>                        劇本大綱審查（動工前，通過後才能 apply）
- *   npm run game -- review <id> --chapter <章節ID>               章節審查（通過後才能新增下一章）
- *   npm run game -- review <id>                                  整體審查（發布前）
+ *   npm run game -- review-treatment <id>                        劇本大綱審查（選用：想聽第二意見時才跑，不擋 apply）
+ *   npm run game -- review <id> --chapter <章節ID>               章節審查（選用：找分支矛盾，一輪就好，不擋下一章）
+ *   npm run game -- review <id>                                  整體審查（選用，不擋發布）
  *   npm run game -- status <id>                                  目前卡在哪一關
  *   npm run game -- publish <id>                                 所有關卡都通過才發布到 public/games/<id>/
  * 審查都是另開一次 Claude Code 的獨立審查員，看不到製作過程；結果存在 content/<id>/reviews/。
+ * 能不能發布只看 check（驗證、防呆、每章與每個結局的自動試玩、品質指標）；AI 審查只是參考，好不好玩由使用者挑提案與真人試玩判斷。
  *
  * 遠端模式（操作線上的 Studio 後台；需在 .env.local 設定 STUDIO_URL 與 STUDIO_TOKEN，token 在 Studio「AI 協作」產生）：
  *   npm run game -- remote list
@@ -92,32 +93,21 @@ function writeReview(gameId: string, r: ReviewResult) {
   writeFileSync(reviewFile(gameId, r.target), JSON.stringify(r, null, 2) + "\n");
 }
 
-/** 送出操作前的關卡：大綱要先通過審查；新增下一章前，上一章要先通過章節審查；一次只能新增一章 */
+/** 送出操作前的關卡：一次只能新增一章（做完一章、check 通過再開下一章）。AI 審查是選用的，不擋操作 */
 function opsGate(gameId: string, project: GameProject, ops: unknown[]): string | null {
   if (values.demo) return null;
-  if (!readReview(gameId, "treatment")?.passed) return `劇本大綱尚未通過審查：先寫 ${path.join(dir(gameId), "treatment.md")}，再執行 npm run game -- review-treatment ${gameId}`;
   const added = ops.filter((o): o is { op: "chapter.upsert"; chapter: { id: string } } => (o as { op?: string }).op === "chapter.upsert" && !project.chapters.some((c) => c.id === (o as { chapter: { id: string } }).chapter.id));
-  if (added.length > 1) return "一次只能新增一章：完成這一章並通過章節審查後，再新增下一章";
-  const last = project.chapters.at(-1);
-  if (added.length === 1 && last && !readReview(gameId, last.id)?.passed) return `第 ${project.chapters.length} 章「${last.title}」尚未通過章節審查（npm run game -- review ${gameId} --chapter ${last.id}），不能開始下一章`;
+  if (added.length > 1) return "一次只能新增一章：這一章做完、remote check 通過後，再新增下一章";
   return null;
 }
 
-/** 目前的關卡狀態 */
+/** 目前的狀態：AI 審查（選用）的結果只供參考，不擋發布；能不能發布只看 check */
 function gateStatus(gameId: string, project: GameProject) {
   const revision = projectRevision(project);
   const treatment = readReview(gameId, "treatment");
   const chapters = project.chapters.map((c, i) => ({ index: i + 1, id: c.id, title: c.title, reviewPassed: Boolean(readReview(gameId, c.id)?.passed) }));
   const full = readReview(gameId, "full");
-  // 連載中：每章通過章節審查就可以推出；完結時才需要整體審查
-  const ongoing = project.release?.status === "ongoing";
-  const fullCurrent = ongoing || Boolean(full?.passed && full.revision === revision);
-  const blockers = [
-    ...(treatment?.passed ? [] : ["劇本大綱尚未通過審查（review-treatment）"]),
-    ...chapters.filter((c) => !c.reviewPassed).map((c) => `第 ${c.index} 章「${c.title}」尚未通過章節審查（review --chapter ${c.id}）`),
-    ...(fullCurrent ? [] : [full?.passed ? "整體審查之後內容又改過了，請重新執行整體審查（review）" : "尚未通過整體審查（review）"]),
-  ];
-  return { treatmentPassed: Boolean(treatment?.passed), chapters, fullReviewPassed: fullCurrent, blockers, next: blockers[0] ?? "可以發布" };
+  return { treatmentPassed: Boolean(treatment?.passed), chapters, fullReviewPassed: Boolean(full?.passed && full.revision === revision), blockers: [] as string[], next: "check 通過就可以發布（AI 審查是選用的）" };
 }
 
 async function provider() {
@@ -148,7 +138,7 @@ function roundGate(gameId: string, target: string, revision: string): number {
   if (prev && !prev.passed && prev.revision === revision) fail(`內容和上一輪審查完全一樣，不能重送。請依上一輪的 topFixes 修改後再審（content/${gameId}/reviews/${target}.json）`);
   const round = prev && !prev.passed ? (prev.round ?? 1) + 1 : 1;
   if (round > MAX_REVIEW_ROUNDS)
-    fail(`「${target}」已經審查 ${MAX_REVIEW_ROUNDS} 輪沒通過。請停下來回報使用者，附上最後一輪的意見；使用者可以在 Studio 的審查紀錄按「👤 人工接受」，或和你一起調整改編合約（scope.md）後重來`);
+    fail(`「${target}」已經審查 ${MAX_REVIEW_ROUNDS} 輪。審查是選用的、不擋發布：請停止重審，把最後一輪的意見回報使用者，由使用者決定要不要再改`);
   return round;
 }
 

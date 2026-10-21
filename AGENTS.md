@@ -6,12 +6,12 @@
 
 1. **引擎固定，遊戲是資料**：遊戲內容一律寫成 `GameProject` JSON，由 runtime 執行。任何情況下都不產生或執行遊戲專屬的程式碼。
 2. **AI 只挑素材，不畫圖、不作曲**：圖像、音效和音樂都來自 `src/game/assets.ts` 的素材庫，而且全部是 CC0。資料裡只能引用素材 ID，不能寫網址。
-3. **驗證由程式負責**：判斷能不能玩、會不會卡關，交給 `validate`、`playtest`、`quality`；AI 審查只負責判斷內容品質。
+3. **驗證由程式負責**：判斷能不能玩、會不會卡關，交給 `validate`、`playtest`、`quality`，通過就可以發布。好不好玩由使用者挑提案與真人試玩判斷；AI 審查是選用的第二意見，不擋流程。
 4. **無人值守，但保留安全閥**：只有狀態為 `approved` 的遊戲可以自動發布；`needs_human_review` 不得自動發布。
 
 ## 製作遊戲：請依照 docs/ai-development-spec.md
 
-製作遊戲的流程是 `npm run game -- new / apply / check / review / publish`，遊戲原始檔放在 `content/<id>/`。
+製作遊戲的流程是 `npm run game -- new / apply / check / publish`（`review` 選用），遊戲原始檔放在 `content/<id>/`。
 
 ## 常用指令（都可以直接執行，輸出也都能被機器讀取）
 

@@ -540,9 +540,7 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor, ct
   if (!check.valid || !check.playtestOk) return error(422, "專案未通過驗證或自動試玩，不能發布");
   // 品質指標（時長、規模等）未達標時，只有人在 Studio 介面明確確認才可以發布；AI（API Token）一律不行
   if ((check.qualityBlocking ?? 99) > 0 && !(body.allowQualityWarnings && actor.kind === "user")) return error(422, "品質指標未達標，不能發布");
-  // 審查關卡：大綱、每一章、整體（針對目前版本）都要通過；AI 不能略過，人可以明確確認後發布
-  const blockers = await reviewBlockers(env, row.id, project);
-  if (blockers.length && !(body.allowQualityWarnings && actor.kind === "user")) return error(422, `審查尚未全部通過：${blockers[0]}`, { blockers });
+  // AI 審查是選用的參考，不擋發布：能不能玩由上面的程式檢查保證，好不好玩由人挑提案與真人試玩判斷
   const catalog = {
     id: row.id,
     title: project.title,
@@ -795,25 +793,6 @@ async function adminPlayer(env: Env, visitor: string) {
   return { info, sessions, events };
 }
 
-/** 審查關卡：每個目標最新一次審查是否通過 */
-async function reviewBlockers(env: Env, projectId: string, project: GameProject) {
-  const { results } = await env.DB.prepare(
-    "SELECT target, passed, revision FROM project_reviews r WHERE project_id = ? AND created_at = (SELECT MAX(created_at) FROM project_reviews r2 WHERE r2.project_id = r.project_id AND r2.target = r.target)",
-  )
-    .bind(projectId)
-    .all<{ target: string; passed: number; revision: string | null }>();
-  const latest = new Map(results.map((r) => [r.target, r]));
-  const out: string[] = [];
-  if (!latest.get("treatment")?.passed) out.push("劇本大綱尚未通過審查");
-  project.chapters.forEach((c, i) => latest.get(c.id)?.passed || out.push(`第 ${i + 1} 章「${c.title}」尚未通過章節審查`));
-  // 連載中：每一章通過章節審查就可以推出；完結時才需要整體審查
-  if (project.release?.status === "ongoing") return out;
-  const full = latest.get("full");
-  if (!full?.passed) out.push("尚未通過整體審查");
-  else if (full.revision !== projectRevision(project)) out.push("整體審查之後內容又改過了，需要重新審查");
-  return out;
-}
-
 const API_DOCS = `# AI RPG Studio API
 
 所有請求都要帶 \`Authorization: Bearer <API Token>\`（在 Studio「設定 → API Token」產生）。修改類請求以 \`Content-Type: application/json\` 送出。
@@ -841,9 +820,9 @@ const API_DOCS = `# AI RPG Studio API
 | GET /api/projects/:id/insights | 玩家行為洞察（選擇比例、沒人發現的事件、卡關的地方、成就解鎖率、選單、設定、錯誤） |
 | GET /api/projects/:id/analytics | 遊玩數據（玩家數、每章完成率與時間、結局分布、最常離開的地方） |
 | GET /api/lessons?game=<id> | AI 案例庫（Markdown）：玩家回饋與審查最常退件的問題，製作前必讀 |
-| POST /api/projects/:id/publish \`{check, update?, silent?}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標與審查關卡。新遊戲、新章節自動推播通知玩家；\`update: {kind: "update"|"fix", text}\` 才通知更新／修正（12 小時內最多一次）。回傳 \`notice\`／\`noticeSkipped\`。建議用 \`npm run game -- remote publish <id>\` |
+| POST /api/projects/:id/publish \`{check, update?, silent?}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標。新遊戲、新章節自動推播通知玩家；\`update: {kind: "update"|"fix", text}\` 才通知更新／修正（12 小時內最多一次）。回傳 \`notice\`／\`noticeSkipped\`。建議用 \`npm run game -- remote publish <id>\` |
 
 資料模型是 RPG Maker 式（資料庫、地圖、多頁事件、事件指令），說明見 docs/ai-development-spec.md 第 6 節。
-建議流程：remote story（讀故事）→ 寫大綱 → remote review-treatment → 一章一章 remote apply／remote check／remote review --chapter → remote review → remote publish。
+建議流程：remote story（讀故事）→ 提案（使用者挑選）→ 寫大綱 → 一章一章 remote apply／remote check → remote publish。AI 審查（remote review）是選用的，不擋發布。
 回應的 report.errors 是程式實際驗證的結果，請依它修正，不要假設已完成。
 `;
