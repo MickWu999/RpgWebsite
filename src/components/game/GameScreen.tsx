@@ -59,6 +59,7 @@ import DebugPanel from "./DebugPanel";
 import FeedbackDialog, { feedbackAsked } from "./FeedbackDialog";
 import TouchPad from "./TouchPad";
 import { flushPlayEvents, trackErrors, trackPlay } from "@/lib/analytics";
+import { canVibrate, vibrate, vibrateForEvents } from "@/lib/haptics";
 import { disablePush, enablePush, fetchLatestNotice, getPushStatus, NOTICE_ICON, PUSH_STATUS_LABEL, type Notice, type PushStatus } from "@/lib/push";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
 
@@ -543,6 +544,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
         }
       }
       getAudio().handleEvents(p, result.state, result.events);
+      if (unlockedNow.length) vibrate([40, 60, 40]);
+      else vibrateForEvents(result.events);
     },
     [update, flash, source.test, source.kind],
   );
@@ -771,7 +774,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         update({ ...u, menuPage: "root" });
         return;
       }
-      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 8, title: 2 }[u.menuPage];
+      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 9, title: 2 }[u.menuPage];
       if (vertical) {
         update({ ...u, subCursor: wrap(u.subCursor + delta, count) });
         return;
@@ -789,6 +792,10 @@ export default function GameScreen({ source }: { source: GameSource }) {
         if (u.subCursor === 4) s.touch = TOUCH_MODES[wrap(TOUCH_MODES.indexOf(s.touch) + 1, TOUCH_MODES.length)];
         if (u.subCursor === 5) s.padOpacity = PAD_OPACITIES[wrap(PAD_OPACITIES.indexOf(s.padOpacity) + (key === "left" ? -1 : 1), PAD_OPACITIES.length)];
         if (u.subCursor === 6) s.analytics = !s.analytics;
+        if (u.subCursor === 8) {
+          s.vibration = !s.vibration;
+          if (s.vibration) window.setTimeout(() => vibrate(40), 0);
+        }
         if (u.subCursor === 7) {
           // 通知：開啟時會跳出瀏覽器的權限詢問；封鎖、不支援時按了沒有作用
           const cur = pushRef.current;
@@ -805,7 +812,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
           return;
         }
         // 先記錄再存：關閉遊玩紀錄的那一下也要記到（之後就不再記錄）
-        const settingKey = ["textSpeed", "sound", "bgm", "voice", "touch", "padOpacity", "analytics"][u.subCursor];
+        const settingKey = ["textSpeed", "sound", "bgm", "voice", "touch", "padOpacity", "analytics", "notify", "vibration"][u.subCursor];
         if (source.kind === "pack" && settingKey) trackPlay(p.id, "setting", { ref: settingKey, detail: settingKey === "sound" ? String(!getAudio().muted) : String(s[settingKey as keyof typeof s]) });
         saveSettings(s);
         sfx(SOUNDS.select);
@@ -1197,6 +1204,9 @@ export default function GameScreen({ source }: { source: GameSource }) {
               )}
               {ui.titleChapters ? (
                 <div className="rm-window rm-title-slots" data-testid="chapter-select">
+                  <button className="rm-item rm-slot rm-back" onClick={() => update((u) => ({ ...u, titleChapters: false }))} data-testid="title-back">
+                    ← 返回
+                  </button>
                   {chapterSaves.map(({ chapter, save }, i) => (
                     <button key={chapter.id} className={`rm-item rm-slot${i === ui.slotCursor ? " selected" : ""}${save ? "" : " disabled"}`} onClick={() => openChapter(chapter.id)} data-chapter={chapter.id}>
                       <span className="rm-slot-name">{chapter.title}</span>
@@ -1206,6 +1216,9 @@ export default function GameScreen({ source }: { source: GameSource }) {
                 </div>
               ) : ui.titleLoad ? (
                 <div className="rm-window rm-title-slots">
+                  <button className="rm-item rm-slot rm-back" onClick={() => update((u) => ({ ...u, titleLoad: false }))} data-testid="title-back">
+                    ← 返回
+                  </button>
                   {(["auto", "1", "2", "3"] as SaveSlot[]).map((slot, i) => (
                     <SlotRow key={slot} project={project} slot={slot} entry={saves.find((x) => x.slot === slot)} selected={i === ui.slotCursor} onSelect={loadSlot} />
                   ))}
@@ -1318,6 +1331,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                     ["按鍵透明度", PAD_OPACITY_LABEL[ui.settings.padOpacity]],
                     ["匿名遊玩紀錄", ui.settings.analytics ? "開" : "關"],
                     ["通知（新章節・更新）", PUSH_STATUS_LABEL[pushStatus]],
+                    ["震動", canVibrate() ? (ui.settings.vibration ? "開" : "關") : "此裝置不支援"],
                   ].map(([label, value], i) => (
                     <button
                       key={label}

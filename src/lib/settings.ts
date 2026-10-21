@@ -7,11 +7,11 @@ export type VoiceMode = "blip" | "tts" | "off";
 export type TouchMode = "pad" | "tap";
 /** 虛擬按鍵的透明度 */
 export type PadOpacity = "low" | "mid" | "high";
-/** analytics：匿名遊玩紀錄（幫助改善遊戲；玩家可以關閉） */
-export type Settings = { textSpeed: TextSpeed; bgm: boolean; voice: VoiceMode; touch: TouchMode; padOpacity: PadOpacity; analytics: boolean };
+/** analytics：匿名遊玩紀錄（幫助改善遊戲；玩家可以關閉）；vibration：震動回饋（Android 支援，iPhone 不支援） */
+export type Settings = { textSpeed: TextSpeed; bgm: boolean; voice: VoiceMode; touch: TouchMode; padOpacity: PadOpacity; analytics: boolean; vibration: boolean };
 
 const KEY = "rpg:settings";
-const DEFAULTS: Settings = { textSpeed: "normal", bgm: true, voice: "blip", touch: "pad", padOpacity: "mid", analytics: true };
+const DEFAULTS: Settings = { textSpeed: "normal", bgm: true, voice: "blip", touch: "pad", padOpacity: "mid", analytics: true, vibration: true };
 export const PAD_OPACITIES: PadOpacity[] = ["low", "mid", "high"];
 export const PAD_OPACITY_LABEL: Record<PadOpacity, string> = { low: "淡", mid: "普通", high: "清楚" };
 export const PAD_OPACITY_VALUE: Record<PadOpacity, number> = { low: 0.35, mid: 0.6, high: 0.9 };

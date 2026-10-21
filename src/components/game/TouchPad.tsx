@@ -1,5 +1,6 @@
 "use client";
 
+import { vibrate } from "@/lib/haptics";
 import type { Direction } from "@/game/engine";
 
 type PadKey = Direction | "ok" | "cancel";
@@ -39,6 +40,7 @@ export default function TouchPad({
         // 多指觸控時 pointer 可能已失效，不影響按鍵輸入
       }
       e.currentTarget.classList.add("pressed");
+      vibrate(8);
       onPress(key);
     },
     onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => {
