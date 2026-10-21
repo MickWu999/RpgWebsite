@@ -17,7 +17,8 @@ export type DurationEstimate = { shortestMinutes: number; typicalMinutes: [numbe
 
 export function routeSeconds(project: GameProject, playtest: PlaytestReport, start?: PlayerState): number[] {
   return playtest.goals
-    .filter((g) => g.reachable && g.actions)
+    // 從後面章節起點找到的路線不能從遊戲開頭重播（只有指定同一個起點時才算）
+    .filter((g) => g.reachable && g.actions && (start || !g.fromChapter))
     .map((g) => {
       let steps = 0;
       let chars = start ? 0 : [...(project.intro ?? "")].length;

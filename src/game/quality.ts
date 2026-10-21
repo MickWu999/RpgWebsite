@@ -2,7 +2,7 @@ import { findCatalogAsset } from "./assets";
 import type { ChapterReport } from "./chapters";
 import { allConditions, allSources, conditionAtoms, walkCommands, walkCondition } from "./commands";
 import { estimateDuration, type DurationEstimate } from "./duration";
-import { createInitialState } from "./engine";
+import { createChapterState, createInitialState } from "./engine";
 import { applyAction, settle, type PlaytestReport } from "./playtest";
 import type { EventCommand, GameProject } from "./schema";
 import type { ValidationIssue } from "./validate";
@@ -105,13 +105,15 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
   const actionsToEnding = Object.fromEntries(routes.map((g) => [g.id, g.actions!.length]));
   const choiceSets: Array<Set<string>> = [];
   const talked = new Set<string>();
+  // 連載的「未完待續」結局只是章節的分界，不和真正的結局比較路線差異
+  const bridge = new Set(project.endings.filter((e) => e.nextChapterId).map((e) => e.id));
   for (const g of routes) {
-    let s = settle(project, createInitialState(project));
+    let s = settle(project, g.fromChapter ? createChapterState(project, g.fromChapter) : createInitialState(project));
     for (const a of g.actions!) {
       if (a.kind === "event") talked.add(`${s.mapId}/${a.eventId}`);
       s = applyAction(project, s, a);
     }
-    choiceSets.push(new Set(s.choiceLog));
+    if (!bridge.has(g.id)) choiceSets.push(new Set(s.choiceLog));
   }
   const endingsHaveDistinctChoices = choiceSets.every((set, i) => choiceSets.every((other, j) => i === j || [...set].some((c) => !other.has(c))));
   const peopleCoverage = peopleIds.size ? [...peopleIds].filter((id) => talked.has(id)).length / peopleIds.size : 0;

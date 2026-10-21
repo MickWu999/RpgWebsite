@@ -1,7 +1,6 @@
-import { checkChapters } from "@/game/chapters";
+import { checkChapters, fullPlaytest } from "@/game/chapters";
 import { projectRevision } from "@/game/engine";
 import { lintDesign } from "@/game/lint";
-import { runPlaytest } from "@/game/playtest";
 import { assessQuality } from "@/game/quality";
 import type { GameProject } from "@/game/schema";
 import { validateProject } from "@/game/validate";
@@ -20,7 +19,7 @@ export function runCheck(project: GameProject, options: { demo?: boolean } = {})
     return { passed: false, revision, validation: { errors: validation.errors, warnings: validation.warnings }, lint: null, playtest: null, chapters: [], quality: null, typicalMinutes: null };
   }
   const lint = lintDesign(validation.project);
-  const playtest = runPlaytest(validation.project);
+  const playtest = fullPlaytest(validation.project);
   const chapters = checkChapters(validation.project);
   const quality = assessQuality(validation.project, playtest, { checkDuration: !options.demo, chapters });
   return {

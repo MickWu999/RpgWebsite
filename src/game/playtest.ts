@@ -25,6 +25,8 @@ export type GoalResult = {
   steps?: string[];
   /** 對應的實際按鍵／選項序列，可重播 */
   actions?: PlaytestAction[];
+  /** 路線從哪一章的測試起點開始（沒有＝從遊戲開頭） */
+  fromChapter?: string;
 };
 
 export type PlaytestReport = {
