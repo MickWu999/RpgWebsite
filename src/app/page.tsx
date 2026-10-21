@@ -6,6 +6,12 @@ import NotifyPrompt from "@/components/NotifyPrompt";
 import { InstallPrompt } from "@/components/PwaSupport";
 import { fetchCatalog, type CatalogEntry } from "@/lib/packs";
 import { fetchLatestNotice, NOTICE_ICON, type Notice } from "@/lib/push";
+import { getAudio } from "@/lib/audio";
+import { MUSIC } from "@/game/assets";
+import { loadSettings, saveSettings } from "@/lib/settings";
+
+/** 首頁（遊戲庫）的背景音樂：瀏覽器規定要等玩家第一次點擊或按鍵後才能出聲 */
+const PORTAL_MUSIC = MUSIC.peaceful.src;
 
 /** 首頁只顯示 14 天內的公告 */
 const NOTICE_DAYS = 14;
@@ -15,6 +21,31 @@ export default function Home() {
   const [library, setLibrary] = useState<CatalogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [bgm, setBgm] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const on = loadSettings().bgm;
+    const frame = requestAnimationFrame(() => setBgm(on));
+    // 第一次互動時解鎖聲音並開始播放（之後進遊戲，會換成那款遊戲自己的音樂）
+    const start = () => {
+      getAudio().unlock();
+      if (loadSettings().bgm) getAudio().playMusic(PORTAL_MUSIC, 0.35);
+    };
+    window.addEventListener("pointerdown", start, { once: true });
+    window.addEventListener("keydown", start, { once: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("pointerdown", start);
+      window.removeEventListener("keydown", start);
+    };
+  }, []);
+  const toggleBgm = () => {
+    const next = !bgm;
+    saveSettings({ ...loadSettings(), bgm: next });
+    setBgm(next);
+    getAudio().unlock();
+    getAudio().playMusic(next ? PORTAL_MUSIC : null, 0.35);
+  };
 
   useEffect(() => {
     void fetchLatestNotice().then((n) => setNotice(n && Date.now() - Date.parse(n.created_at) < NOTICE_DAYS * 864e5 ? n : null));
@@ -36,7 +67,14 @@ export default function Home() {
             <div className="portal-logo-sub">Adventure Library</div>
           </div>
         </div>
-        <InstallPrompt />
+        <div className="row" style={{ gap: 8 }}>
+          {bgm !== null && (
+            <button className="btn small" onClick={toggleBgm} aria-label={bgm ? "關閉音樂" : "開啟音樂"} data-testid="portal-bgm">
+              {bgm ? "🔊 音樂" : "🔇 音樂"}
+            </button>
+          )}
+          <InstallPrompt />
+        </div>
       </header>
 
       <main className="portal-main">

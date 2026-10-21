@@ -422,3 +422,12 @@ export const MUSIC: Record<MusicMood, { src: string; title: string }> = {
   melancholy: { src: `${MUSIC_DIR}/melancholy_place_i_call_home.mp3${MUSIC_VERSION}`, title: "Calm1 - A Place I Call Home" },
 };
 export const DEFAULT_MUSIC: MusicMood = "adventure";
+
+/** 環境音（CC0，來源見 public/assets/ambience/LICENSE.txt）：循環播放，音量比音樂小 */
+export type Ambience = "rain" | "waves" | "chimes" | "night";
+export const AMBIENCE: Record<Ambience, { src: string; title: string }> = {
+  rain: { src: "/assets/ambience/rain.mp3", title: "雨打在窗上" },
+  waves: { src: "/assets/ambience/waves.mp3", title: "海浪" },
+  chimes: { src: "/assets/ambience/chimes.mp3", title: "風鈴" },
+  night: { src: "/assets/ambience/night.mp3", title: "深夜的空氣聲" },
+};

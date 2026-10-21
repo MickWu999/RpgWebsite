@@ -13701,7 +13701,8 @@
           ]
         }
       ],
-      "view": "wide"
+      "view": "wide",
+      "ambience": "waves"
     }
   ],
   "assetManifest": {

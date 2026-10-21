@@ -77,6 +77,8 @@
 
 **依玩家的行為修正**：修改或擴充已上線的遊戲前，先看 `remote insights <id>`（選擇比例、沒人觸發的事件、卡關的地方、成就解鎖率、錯誤）。選項一面倒時檢查是不是假抉擇；沒人觸發的事件要加引導或移到主要路線旁；卡關的地方補分層提示（H17）。
 
+**聲音也要為每款遊戲設計**：不要全部套用預設音樂。每張地圖選情緒音樂（`map.update {id, music}`），不適合任何一首時用 `music: "none"` 只留環境音；環境音 `ambience`：`rain`（雨打在窗上）、`waves`（海浪）、`chimes`（風鈴）、`night`（深夜的空氣聲）。標題畫面用 `project.update` 的 `cover.music`／`cover.ambience` 另外設定。例如下雨的便利商店＝不放音樂＋雨聲；海邊＝海浪。
+
 **畫面模式**：`map.update {id, view: "wide"}` 讓開闊的戶外場景填滿寬螢幕（全景），室內與需要專注的場景維持預設的 RPG 比例（兩側黑邊）。見準則 G6。
 
 **成就**：用 `achievement.upsert {achievement: {id, title, description, hint?, hidden?, condition}}` 設定，條件成立時解鎖（結局會自動產生成就）。每章約 2～4 個，獎勵探索與走另一條路（準則 G5）；設計防呆會擋下永遠無法解鎖的成就。

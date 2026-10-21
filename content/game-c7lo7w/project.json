@@ -379,7 +379,7 @@
           false
         ]
       ],
-      "music": "mysterious",
+      "music": "none",
       "events": [
         {
           "id": "opening",
@@ -1170,7 +1170,8 @@
             }
           ]
         }
-      ]
+      ],
+      "ambience": "rain"
     }
   ],
   "assetManifest": {
@@ -1280,7 +1281,9 @@
       "char_modern_boy",
       "char_modern_girl"
     ],
-    "tagline": "這個夜晚，已經重來第幾次了？"
+    "tagline": "這個夜晚，已經重來第幾次了？",
+    "music": "none",
+    "ambience": "rain"
   },
   "release": {
     "status": "ongoing",

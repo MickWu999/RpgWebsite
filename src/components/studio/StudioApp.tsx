@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MUSIC_MOODS, TERRAIN } from "@/game/assets";
+import { AMBIENCE, MUSIC_MOODS, TERRAIN, type Ambience } from "@/game/assets";
 import { describePageConditions, TRIGGER_LABEL } from "@/game/describe";
 import type { GameProject, MapDefinition, MapEvent } from "@/game/schema";
 import { downloadJson } from "@/game/storage";
@@ -447,10 +447,22 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
               </label>
               <label className="field">
                 背景音樂
-                <select value={map.music ?? "adventure"} onChange={(e) => dispatch([{ op: "map.update", id: map.id, music: e.target.value as (typeof MUSIC_MOODS)[number] }])}>
+                <select value={map.music ?? "adventure"} onChange={(e) => dispatch([{ op: "map.update", id: map.id, music: e.target.value as (typeof MUSIC_MOODS)[number] | "none" }])}>
                   {MUSIC_MOODS.map((m) => (
                     <option key={m} value={m}>
                       {MUSIC_LABELS[m]}
+                    </option>
+                  ))}
+                  <option value="none">不放音樂（只留環境音）</option>
+                </select>
+              </label>
+              <label className="field">
+                環境音
+                <select value={map.ambience ?? ""} onChange={(e) => dispatch([{ op: "map.update", id: map.id, ambience: (e.target.value || null) as Ambience | null }])}>
+                  <option value="">（沒有）</option>
+                  {(Object.keys(AMBIENCE) as Ambience[]).map((a) => (
+                    <option key={a} value={a}>
+                      {AMBIENCE[a].title}
                     </option>
                   ))}
                 </select>

@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_MUSIC, MUSIC, SOUNDS, TERRAIN, type MusicMood } from "@/game/assets";
+import { AMBIENCE, DEFAULT_MUSIC, MUSIC, SOUNDS, TERRAIN, type MusicMood } from "@/game/assets";
 import {
   advance,
   choose,
@@ -424,18 +424,30 @@ export default function GameScreen({ source }: { source: GameSource }) {
     if (!p || !musicMode || musicMode === "loading") return;
     if (!bgmOn || musicMode === "ending" || musicMode === "splash") {
       getAudio().playMusic(null);
+      getAudio().playAmbience(null);
       return;
     }
     if (musicMode !== "title" && musicMode !== "cover" && musicOverride !== undefined) {
       getAudio().playMusic(musicOverride ? MUSIC[musicOverride as MusicMood].src : null);
       return;
     }
-    const mapId = musicMode === "title" || musicMode === "cover" ? (p.cover?.mapId ?? p.system.start.mapId) : musicMap!;
-    const mood = p.maps.find((m) => m.id === mapId)?.music ?? DEFAULT_MUSIC;
-    getAudio().playMusic(MUSIC[mood].src);
+    const onTitle = musicMode === "title" || musicMode === "cover";
+    const mapId = onTitle ? (p.cover?.mapId ?? p.system.start.mapId) : musicMap!;
+    const map = p.maps.find((m) => m.id === mapId);
+    // 每款遊戲自己設計聲音：標題畫面可以另外設定；地圖可以不放音樂（none），只留環境音
+    const mood = (onTitle ? p.cover?.music : undefined) ?? map?.music ?? DEFAULT_MUSIC;
+    getAudio().playMusic(mood === "none" ? null : MUSIC[mood].src);
+    const ambience = (onTitle ? p.cover?.ambience : undefined) ?? map?.ambience;
+    getAudio().playAmbience(ambience ? AMBIENCE[ambience].src : null);
   }, [musicMode, musicMap, musicOverride, bgmOn]);
 
-  useEffect(() => () => getAudio().playMusic(null), []);
+  useEffect(
+    () => () => {
+      getAudio().playMusic(null);
+      getAudio().playAmbience(null);
+    },
+    [],
+  );
 
   // ---------- 遊戲動作 ----------
   const flash = useCallback(

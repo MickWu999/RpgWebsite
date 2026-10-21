@@ -36,6 +36,10 @@ export const QUEST_STATUSES = ["inactive", "active", "completed", "failed"] as c
 export type QuestStatus = (typeof QUEST_STATUSES)[number];
 export const COMPARE_OPS = ["==", "!=", ">=", "<=", ">", "<"] as const;
 export const MUSIC_MOOD_IDS = ["peaceful", "lively", "adventure", "mysterious", "tense", "melancholy"] as const;
+/** 地圖與標題畫面的音樂：情緒標籤，或 none（不放音樂，只留環境音） */
+export const MAP_MUSIC_IDS = [...MUSIC_MOOD_IDS, "none"] as const;
+/** 環境音（循環，疊在音樂下面或單獨播放）：雨聲、海浪、風鈴、深夜的空氣聲 */
+export const AMBIENCE_IDS = ["rain", "waves", "chimes", "night"] as const;
 export const ENDING_MOOD_IDS = ["triumphant", "bittersweet", "somber", "mysterious"] as const;
 
 // ---------- 條件（條件分支、選項條件、事件頁進階條件、尾聲條件） ----------
@@ -207,7 +211,9 @@ export const mapSchema = z.strictObject({
   /** 語意化地形字元（見 assets.ts 的 TERRAIN） */
   terrain: z.array(z.string().max(64)).max(64),
   walkable: z.array(z.array(z.boolean()).max(64)).max(64),
-  music: z.enum(MUSIC_MOOD_IDS).optional(),
+  music: z.enum(MAP_MUSIC_IDS).optional(),
+  /** 環境音：每一款遊戲、每一張地圖自己設計聲音，例如下雨的便利商店＝不放音樂＋雨聲 */
+  ambience: z.enum(AMBIENCE_IDS).optional(),
   /**
    * 畫面模式（營造氣氛用）：standard＝RPG 比例（4:3，寬螢幕兩側留黑邊，預設）；wide＝全景（填滿寬螢幕）。
    * 例如告別式會場用 standard 顯得封閉安靜，海邊的燈籠流水用 wide 顯得開闊。
@@ -347,6 +353,9 @@ export const gameProjectSchema = z.strictObject({
       mapId: idSchema.optional(),
       characterAssetIds: z.array(idSchema).max(3).optional(),
       tagline: z.string().max(60).optional(),
+      /** 標題畫面的音樂與環境音（沒設定就用封面地圖的） */
+      music: z.enum(MAP_MUSIC_IDS).optional(),
+      ambience: z.enum(AMBIENCE_IDS).optional(),
     })
     .optional(),
   /** 推出方式：連載中（一章一章推出，玩家更新後存檔接著玩）或已完結 */

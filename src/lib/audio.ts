@@ -32,6 +32,8 @@ class AudioManager {
   private stepIndex = 0;
   private music: { src: string; source: AudioBufferSourceNode; gain: GainNode } | null = null;
   private wantedMusic: string | null = null;
+  private ambience: { src: string; source: AudioBufferSourceNode; gain: GainNode } | null = null;
+  private wantedAmbience: string | null = null;
   private lastBlip = 0;
   /** 已播放的講話音節數（供自動化驗證） */
   blipCount = 0;
@@ -70,6 +72,38 @@ class AudioManager {
     if (this.ctx.state === "suspended") void this.ctx.resume();
     // 第一次互動之前要求的背景音樂，在解鎖後開始播放
     if (this.wantedMusic && !this.music) this.playMusic(this.wantedMusic);
+    if (this.wantedAmbience && !this.ambience) this.playAmbience(this.wantedAmbience);
+  }
+
+  /** 環境音（雨聲、海浪…）：和背景音樂分開的一軌，循環播放；null 表示停止 */
+  playAmbience(src: string | null, volume = 0.32) {
+    this.wantedAmbience = src;
+    if (!this.ctx || this.ambience?.src === src) return;
+    const ctx = this.ctx;
+    const old = this.ambience;
+    if (old) {
+      old.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+      old.source.stop(ctx.currentTime + 2);
+      this.ambience = null;
+    }
+    if (!src) return;
+    void this.load(src).then((buffer) => {
+      if (!buffer || this.wantedAmbience !== src || this.ambience) return;
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      source.buffer = buffer;
+      source.loop = true;
+      gain.gain.setValueAtTime(0, ctx.currentTime);
+      gain.gain.setTargetAtTime(volume, ctx.currentTime, 0.8);
+      source.connect(gain).connect(this.out!);
+      source.start();
+      this.ambience = { src, source, gain };
+    });
+  }
+
+  /** 目前的環境音（供除錯與自動化驗證） */
+  get currentAmbience() {
+    return this.ambience?.src ?? null;
   }
 
   /** 播放循環背景音樂（同一首不重新開始）；null 表示停止。切換時淡入淡出。 */

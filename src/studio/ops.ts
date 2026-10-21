@@ -11,6 +11,8 @@ import {
   idSchema,
   itemSchema,
   mapEventSchema,
+  AMBIENCE_IDS,
+  MAP_MUSIC_IDS,
   MUSIC_MOOD_IDS,
   questSchema,
   type GameProject,
@@ -37,7 +39,7 @@ export const opSchema = z.discriminatedUnion("op", [
     intro: z.string().max(4000).optional(),
     genre: z.enum(["fantasy", "modern", "sci-fi", "mystery"]).optional(),
     cover: z
-      .strictObject({ mapId: idSchema.optional(), characterAssetIds: z.array(idSchema).max(3).optional(), tagline: z.string().max(60).optional() })
+      .strictObject({ mapId: idSchema.optional(), characterAssetIds: z.array(idSchema).max(3).optional(), tagline: z.string().max(60).optional(), music: z.enum(MAP_MUSIC_IDS).optional(), ambience: z.enum(AMBIENCE_IDS).optional() })
       .optional(),
     release: z.strictObject({ status: z.enum(["ongoing", "complete"]), plannedChapters: z.number().int().min(1).max(20).optional() }).optional(),
   }),
@@ -56,7 +58,8 @@ export const opSchema = z.discriminatedUnion("op", [
     width: z.number().int().min(3).max(64),
     height: z.number().int().min(3).max(64),
     fill: terrainChar.optional(),
-    music: z.enum(MUSIC_MOOD_IDS).optional(),
+    music: z.enum(MAP_MUSIC_IDS).optional(),
+    ambience: z.enum(AMBIENCE_IDS).optional(),
     view: z.enum(["standard", "wide"]).optional(),
     parentId: idSchema.optional(),
   }),
@@ -64,7 +67,8 @@ export const opSchema = z.discriminatedUnion("op", [
     op: z.literal("map.update"),
     id: idSchema,
     name: z.string().min(1).max(200).optional(),
-    music: z.enum(MUSIC_MOOD_IDS).nullable().optional(),
+    music: z.enum(MAP_MUSIC_IDS).nullable().optional(),
+    ambience: z.enum(AMBIENCE_IDS).nullable().optional(),
     /** 畫面模式：standard＝RPG 比例（兩側黑邊）；wide＝全景；null＝回到預設 */
     view: z.enum(["standard", "wide"]).nullable().optional(),
     parentId: idSchema.nullable().optional(),
@@ -289,6 +293,7 @@ function applyOne(p: GameProject, op: StudioOp) {
         walkable: walkableFromTerrain(terrain),
         ...(op.music ? { music: op.music } : {}),
         ...(op.view ? { view: op.view } : {}),
+        ...(op.ambience ? { ambience: op.ambience } : {}),
         events: [],
       });
       return;
@@ -298,6 +303,8 @@ function applyOne(p: GameProject, op: StudioOp) {
       if (op.name !== undefined) m.name = op.name;
       if (op.music === null) delete m.music;
       else if (op.music !== undefined) m.music = op.music;
+      if (op.ambience === null) delete m.ambience;
+      else if (op.ambience !== undefined) m.ambience = op.ambience;
       if (op.view === null) delete m.view;
       else if (op.view !== undefined) m.view = op.view;
       if (op.parentId === null) delete m.parentId;

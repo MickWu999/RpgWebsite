@@ -1,0 +1,6 @@
+環境音（全部 CC0，可自由使用、修改、商用，不需標示）
+- rain.mp3：Rain on window loop，作者 alxl，https://opengameart.org/content/rain-on-window-loop（多重授權，此處採 CC0）
+- waves.mp3：Beach ocean waves，作者 qubodup（錄音 jasinski），https://opengameart.org/content/beach-ocean-waves
+- chimes.mp3：Free Wind Chimes，作者 pmiller，https://opengameart.org/node/97378
+- night.mp3：30 CC0 SFX loops 的 ambient_01，作者 rubberduck，https://opengameart.org/content/30-cc0-sfx-loops
+皆已用 ffmpeg 統一音量（loudnorm I=-24）並轉為 mp3。授權確認日期：2026-10-21。

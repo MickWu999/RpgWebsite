@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import IssueList from "@/components/IssueList";
-import { ASSET_CATALOG, LICENSES } from "@/game/assets";
+import { AMBIENCE, ASSET_CATALOG, LICENSES, MUSIC_MOODS } from "@/game/assets";
 import { allConditions, walkCondition, walkProject } from "@/game/commands";
 import { describeCondition } from "@/game/describe";
 import {
@@ -763,6 +763,27 @@ function SystemForm({ project, dispatch }: { project: GameProject; dispatch: (op
         標語
         <input type="text" maxLength={60} value={cover.tagline ?? ""} onChange={(e) => setCover({ ...cover, tagline: e.target.value || undefined })} />
       </label>
+      <div className="logic-row">
+        <span>標題畫面的音樂</span>
+        <select value={cover.music ?? ""} onChange={(e) => setCover({ ...cover, music: (e.target.value || undefined) as typeof cover.music })}>
+          <option value="">跟封面地圖一樣</option>
+          {MUSIC_MOODS.map((m) => (
+            <option key={m} value={m}>
+              {m}
+            </option>
+          ))}
+          <option value="none">不放音樂</option>
+        </select>
+        <span>環境音</span>
+        <select value={cover.ambience ?? ""} onChange={(e) => setCover({ ...cover, ambience: (e.target.value || undefined) as typeof cover.ambience })}>
+          <option value="">跟封面地圖一樣</option>
+          {(Object.keys(AMBIENCE) as Array<keyof typeof AMBIENCE>).map((a) => (
+            <option key={a} value={a}>
+              {AMBIENCE[a].title}
+            </option>
+          ))}
+        </select>
+      </div>
       <div className="small muted">主視覺角色（最多 3 個，點選切換）</div>
       <div className="asset-picker">
         {characters.map((a) => (
