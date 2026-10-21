@@ -205,6 +205,9 @@ export const TERRAIN: Record<string, TerrainDef> = {
   t: urban("垃圾桶", 279, false, { overlay: true, under: "a", examine: "垃圾桶，裡面塞滿了空飲料罐。" }),
   m: urban("郵筒", 305, false, { overlay: true, under: "a", examine: "藍色的郵筒，寄限時信用的。" }),
   k: urban("行道樹", 260, false, { overlay: true, under: "a", examine: "修剪整齊的行道樹。" }),
+  // 港口與海邊：海水（無邊框）與堤岸（上緣是石砌岸邊，放在陸地與海水之間）
+  "~": urban("海水", 176, false, { examine: "海水很平靜，看不出底下有多深。" }),
+  _: urban("堤岸", 171, false, { examine: "港口的堤岸，往下就是海。" }),
   // ---------- 室內（Roguelike Indoors）：家、寢室、辦公室 ----------
   o: indoor("木地板", 51, true),
   c: indoor("綠地毯", 159, true),

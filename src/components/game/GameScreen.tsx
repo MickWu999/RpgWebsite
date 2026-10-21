@@ -877,7 +877,12 @@ export default function GameScreen({ source }: { source: GameSource }) {
   /** Android 等支援的瀏覽器：切換全螢幕（進入時鎖定橫向，再按一次離開）；iPhone Safari 不支援，按鈕不顯示 */
   const [isFullscreen, setIsFullscreen] = useState(false);
   useEffect(() => {
-    const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const onChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+      // 離開全螢幕（不論是按按鈕、從頂端滑下來，或切到別的 App）後就不再自動進入：
+      // 瀏覽器每次進入全螢幕都會跳出「如要結束全螢幕…」的提示，一直自動重進會很煩。想再進入時按右上角的全螢幕按鈕
+      if (!document.fullscreenElement) userExitedFullscreen.current = true;
+    };
     document.addEventListener("fullscreenchange", onChange);
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
@@ -1006,7 +1011,9 @@ export default function GameScreen({ source }: { source: GameSource }) {
       onPointerDown={() => {
         getAudio().unlock();
         // 手機：第一次觸控就進入全螢幕（瀏覽器規定必須由使用者的動作觸發；iPhone Safari 不支援，改用加入主畫面）
-        if (layout.touch && layout.canFullscreen && !document.fullscreenElement && !userExitedFullscreen.current) void enterFullscreen();
+        // 從主畫面開啟（已經是全螢幕的 App）時不必再要求，也就不會出現瀏覽器的全螢幕提示
+        const standalone = window.matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches;
+        if (layout.touch && layout.canFullscreen && !standalone && !document.fullscreenElement && !userExitedFullscreen.current) void enterFullscreen();
       }}
     >
       <div className="rm-screen-box" style={{ width: SCREEN_W * layout.scale, height: layout.height * layout.scale }}>
