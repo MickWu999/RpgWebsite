@@ -156,6 +156,24 @@
       "name": "褪色的紙鶴",
       "description": "小光摺的紙鶴，美柑留了十年。翅膀上有一個用蠟筆寫的「光」。",
       "iconAssetId": "icon_letter"
+    },
+    {
+      "id": "score_book",
+      "name": "魚店大叔的分數本",
+      "description": "十年、三十二本。每一天晴生的眼淚幾分，都寫在裡面。最高分的那幾天旁邊，畫著小小的叉。",
+      "iconAssetId": "icon_letter"
+    },
+    {
+      "id": "order_book",
+      "name": "美柑的客人紀錄",
+      "description": "美柑的出貨與客人回饋。每一筆都寫著：喝了之後，想起了什麼。",
+      "iconAssetId": "icon_letter"
+    },
+    {
+      "id": "obit_book",
+      "name": "福壽堂的訃聞簿",
+      "description": "福壽堂十年份的訃聞。每一頁是一個名字、一個日期。",
+      "iconAssetId": "icon_letter"
     }
   ],
   "quests": [
@@ -188,6 +206,25 @@
         },
         {
           "text": "讓「客戶」好好地告別"
+        }
+      ]
+    },
+    {
+      "id": "q_night",
+      "title": "那一夜",
+      "description": "周防博士在傘店的櫃檯上攤開一張地圖：全國的箭頭都指向潮見町。她不肯說為什麼，只叫晴生自己去找答案。",
+      "steps": [
+        {
+          "text": "找出三份紀錄：每天記錄你眼淚的人（魚店）、每天賣你眼淚的人（美柑的店面）、每天送走鎮上的人（福壽堂事務所）"
+        },
+        {
+          "text": "三份紀錄都拿到了。回傘店，把它們攤在櫃檯上"
+        },
+        {
+          "text": "在市立醫院舊病房大樓三樓找回那一夜：三〇七號病房、走廊的公共電話、樓梯間的窗戶"
+        },
+        {
+          "text": "回到三〇七號病房"
         }
       ]
     }
@@ -350,6 +387,64 @@
         }
       ],
       "nextChapterId": "ch3"
+    },
+    {
+      "id": "end_ch3",
+      "title": "第三章　十年前的那一夜",
+      "text": "燈籠流水，還有兩個禮拜。\n那天晚上，晴生把小夜那把天藍色的折傘攤在工作台上。\n十年了，他第一次想把它修好。",
+      "mood": "somber",
+      "epilogues": [
+        {
+          "condition": {
+            "type": "switch",
+            "id": "research_public",
+            "value": true
+          },
+          "text": "周防博士的論文，會在燈籠流水之前寫好。到時候，鎮上的每個人都會知道自己的悲傷在哪裡。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "research_public",
+            "value": false
+          },
+          "text": "這件事，只有晴生和周防博士知道。燈籠流水那天晚上，他得一個人決定。"
+        },
+        {
+          "condition": {
+            "type": "variable",
+            "id": "c3_wrong",
+            "op": "==",
+            "value": 0
+          },
+          "text": "周防博士說，她花了十年才拼出來的東西，他在櫃檯前只花了一個下午。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "c3_tried",
+            "value": true
+          },
+          "text": "在三〇七號病房，他試過只為小夜哭，可是做不到。他第一次知道，自己想做到。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "c3_waited",
+            "value": true
+          },
+          "text": "在三〇七號病房，他沒有試。他想先把那把天藍色的傘修好，再跟她說話。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "c3_lastpage",
+            "value": true
+          },
+          "text": "魚店的分數本，多了第三十三本。第一頁寫著：「修傘的，今天沒來。有點寂寞。」"
+        }
+      ],
+      "nextChapterId": "ch4"
     }
   ],
   "chapters": [
@@ -398,6 +493,69 @@
         },
         "quests": {
           "q_itsuki": {
+            "status": "completed",
+            "step": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "ch3",
+      "title": "第三章　十年前的那一夜",
+      "summary": "他終於知道，自己在替誰哭。",
+      "testStart": {
+        "mapId": "kasaya",
+        "x": 4,
+        "y": 4,
+        "switches": [
+          "accepted_gladly",
+          "clue_konbu",
+          "clue_whale",
+          "clue_letters",
+          "saw_bucket",
+          "refused_mikan",
+          "fish_100",
+          "funeral_ready",
+          "funeral_done",
+          "told_konbu",
+          "told_whale",
+          "told_letters",
+          "miyuki_knows_whale",
+          "miyuki_cried",
+          "tell_done",
+          "c2_start",
+          "c2_knows",
+          "c2_matsu",
+          "c2_crane",
+          "c2_sheet",
+          "c2_reviews",
+          "mikan_stopped",
+          "c2_miyuki",
+          "c2_tai",
+          "c2_used_matsu",
+          "c2_used_crane",
+          "c2_used_sheet",
+          "fukuda_cried",
+          "crane_return",
+          "c2_memorial_done"
+        ],
+        "variables": {
+          "clues": 3,
+          "told": 3,
+          "c2_clues": 3,
+          "c2_told": 3
+        },
+        "items": {
+          "photo": 1,
+          "letters": 1,
+          "crane": 1
+        },
+        "quests": {
+          "q_itsuki": {
+            "status": "completed",
+            "step": 2
+          },
+          "q_hikari": {
             "status": "completed",
             "step": 2
           }
@@ -549,6 +707,58 @@
     {
       "id": "crane_fukuda",
       "name": "紙鶴留給了福田社長"
+    },
+    {
+      "id": "research_public",
+      "name": "讓周防博士公開研究"
+    },
+    {
+      "id": "c3_tried",
+      "name": "在病房試過只為小夜哭"
+    },
+    {
+      "id": "c3_lastpage",
+      "name": "偷看了分數本的最後一頁"
+    },
+    {
+      "id": "c3_start",
+      "name": "第 3 章開場結束"
+    },
+    {
+      "id": "c3_fish",
+      "name": "拿到魚店大叔的分數本"
+    },
+    {
+      "id": "c3_mikan",
+      "name": "拿到美柑的客人紀錄"
+    },
+    {
+      "id": "c3_obit",
+      "name": "拿到福壽堂的訃聞簿"
+    },
+    {
+      "id": "c3_deduced",
+      "name": "自己說出了答案"
+    },
+    {
+      "id": "m_bed",
+      "name": "想起病床上的小夜"
+    },
+    {
+      "id": "m_phone",
+      "name": "想起走廊的公共電話"
+    },
+    {
+      "id": "m_window",
+      "name": "想起樓梯間的窗戶"
+    },
+    {
+      "id": "c3_decided",
+      "name": "決定了研究要不要公開"
+    },
+    {
+      "id": "c3_waited",
+      "name": "在病房說「再等我一下」"
     }
   ],
   "variables": [
@@ -571,6 +781,18 @@
     {
       "id": "c2_last",
       "name": "法事上晴生剛說的那件事（社長的擋話回應用）"
+    },
+    {
+      "id": "c3_wrong",
+      "name": "在櫃檯前說錯的次數"
+    },
+    {
+      "id": "c3_records",
+      "name": "拿到幾份紀錄"
+    },
+    {
+      "id": "c3_memories",
+      "name": "在醫院找回幾段記憶"
     }
   ],
   "commonEvents": [],
@@ -1276,6 +1498,21 @@
                   "text": "（福壽堂的門口沒有人。預約簿放在門邊的椅子上，第一頁被劃掉了一行。）"
                 }
               ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（福壽堂門口貼著一張新的紙：「故人的故事，歡迎來說」。是社長的字。）"
+                }
+              ]
             }
           ]
         },
@@ -1418,6 +1655,163 @@
                       "actorId": "fish"
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_bald_villager"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "分數本？十年、三十二本，一天都沒漏！拿去！",
+                  "actorId": "fish"
+                },
+                {
+                  "code": "item",
+                  "itemId": "score_book",
+                  "delta": 1
+                },
+                {
+                  "code": "text",
+                  "text": "（第一頁：「晴天日的隔天。修傘的在店門口哭，九十八分。他說不知道為什麼。」）"
+                },
+                {
+                  "code": "text",
+                  "text": "（打了叉的日子：十一月三日，九十分。三月九日，八十八分。四月二十日，九十二分。六月十日，九十五分。）"
+                },
+                {
+                  "code": "text",
+                  "text": "那些叉啊……那幾天，整條商店街都怪怪的。四月那次最怪，鎮上明明什麼事都沒有，電視倒是一直在播很遠的地方的大火。",
+                  "actorId": "fish"
+                },
+                {
+                  "code": "text",
+                  "text": "……最後一頁你別看！",
+                  "actorId": "fish"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "翻到最後一頁。",
+                      "commands": [
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "miyuki_cried",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（「修傘的今天零分。他沒哭。……老實說，有點寂寞。」）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "text",
+                              "text": "（「修傘的今天六十分。他好像知道自己在為誰哭了。我也想知道。」）"
+                            }
+                          ]
+                        },
+                        {
+                          "code": "text",
+                          "text": "就叫你別看了啦！！",
+                          "actorId": "fish"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "c3_lastpage"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    },
+                    {
+                      "text": "不看。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……謝謝。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "text",
+                          "text": "哼，算你有良心！",
+                          "actorId": "fish"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "c3_fish"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "variable",
+                  "id": "c3_records",
+                  "op": "add",
+                  "value": 1
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "variable",
+                    "id": "c3_records",
+                    "op": ">=",
+                    "value": 3
+                  },
+                  "then": [
+                    {
+                      "code": "quest",
+                      "questId": "q_night",
+                      "action": "step",
+                      "step": 1
+                    },
+                    {
+                      "code": "text",
+                      "text": "（三份紀錄都拿到了。回傘店，把它們攤在櫃檯上吧。）"
+                    }
+                  ]
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "B",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_fish"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_bald_villager"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "分數本拿去看，要還喔！三十二本是我的命！",
+                  "actorId": "fish"
                 }
               ]
             }
@@ -1866,6 +2260,16 @@
                   "endingId": "end_ch2"
                 }
               ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
             }
           ]
         },
@@ -2235,6 +2639,21 @@
                   ]
                 }
               ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（收音機在播盂蘭盆節的特集：「今年潮見港的燈籠流水，報名的人數又創新低……」）"
+                }
+              ]
             }
           ]
         },
@@ -2328,7 +2747,7 @@
                     },
                     {
                       "code": "text",
-                      "text": "（十年來，這段天氣預報第一次放過了他。他也不知道為什麼。）"
+                      "text": "（這三個月來，這段天氣預報第一次沒有讓他掉眼淚。他也不知道為什麼。）"
                     },
                     {
                       "code": "text",
@@ -2554,6 +2973,535 @@
                   "code": "selfSwitch",
                   "key": "A",
                   "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c2_memorial_done"
+                ]
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "ch3_opening",
+          "name": "第 3 章開場",
+          "x": 5,
+          "y": 3,
+          "note": "第 3 章開場：周防博士的地圖",
+          "pages": [
+            {
+              "conditions": {
+                "switches": [
+                  "c2_memorial_done"
+                ]
+              },
+              "trigger": "autorun",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "comment",
+                  "text": "章節標題卡：玩家在第 2 章章末（end_ch2，nextChapterId＝ch3）按「繼續」時，系統會切換到第 3 章、自動顯示標題卡，並把玩家放在這一章的起點（傘店）"
+                },
+                {
+                  "code": "text",
+                  "text": "（七月底。梅雨季結束了。）"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "miyuki_cried",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "（收音機播著天氣預報。晴生的眼睛是乾的。）"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "（收音機播著天氣預報。晴生的眼角又熱了，他已經懶得擦。）"
+                    }
+                  ]
+                },
+                {
+                  "code": "text",
+                  "text": "（周防博士走進來，把一捲很大的紙攤在櫃檯上。是一張日本地圖，畫滿了紅色的箭頭。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（從北海道、從九州、從每一座城市出發的箭頭，全部指向同一個地方：潮見町。）"
+                },
+                {
+                  "code": "text",
+                  "text": "……為什麼都指向這裡？",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "你自己覺得呢？我說出來，你不會相信。你自己找出來，你就不得不信。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "c2_sample",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "你給我的那滴眼淚，我又量了一次。還是對不上。",
+                      "actorId": "suou"
+                    }
+                  ]
+                },
+                {
+                  "code": "text",
+                  "text": "去找三本帳：每天記錄你眼淚的人、每天賣你眼淚的人、每天送走鎮上的人。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "quest",
+                  "questId": "q_night",
+                  "action": "start"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "c3_start"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "suou_map",
+          "name": "櫃檯上的地圖",
+          "x": 3,
+          "y": 3,
+          "pages": [
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（周防博士的地圖。全國的紅色箭頭，全部指向潮見町。角落用鉛筆寫著：「不是消失，是流走了」。）"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "variable",
+                    "id": "c3_records",
+                    "op": "<",
+                    "value": 3
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "（三本帳，還缺：）"
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "c3_fish",
+                        "value": false
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "（每天記錄他眼淚的人：魚店大叔的分數本。）"
+                        }
+                      ]
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "c3_mikan",
+                        "value": false
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "（每天賣他眼淚的人：美柑的客人紀錄。店面在魚店旁邊。）"
+                        }
+                      ]
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "c3_obit",
+                        "value": false
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "（每天送走鎮上的人：福壽堂的訃聞簿。商店街東邊的事務所。）"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "deduce",
+          "name": "櫃檯",
+          "x": 2,
+          "y": 4,
+          "note": "第 3 章的轉：晴生自己拼出答案",
+          "pages": [
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ],
+                "variable": {
+                  "id": "c3_records",
+                  "min": 3
+                }
+              },
+              "trigger": "autorun",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（晴生把三本帳攤在櫃檯上。周防博士靠在門邊，沒有說話。）"
+                },
+                {
+                  "code": "label",
+                  "name": "q1"
+                },
+                {
+                  "code": "text",
+                  "text": "分數本上打了叉的日子：十一月三日、三月九日、六月十日。訃聞簿翻到同一天——",
+                  "actorId": "player"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "佐藤爺爺、郵局的田中太太、森下樹。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "（三天，三個名字。一天都沒有對不上。）"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "福田光、佐藤爺爺、森下樹。",
+                      "commands": [
+                        {
+                          "code": "variable",
+                          "id": "c3_wrong",
+                          "op": "add",
+                          "value": 1
+                        },
+                        {
+                          "code": "text",
+                          "text": "……不對。小光是十年前的六月，分數本那時候才剛開始。三月九日，是郵局的田中太太。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "jump",
+                          "name": "q1"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "那幾天，訃聞簿上沒有人。",
+                      "commands": [
+                        {
+                          "code": "variable",
+                          "id": "c3_wrong",
+                          "op": "add",
+                          "value": 1
+                        },
+                        {
+                          "code": "text",
+                          "text": "……不對。我再翻一次。十一月三日，佐藤松吉，八十八歲。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "jump",
+                          "name": "q1"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "label",
+                  "name": "q2"
+                },
+                {
+                  "code": "text",
+                  "text": "可是四月二十日，也打了叉，九十二分。訃聞簿上，那天沒有人走。那一天是……",
+                  "actorId": "player"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "大叔記錯了。",
+                      "commands": [
+                        {
+                          "code": "variable",
+                          "id": "c3_wrong",
+                          "op": "add",
+                          "value": 1
+                        },
+                        {
+                          "code": "text",
+                          "text": "……大叔三十二本一天都沒漏。他還寫了：「鎮上明明什麼事都沒有」。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "jump",
+                          "name": "q2"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "我感冒的日子。",
+                      "commands": [
+                        {
+                          "code": "variable",
+                          "id": "c3_wrong",
+                          "op": "add",
+                          "value": 1
+                        },
+                        {
+                          "code": "text",
+                          "text": "……感冒會打噴嚏，不會哭到九十二分。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "jump",
+                          "name": "q2"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "新聞說遠方發生大火的日子。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "（分數本的那一頁，大叔的小字：「電視說，很遠的城市發生了大火。修傘的哭到打烊。」）"
+                        },
+                        {
+                          "code": "text",
+                          "text": "鎮上沒有人走。走掉的，是很遠的地方、我一個都不認識的人。",
+                          "actorId": "player"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "label",
+                  "name": "q3"
+                },
+                {
+                  "code": "text",
+                  "text": "所以，我的眼淚裡，裝的是……",
+                  "actorId": "player"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "鎮上的人的悲傷。",
+                      "commands": [
+                        {
+                          "code": "variable",
+                          "id": "c3_wrong",
+                          "op": "add",
+                          "value": 1
+                        },
+                        {
+                          "code": "text",
+                          "text": "……不對。四月二十日的大火，在很遠的城市。美柑的客人在東京、在九州，他們喝了，想起的也都是自己的事。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "jump",
+                          "name": "q3"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "我自己的悲傷。",
+                      "commands": [
+                        {
+                          "code": "variable",
+                          "id": "c3_wrong",
+                          "op": "add",
+                          "value": 1
+                        },
+                        {
+                          "code": "text",
+                          "text": "……如果是我的，我為什麼十年來，一直說不出自己在難過什麼？",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "jump",
+                          "name": "q3"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "全世界的悲傷。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……全世界的悲傷。東京的、九州的、很遠的城市的。",
+                          "actorId": "player"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "text",
+                  "text": "有人走掉的那天，我就會哭。我不是特別。我只是……大家的悲傷流過來的地方。",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "……你自己說出來了。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "text",
+                  "text": "……天氣預報。以前聽到只是眼睛發酸。三個月前開始，一播就停不下來。",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "那天早上也是。天氣預報一播我就哭了，森下太太剛好走進店裡。",
+                  "actorId": "player"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "c2_miyuki",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "阿樹出事那天，她在電話裡罵了他。那時候收音機正在播天氣預報。",
+                      "actorId": "player"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "她說過，那段天氣預報，她最近都不敢聽。",
+                      "actorId": "player"
+                    }
+                  ]
+                },
+                {
+                  "code": "text",
+                  "text": "那滴眼淚是她的。告別式上我說了阿樹的事，她哭了，我的胸口就變輕了。悲傷回到了它的主人那裡。",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "……說出一個人的故事，悲傷就會回家。這是我的溫度計量不出來的那一半。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "text",
+                  "text": "……可是，為什麼是我？",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "那一夜，你在哪裡？",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "text",
+                  "text": "……市立醫院。（那一夜的後半段，十年來都是一片白。）",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "舊病房大樓還在，下個月就要拆了。我借到了鑰匙。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "c3_deduced"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "quest",
+                  "questId": "q_night",
+                  "action": "step",
+                  "step": 2
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                },
+                {
+                  "code": "transfer",
+                  "mapId": "city_hospital",
+                  "x": 8,
+                  "y": 5,
+                  "direction": "up"
                 }
               ]
             },
@@ -2976,6 +3924,30 @@
                   "actorId": "ume"
                 }
               ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_modern_elder"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "孩子，要不要燈籠紙？盂蘭盆節快到了。",
+                  "actorId": "ume"
+                },
+                {
+                  "code": "text",
+                  "text": "這十年，來買燈籠紙的人越來越少囉。今年倒是多了幾個。",
+                  "actorId": "ume"
+                }
+              ]
             }
           ]
         },
@@ -3203,6 +4175,64 @@
                   "code": "text",
                   "text": "路上小心喔，阿樹。……婆婆都是這樣說的吧。",
                   "actorId": "miyuki"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_modern_woman"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "c2_miyuki",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "雨宮先生。盂蘭盆節，我想放一盞燈籠。十年來第一次。",
+                      "actorId": "miyuki"
+                    },
+                    {
+                      "code": "text",
+                      "text": "……放給阿樹。也放給那天的那通電話。",
+                      "actorId": "miyuki"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "雨宮先生。……有件事，我一直沒有跟任何人說。",
+                      "actorId": "miyuki"
+                    },
+                    {
+                      "code": "text",
+                      "text": "阿樹出事那天下午，他打電話給我，說要去港口。收音機正在播天氣預報。",
+                      "actorId": "miyuki"
+                    },
+                    {
+                      "code": "text",
+                      "text": "我說：「下雨天去什麼港口，隨便你，不要再打來了。」那是我跟他說的最後一句話。",
+                      "actorId": "miyuki"
+                    },
+                    {
+                      "code": "switch",
+                      "ids": [
+                        "c2_miyuki"
+                      ],
+                      "value": true
+                    }
+                  ]
                 }
               ]
             }
@@ -3665,6 +4695,30 @@
                       ]
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_modern_boy"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "呃、那個……盂蘭盆節那天，我想把鯨魚放回海裡。",
+                  "actorId": "sho"
+                },
+                {
+                  "code": "text",
+                  "text": "阿樹說過，等牠長大，要放回海裡。牠……已經很胖了。",
+                  "actorId": "sho"
                 }
               ]
             }
@@ -4189,6 +5243,16 @@
                   "text": "（周防博士在筆記本上畫了一張潮見町的地圖，上面有很多箭頭。她看到晴生，把筆記本闔上了。）"
                 }
               ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
             }
           ]
         }
@@ -4549,6 +5613,51 @@
                     {
                       "code": "text",
                       "text": "十一封。",
+                      "actorId": "iwa"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_villager"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "clue_letters",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "……寫了一行。",
+                      "actorId": "iwa"
+                    },
+                    {
+                      "code": "text",
+                      "text": "（信紙上，「阿樹」的下面多了一行字，被用力劃掉了。）"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "……盂蘭盆節。",
+                      "actorId": "iwa"
+                    },
+                    {
+                      "code": "text",
+                      "text": "燈塔那晚，會亮整夜。",
                       "actorId": "iwa"
                     }
                   ]
@@ -5371,6 +6480,21 @@
                   "text": "（第 1 號業績表放回了抽屜。滿意度那一欄，還是空白的。）"
                 }
               ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（講台的抽屜空了。第 1 號業績表，社長拿回去了。）"
+                }
+              ]
             }
           ]
         }
@@ -6015,6 +7139,139 @@
                       "code": "text",
                       "text": "小光的印章，還收在這個抽屜裡。社長不知道，是吧。",
                       "actorId": "matsu"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_hooded_elder"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "c3_obit",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "訃聞簿，看完了要還，是吧。下個月還要寫。",
+                      "actorId": "matsu"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "訃聞簿？……社長前幾天把它收進辦公桌的抽屜，上了鎖，是吧。",
+                      "actorId": "matsu"
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "item",
+                        "itemId": "score_book"
+                      },
+                      "then": [
+                        {
+                          "code": "choices",
+                          "options": [
+                            {
+                              "text": "給阿松看分數本。",
+                              "commands": [
+                                {
+                                  "code": "text",
+                                  "text": "（晴生翻開魚店大叔的分數本，指著那些打了叉的日子。）"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "……十一月三日，三月九日。這幾天的訃聞，都是我寫的，是吧。",
+                                  "actorId": "matsu"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "（阿松從圍裙口袋裡拿出一把小鑰匙。）備用的。社長不知道，是吧。",
+                                  "actorId": "matsu"
+                                },
+                                {
+                                  "code": "item",
+                                  "itemId": "obit_book",
+                                  "delta": 1
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "（訃聞簿，十年份。十一月三日：佐藤松吉，八十八歲。三月九日：郵局的田中太太。六月十日：森下樹，十二歲。）"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "（十年前的六月那一頁，只有一行：福田光，六歲。這本簿子，翻起來比想像中重。）"
+                                },
+                                {
+                                  "code": "switch",
+                                  "ids": [
+                                    "c3_obit"
+                                  ],
+                                  "value": true
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c3_records",
+                                  "op": "add",
+                                  "value": 1
+                                },
+                                {
+                                  "code": "if",
+                                  "condition": {
+                                    "type": "variable",
+                                    "id": "c3_records",
+                                    "op": ">=",
+                                    "value": 3
+                                  },
+                                  "then": [
+                                    {
+                                      "code": "quest",
+                                      "questId": "q_night",
+                                      "action": "step",
+                                      "step": 1
+                                    },
+                                    {
+                                      "code": "text",
+                                      "text": "（三份紀錄都拿到了。回傘店，把它們攤在櫃檯上吧。）"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "text": "我去跟社長要。",
+                              "commands": [
+                                {
+                                  "code": "text",
+                                  "text": "社長在裡面，是吧。他這幾天，話很少。",
+                                  "actorId": "matsu"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "else": [
+                        {
+                          "code": "text",
+                          "text": "要的話，去跟社長說吧。……或者，您拿得出什麼讓我非開不可的東西，是吧。",
+                          "actorId": "matsu"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -7144,6 +8401,136 @@
               "trigger": "action",
               "priority": "same",
               "commands": []
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_modern_man"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "fukuda_cried",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "專業哭喪方案，我取消了。現在每一場，我都先去聽家屬說故人的事。",
+                      "actorId": "fukuda"
+                    },
+                    {
+                      "code": "text",
+                      "text": "你猜怎麼樣？二十三場裡，有三家人自己哭出來了。……我的業績表，不知道怎麼填了。",
+                      "actorId": "fukuda"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "二十三場，我一場一場在辦。還是沒有人哭。",
+                      "actorId": "fukuda"
+                    },
+                    {
+                      "code": "text",
+                      "text": "……可是我開始會問家屬，故人生前喜歡什麼。以前從來不問的。",
+                      "actorId": "fukuda"
+                    }
+                  ]
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "c3_obit",
+                    "value": false
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "……訃聞簿？",
+                      "actorId": "fukuda"
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "fukuda_cried",
+                        "value": true
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "（社長打開抽屜的鎖。）拿去。小光那一頁，你翻到就知道了。我收起來，是怕自己一直去翻。",
+                          "actorId": "fukuda"
+                        }
+                      ],
+                      "else": [
+                        {
+                          "code": "text",
+                          "text": "訃聞簿是公司的機密。……（他看著晴生很久，嘆了一口氣，打開抽屜。）業務上，借你一天。",
+                          "actorId": "fukuda"
+                        }
+                      ]
+                    },
+                    {
+                      "code": "item",
+                      "itemId": "obit_book",
+                      "delta": 1
+                    },
+                    {
+                      "code": "text",
+                      "text": "（訃聞簿，十年份。十一月三日：佐藤松吉，八十八歲。三月九日：郵局的田中太太。六月十日：森下樹，十二歲。）"
+                    },
+                    {
+                      "code": "text",
+                      "text": "（十年前的六月那一頁，只有一行：福田光，六歲。這本簿子，翻起來比想像中重。）"
+                    },
+                    {
+                      "code": "switch",
+                      "ids": [
+                        "c3_obit"
+                      ],
+                      "value": true
+                    },
+                    {
+                      "code": "variable",
+                      "id": "c3_records",
+                      "op": "add",
+                      "value": 1
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "variable",
+                        "id": "c3_records",
+                        "op": ">=",
+                        "value": 3
+                      },
+                      "then": [
+                        {
+                          "code": "quest",
+                          "questId": "q_night",
+                          "action": "step",
+                          "step": 1
+                        },
+                        {
+                          "code": "text",
+                          "text": "（三份紀錄都拿到了。回傘店，把它們攤在櫃檯上吧。）"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             }
           ]
         }
@@ -7622,6 +9009,413 @@
                   ]
                 }
               ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_start"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_modern_girl"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "mikan_partner",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "白金會員！一千瓶全賣光了！可是客人寫信來問了一件怪事。",
+                      "actorId": "mikan"
+                    },
+                    {
+                      "code": "text",
+                      "text": "（「喝了一口，想起了我的女兒。可是我女兒的事，怎麼會在您的眼淚裡？」）"
+                    },
+                    {
+                      "code": "text",
+                      "text": "客人紀錄？不行不行，那是本店的商業機密！……除非您拿得出比本店更厲害的帳。",
+                      "actorId": "mikan"
+                    },
+                    {
+                      "code": "choices",
+                      "options": [
+                        {
+                          "text": "拿出魚店大叔的分數本。",
+                          "condition": {
+                            "type": "item",
+                            "itemId": "score_book"
+                          },
+                          "commands": [
+                            {
+                              "code": "text",
+                              "text": "（晴生翻開分數本，指著打了叉的日子。美柑湊過來，把自己的出貨單攤在旁邊。）"
+                            },
+                            {
+                              "code": "text",
+                              "text": "……本店賣得最好的那幾天，跟大叔的叉，是同一天？好啦，給您。本店也想知道為什麼。",
+                              "actorId": "mikan"
+                            },
+                            {
+                              "code": "item",
+                              "itemId": "order_book",
+                              "delta": 1
+                            },
+                            {
+                              "code": "switch",
+                              "ids": [
+                                "c3_mikan"
+                              ],
+                              "value": true
+                            },
+                            {
+                              "code": "variable",
+                              "id": "c3_records",
+                              "op": "add",
+                              "value": 1
+                            },
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "variable",
+                                "id": "c3_records",
+                                "op": ">=",
+                                "value": 3
+                              },
+                              "then": [
+                                {
+                                  "code": "quest",
+                                  "questId": "q_night",
+                                  "action": "step",
+                                  "step": 1
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "（三份紀錄都拿到了。回傘店，把它們攤在櫃檯上吧。）"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "text": "說小光的紙鶴。",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c2_crane",
+                            "value": true
+                          },
+                          "commands": [
+                            {
+                              "code": "text",
+                              "text": "妳借我的那隻紙鶴，社長哭的時候，就握在手上。",
+                              "actorId": "player"
+                            },
+                            {
+                              "code": "text",
+                              "text": "……看在小光的份上。給您。不准外流喔。",
+                              "actorId": "mikan"
+                            },
+                            {
+                              "code": "item",
+                              "itemId": "order_book",
+                              "delta": 1
+                            },
+                            {
+                              "code": "switch",
+                              "ids": [
+                                "c3_mikan"
+                              ],
+                              "value": true
+                            },
+                            {
+                              "code": "variable",
+                              "id": "c3_records",
+                              "op": "add",
+                              "value": 1
+                            },
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "variable",
+                                "id": "c3_records",
+                                "op": ">=",
+                                "value": 3
+                              },
+                              "then": [
+                                {
+                                  "code": "quest",
+                                  "questId": "q_night",
+                                  "action": "step",
+                                  "step": 1
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "（三份紀錄都拿到了。回傘店，把它們攤在櫃檯上吧。）"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "text": "改天再來。",
+                          "commands": [
+                            {
+                              "code": "text",
+                              "text": "本店隨時歡迎！帶著厲害的帳來！",
+                              "actorId": "mikan"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "c3_mikan",
+                        "value": true
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "錢存夠了。盂蘭盆節之後，本店就去東京。",
+                          "actorId": "mikan"
+                        }
+                      ]
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "mikan_stopped",
+                        "value": true
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "……本店，還在公休。",
+                          "actorId": "mikan"
+                        },
+                        {
+                          "code": "text",
+                          "text": "這些是以前的客人紀錄。我看了一整晚，每一個人想起的，都是自己的事。您拿去吧。",
+                          "actorId": "mikan"
+                        },
+                        {
+                          "code": "text",
+                          "text": "……我寫了一封信給我媽。還沒寄。",
+                          "actorId": "mikan"
+                        },
+                        {
+                          "code": "item",
+                          "itemId": "order_book",
+                          "delta": 1
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "c3_mikan"
+                          ],
+                          "value": true
+                        },
+                        {
+                          "code": "variable",
+                          "id": "c3_records",
+                          "op": "add",
+                          "value": 1
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "variable",
+                            "id": "c3_records",
+                            "op": ">=",
+                            "value": 3
+                          },
+                          "then": [
+                            {
+                              "code": "quest",
+                              "questId": "q_night",
+                              "action": "step",
+                              "step": 1
+                            },
+                            {
+                              "code": "text",
+                              "text": "（三份紀錄都拿到了。回傘店，把它們攤在櫃檯上吧。）"
+                            }
+                          ]
+                        }
+                      ],
+                      "else": [
+                        {
+                          "code": "text",
+                          "text": "本店小本經營中！今天也有三個客人！",
+                          "actorId": "mikan"
+                        },
+                        {
+                          "code": "text",
+                          "text": "客人紀錄？要那個做什麼……好啦，給您。每一筆都寫著，客人喝了之後想起了什麼。",
+                          "actorId": "mikan"
+                        },
+                        {
+                          "code": "item",
+                          "itemId": "order_book",
+                          "delta": 1
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "c3_mikan"
+                          ],
+                          "value": true
+                        },
+                        {
+                          "code": "variable",
+                          "id": "c3_records",
+                          "op": "add",
+                          "value": 1
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "variable",
+                            "id": "c3_records",
+                            "op": ">=",
+                            "value": 3
+                          },
+                          "then": [
+                            {
+                              "code": "quest",
+                              "questId": "q_night",
+                              "action": "step",
+                              "step": 1
+                            },
+                            {
+                              "code": "text",
+                              "text": "（三份紀錄都拿到了。回傘店，把它們攤在櫃檯上吧。）"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "c3_mikan",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "all",
+                        "conditions": [
+                          {
+                            "type": "switch",
+                            "id": "crane_return",
+                            "value": true
+                          },
+                          {
+                            "type": "item",
+                            "itemId": "crane"
+                          }
+                        ]
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "對了，這個還妳。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "text",
+                          "text": "（美柑接過紙鶴，放回餅乾鐵盒裡，蓋上蓋子之前，看了很久。）"
+                        },
+                        {
+                          "code": "text",
+                          "text": "……歡迎回家。",
+                          "actorId": "mikan"
+                        },
+                        {
+                          "code": "item",
+                          "itemId": "crane",
+                          "delta": -1
+                        }
+                      ],
+                      "else": [
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "crane_fukuda",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "那隻紙鶴，我留給社長了。",
+                              "actorId": "player"
+                            },
+                            {
+                              "code": "text",
+                              "text": "……那就送給社長吧。本店免費贈送。開店以來第一次。",
+                              "actorId": "mikan"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "c3_mikan"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_modern_girl"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "mikan_partner",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "東京的車票，本店已經買好了！……是單程票，因為不知道要待多久。",
+                      "actorId": "mikan"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "……盂蘭盆節那天，本店想去港口。放一盞燈籠給……算了，到時候再說。",
+                      "actorId": "mikan"
+                    }
+                  ]
+                }
+              ]
             }
           ]
         },
@@ -7684,6 +9478,1377 @@
           ]
         }
       ]
+    },
+    {
+      "id": "city_hospital",
+      "name": "市立醫院　舊病房大樓三樓",
+      "width": 18,
+      "height": 7,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "terrain": [
+        "bbbbbbbbbbbbbbbbbb",
+        "bwwbbbdbbbbbbwwbbb",
+        "boooooooooooooooob",
+        "boooooooooooooooob",
+        "bhhoooooooooooooob",
+        "boooooooooooooooob",
+        "bbbbbbbbdbbbbbbbbb"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "music": "melancholy",
+      "events": [
+        {
+          "id": "hosp_intro",
+          "name": "舊病房大樓",
+          "x": 8,
+          "y": 4,
+          "pages": [
+            {
+              "conditions": {
+                "switches": [
+                  "c3_deduced"
+                ]
+              },
+              "trigger": "autorun",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（舊病房大樓的三樓。電燈只亮了一半，走廊盡頭有一台綠色的公共電話。）"
+                },
+                {
+                  "code": "text",
+                  "text": "我在這裡等。你慢慢來。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "text",
+                  "text": "（三〇七號病房、走廊的公共電話、樓梯間的窗戶。那一夜，他去過這三個地方。）"
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "to_room307",
+          "name": "三〇七號病房",
+          "x": 6,
+          "y": 1,
+          "pages": [
+            {
+              "trigger": "touch",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "transfer",
+                  "mapId": "sayo_room",
+                  "x": 4,
+                  "y": 4,
+                  "direction": "up"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hosp_exit",
+          "name": "電梯",
+          "x": 8,
+          "y": 6,
+          "pages": [
+            {
+              "trigger": "touch",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（電梯口貼著「停止使用」。周防博士說，看完了再一起走樓梯下去。）"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "suou_hosp",
+          "name": "周防博士",
+          "x": 10,
+          "y": 5,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_long_hair"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "variable",
+                    "id": "c3_memories",
+                    "op": ">=",
+                    "value": 3
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "最後一塊在病房裡吧。去吧。",
+                      "actorId": "suou"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "慢慢來。這裡下個月就要拆了，可是今天，時間是你的。",
+                      "actorId": "suou"
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "m_bed",
+                        "value": false
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "三〇七號病房，就在那扇門後面。",
+                          "actorId": "suou"
+                        }
+                      ]
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "m_phone",
+                        "value": false
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "走廊盡頭那台公共電話，十年前還能打。",
+                          "actorId": "suou"
+                        }
+                      ]
+                    },
+                    {
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "m_window",
+                        "value": false
+                      },
+                      "then": [
+                        {
+                          "code": "text",
+                          "text": "樓梯間的窗戶，看得見整座城。",
+                          "actorId": "suou"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "payphone",
+          "name": "公共電話",
+          "x": 17,
+          "y": 3,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（綠色的公共電話。話筒上積了一層灰。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（十年前，他就是在這裡打電話給小夜的媽媽。凌晨兩點十五分。）"
+                },
+                {
+                  "code": "text",
+                  "text": "媽……小夜她……",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "（電話那頭沉默了很久，然後是一個很平的聲音。）"
+                },
+                {
+                  "code": "text",
+                  "text": "……是嗎。我知道了。",
+                  "speaker": "小夜的媽媽"
+                },
+                {
+                  "code": "text",
+                  "text": "（她沒有哭。那一刻，全世界的人都沒有哭。只有他，在這台電話前面，哭到站不住。）"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "m_phone"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "variable",
+                  "id": "c3_memories",
+                  "op": "add",
+                  "value": 1
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "variable",
+                    "id": "c3_memories",
+                    "op": ">=",
+                    "value": 3
+                  },
+                  "then": [
+                    {
+                      "code": "quest",
+                      "questId": "q_night",
+                      "action": "step",
+                      "step": 3
+                    },
+                    {
+                      "code": "text",
+                      "text": "（那一夜的三個片段都回來了。最後一塊，在三〇七號病房。）"
+                    }
+                  ]
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（話筒掛回去了。那個很平的聲音，還在耳朵裡。）"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "stair_window",
+          "name": "樓梯間的窗戶",
+          "x": 14,
+          "y": 1,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（樓梯間的窗戶。十年前的那一夜，外面下著很大的梅雨。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（他記得自己站在這裡，把額頭靠在玻璃上。然後——雨停了。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（不是慢慢變小。是一瞬間，整座城市的雨，同時停了。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（隔天早上是大晴天。後來，大家把那一天叫做「晴天日」。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（窗外的雨停了。可是他的雨，一直沒有停。）"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "m_window"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "variable",
+                  "id": "c3_memories",
+                  "op": "add",
+                  "value": 1
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "variable",
+                    "id": "c3_memories",
+                    "op": ">=",
+                    "value": 3
+                  },
+                  "then": [
+                    {
+                      "code": "quest",
+                      "questId": "q_night",
+                      "action": "step",
+                      "step": 3
+                    },
+                    {
+                      "code": "text",
+                      "text": "（那一夜的三個片段都回來了。最後一塊，在三〇七號病房。）"
+                    }
+                  ]
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（窗外是七月的晴天。看得見港口。）"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "hosp_chairs",
+          "name": "候診椅",
+          "x": 1,
+          "y": 4,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（一排褪色的候診椅。那一夜，小夜的媽媽沒有來。椅子一直是空的。）"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sayo_room",
+      "name": "三〇七號病房",
+      "width": 8,
+      "height": 6,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "terrain": [
+        "bbbbbbbb",
+        "bwwbbwwb",
+        "boeoooob",
+        "boEoooob",
+        "boooohob",
+        "bbbbdbbb"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "music": "melancholy",
+      "events": [
+        {
+          "id": "room_exit",
+          "name": "門",
+          "x": 4,
+          "y": 5,
+          "pages": [
+            {
+              "trigger": "touch",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "transfer",
+                  "mapId": "city_hospital",
+                  "x": 6,
+                  "y": 2,
+                  "direction": "down"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sayo_bed",
+          "name": "病床",
+          "x": 2,
+          "y": 2,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（三〇七號病房。床單是新的，窗簾是舊的。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（晴生在床邊坐下。手放到床沿的那一瞬間，他想起來了。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（十年前的這張床上，小夜瘦得只剩下一雙眼睛。她握著他的手，問了一句很普通的話。）"
+                },
+                {
+                  "code": "text",
+                  "text": "……傘，修好了沒？",
+                  "speaker": "小夜"
+                },
+                {
+                  "code": "text",
+                  "text": "（她那把天藍色的折傘，傘骨斷了兩根。他說：「明天就修好。」）"
+                },
+                {
+                  "code": "text",
+                  "text": "你每次都這樣說。",
+                  "speaker": "小夜"
+                },
+                {
+                  "code": "text",
+                  "text": "（她笑了一下。那是她說的，最後一句話。）"
+                },
+                {
+                  "code": "text",
+                  "text": "……我到現在，還沒修好。",
+                  "actorId": "player"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "m_bed"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "variable",
+                  "id": "c3_memories",
+                  "op": "add",
+                  "value": 1
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "variable",
+                    "id": "c3_memories",
+                    "op": ">=",
+                    "value": 3
+                  },
+                  "then": [
+                    {
+                      "code": "quest",
+                      "questId": "q_night",
+                      "action": "step",
+                      "step": 3
+                    },
+                    {
+                      "code": "text",
+                      "text": "（那一夜的三個片段都回來了。最後一塊，在三〇七號病房。）"
+                    }
+                  ]
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（床單是新的。可是他記得，十年前床單上有一小塊被眼淚弄溼的痕跡。是他的。）"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "the_minute",
+          "name": "那一分鐘",
+          "x": 4,
+          "y": 3,
+          "note": "第 3 章的合：小夜過世的那一分鐘",
+          "pages": [
+            {
+              "conditions": {
+                "switches": [
+                  "c3_deduced"
+                ],
+                "variable": {
+                  "id": "c3_memories",
+                  "min": 3
+                }
+              },
+              "trigger": "autorun",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（凌晨兩點十三分。小夜的手鬆開的那一刻，他哭了。那一分鐘的眼淚，是他自己的。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（兩點十四分。有什麼東西從四面八方湧進來：不認識的老人的臉、一隻沒有回家的狗、一通沒有接到的電話……）"
+                },
+                {
+                  "code": "text",
+                  "text": "（全世界的悲傷，流向了那一刻正在痛哭的人。他自己的那一分鐘，就這樣被淹沒了。）"
+                },
+                {
+                  "code": "text",
+                  "text": "……小夜。",
+                  "actorId": "player"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "只為小夜哭。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "（他閉上眼睛。湧上來的，卻是佐藤爺爺的孫子、郵局太太的先生、遠方大火裡的陌生人……）"
+                        },
+                        {
+                          "code": "text",
+                          "text": "……我找不到她。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "c3_tried"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    },
+                    {
+                      "text": "……現在還不行。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "（他沒有試。他怕一試，就會發現自己做不到。）"
+                        },
+                        {
+                          "code": "text",
+                          "text": "……對不起。再等我一下。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "c3_waited"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "text",
+                  "text": "（周防博士站在門口。）……你找到了。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "text",
+                  "text": "我的研究可以寫成論文。公開的話，鎮上的人會知道自己的悲傷在哪裡，要不要拿回去，他們自己決定。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "text",
+                  "text": "可是你會變成一座水庫。福壽堂、美柑、東京的研究所，所有人都會來排隊。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "text",
+                  "text": "不公開的話，你可以繼續當一個修傘的。可是最後要不要還，只有你一個人決定。……你來選。",
+                  "actorId": "suou"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "公開吧。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "大家的悲傷，應該讓大家自己決定。就算之後，我得天天排隊給人哭。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "text",
+                          "text": "……好。我會寫得很小心。",
+                          "actorId": "suou"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "research_public"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    },
+                    {
+                      "text": "不要公開。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……我不想變成水庫。也不想讓鎮上的人，一覺醒來發現自己欠了十年的眼淚。",
+                          "actorId": "player"
+                        },
+                        {
+                          "code": "text",
+                          "text": "好。那這件事，只有我們兩個知道。",
+                          "actorId": "suou"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "c3_decided"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "quest",
+                  "questId": "q_night",
+                  "action": "complete"
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                },
+                {
+                  "code": "wait",
+                  "ms": 600
+                },
+                {
+                  "code": "transfer",
+                  "mapId": "harbor",
+                  "x": 12,
+                  "y": 6,
+                  "direction": "up"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "room_window",
+          "name": "窗戶",
+          "x": 5,
+          "y": 1,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（窗外看得見港口。阿樹三個月前，就是在那裡。）"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "harbor",
+      "name": "潮見港",
+      "width": 24,
+      "height": 12,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "terrain": [
+        "~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~",
+        "~~~~~~~~~~~~~~~~~~~~~~~~",
+        "________________________",
+        "aaaaaaaaaaaaaaaaaaaaaaaa",
+        "aanaaaaaaataaaaaaanaaaaa",
+        "aaaaaaaaaaaaaaaaaaaaaaaa",
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "llllllllllllllllllllllll",
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "bbbbbwwbbbbbbbbbwwbbbbbb"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        [
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "music": "melancholy",
+      "events": [
+        {
+          "id": "c3_end",
+          "name": "阿梅婆婆",
+          "x": 13,
+          "y": 6,
+          "note": "第 3 章章末：燈籠流水的海報",
+          "pages": [
+            {
+              "conditions": {
+                "switches": [
+                  "c3_decided"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_modern_elder"
+              },
+              "trigger": "autorun",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（從醫院出來，太陽已經下山了。晴生一個人走到港口。三個月前，阿樹就是在這裡。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（倉庫的牆上貼著海報：「燈籠流水　八月十五日　潮見港」。）"
+                },
+                {
+                  "code": "text",
+                  "text": "孩子，你也來看海啊。（阿梅婆婆提著一袋燈籠紙，慢慢走過來。）",
+                  "actorId": "ume"
+                },
+                {
+                  "code": "text",
+                  "text": "燈籠流水那天晚上，回不了家的東西，都會回家喔。……今年，你也放一盞吧。",
+                  "actorId": "ume"
+                },
+                {
+                  "code": "text",
+                  "text": "……放給誰？",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "給你想讓它回家的。",
+                  "actorId": "ume"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "research_public",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "（周防博士的論文，會在燈籠流水之前寫好。到時候，鎮上每個人都會知道。）"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "（這件事，只有他和周防博士知道。到了那天晚上，他得一個人決定。）"
+                    }
+                  ]
+                },
+                {
+                  "code": "text",
+                  "text": "（海很平靜。燈塔的光，一圈一圈掃過水面。）"
+                },
+                {
+                  "code": "ending",
+                  "endingId": "end_ch3"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "poster",
+          "name": "海報",
+          "x": 6,
+          "y": 11,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（「燈籠流水　八月十五日　晚上七點　潮見港」。海報的一角被風吹得翹起來了。）"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "view": "wide"
     }
   ],
   "assetManifest": {
@@ -7998,6 +11163,40 @@
       "condition": {
         "type": "switch",
         "id": "mikan_stopped",
+        "value": true
+      }
+    },
+    {
+      "id": "achv_deduce",
+      "title": "一個下午",
+      "description": "在傘店的櫃檯前，一次都沒有說錯，就拼出了答案。",
+      "hint": "三本帳攤在一起，答案就在那裡",
+      "condition": {
+        "type": "all",
+        "conditions": [
+          {
+            "type": "switch",
+            "id": "c3_deduced",
+            "value": true
+          },
+          {
+            "type": "variable",
+            "id": "c3_wrong",
+            "op": "==",
+            "value": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "achv_lastpage",
+      "title": "分數本的最後一頁",
+      "description": "偷看了魚店大叔分數本的最後一頁。",
+      "hint": "大叔叫你別看的那一頁",
+      "hidden": true,
+      "condition": {
+        "type": "switch",
+        "id": "c3_lastpage",
         "value": true
       }
     }

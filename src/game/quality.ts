@@ -125,7 +125,8 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
     quests: project.quests.length,
     questSteps: project.quests.reduce((n, q) => n + q.steps.length, 0),
     items: project.items.length,
-    endings: project.endings.length,
+    // 連載的「未完待續」結局（nextChapterId）只是章節的收尾，不算進結局數
+    endings: project.endings.filter((e) => !e.nextChapterId).length,
     chapters: project.chapters.length,
     texts: texts.length,
     avgTextChars,

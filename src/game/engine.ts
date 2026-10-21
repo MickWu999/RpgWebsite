@@ -513,9 +513,10 @@ export function confirm(project: GameProject, input: PlayerState): ActionResult 
   const events: GameEvent[] = [];
   if (isBusy(input)) return { state: input, events };
   const s = clone(input);
-  const under = eventsAt(project, s, s.x, s.y).find((e) => e.page.priority !== "same" && e.page.trigger === "action");
+  // 沒有任何指令的事件頁（例如劇情結束後留下的空白頁）不會吃掉確定鍵，讓玩家能調查面前的東西
+  const under = eventsAt(project, s, s.x, s.y).find((e) => e.page.priority !== "same" && e.page.trigger === "action" && e.page.commands.length > 0);
   const front = facedTile(s);
-  const target = under ?? eventsAt(project, s, front.x, front.y).find((e) => e.page.priority === "same" && e.page.trigger === "action");
+  const target = under ?? eventsAt(project, s, front.x, front.y).find((e) => e.page.priority === "same" && e.page.trigger === "action" && e.page.commands.length > 0);
   if (!target) return { state: input, events };
   startEvent(s, s.mapId, target.event, target.index, events);
   run(project, s, events);
