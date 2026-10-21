@@ -76,7 +76,6 @@ export const SCREEN_W = 640;
 export const SCREEN_H = 480;
 const MOVE_INTERVAL_MS = 140;
 /** 手機橫向時畫面依螢幕比例變寬（固定寬 640，高度介於此範圍），搖桿與按鈕疊在畫面上 */
-const MIN_SCREEN_H = 260;
 
 type Mode = "loading" | "splash" | "cover" | "title" | "map" | "menu" | "ending";
 export type TestStart = { chapterId?: string; at?: { mapId: string; x: number; y: number } };
@@ -99,6 +98,8 @@ type UI = {
   banner: { text: string; id: number } | null;
   fadeId: number;
   toasts: Toast[];
+  /** 成就解鎖的橫幅（畫面上方正中央，短暫出現） */
+  achievementPop: { id: number; title: string; description: string } | null;
   notice: string | null;
   /** 自動存檔提示（重要事件後短暫顯示） */
   savedFlash: number;
@@ -253,6 +254,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         banner: null,
         fadeId: 0,
         toasts: [],
+        achievementPop: null,
         notice,
         savedFlash: 0,
         settings: loadSettings(),
@@ -345,18 +347,25 @@ export default function GameScreen({ source }: { source: GameSource }) {
   }, [source.test]);
 
   // ---------- 縮放 ----------
+  // 地圖的畫面模式：standard＝RPG 比例（4:3，寬螢幕兩側留黑邊）；wide＝全景（填滿寬螢幕）。標題與封面一律用 standard
+  const wideView = Boolean(project && ui && (ui.mode === "map" || ui.mode === "menu" || ui.mode === "ending") && project.maps.find((m) => m.id === ui.game.mapId)?.view === "wide");
   useEffect(() => {
     const resize = () => {
       const touch = window.matchMedia("(pointer: coarse)").matches;
       const portrait = window.innerHeight > window.innerWidth;
       const canFullscreen = touch && Boolean(document.documentElement.requestFullscreen);
-      if (touch && !portrait) {
-        // 手機橫向：畫面寬度填滿螢幕，高度依螢幕比例決定，鏡頭跟著角色捲動。
-        // 虛擬按鍵疊在畫面上，依情境自動隱藏（對話時隱藏），不另外縮小畫面
-        const width = window.innerWidth;
-        const height = Math.round(Math.min(SCREEN_H, Math.max(MIN_SCREEN_H, (SCREEN_W * window.innerHeight) / width)));
-        const scale = Math.min(width / SCREEN_W, window.innerHeight / height);
+      if (wideView && !portrait) {
+        // 全景：寬度填滿螢幕，高度依螢幕比例決定（至少 260），鏡頭跟著角色捲動
+        const height = Math.round(Math.min(SCREEN_H, Math.max(260, (SCREEN_W * window.innerHeight) / window.innerWidth)));
+        const scale = Math.min(window.innerWidth / SCREEN_W, window.innerHeight / height);
         setLayout({ scale, height, touch, portrait, canFullscreen });
+        return;
+      }
+      if (touch && !portrait) {
+        // 手機橫向：維持 RPG 的畫面比例（4:3，接近 RPG Maker MZ 預設的 816×624），以螢幕高度為準放大。
+        // 左右的黑邊剛好放十字鍵與 A 鍵，按鍵不會蓋住畫面，手指放在邊緣也不會誤觸；每支手機看到的畫面範圍都一樣
+        const scale = Math.min(window.innerWidth / SCREEN_W, window.innerHeight / SCREEN_H);
+        setLayout({ scale, height: SCREEN_H, touch, portrait, canFullscreen });
         return;
       }
       // 桌面：4:3 等比放大；手機直向（備用）：下方保留手把空間
@@ -370,7 +379,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [wideView]);
 
   useEffect(() => {
     (window as unknown as { __RPG_DEBUG__?: unknown }).__RPG_DEBUG__ = {
@@ -449,10 +458,18 @@ export default function GameScreen({ source }: { source: GameSource }) {
         sfx(SOUNDS.questComplete, 0.5);
         if (source.kind === "pack") unlockedNow.forEach((a) => trackPlay(p.id, "achievement", { chapterId: result.state.chapterId, ref: a.id.slice(0, 64) }));
       }
-      const toasts = [
-        ...result.events.map((e) => eventToast(p, e)).filter((t): t is string => Boolean(t)),
-        ...unlockedNow.map((a) => `🏆 解鎖成就：${a.title}`),
-      ].map((text) => ({ id: ++seq.current, text }));
+      const toasts = result.events
+        .map((e) => eventToast(p, e))
+        .filter((t): t is string => Boolean(t))
+        .map((text) => ({ id: ++seq.current, text }));
+      // 成就：上方正中央的橫幅（同時解鎖好幾個時，一個接一個出現）
+      unlockedNow.forEach((a, i) =>
+        window.setTimeout(() => {
+          const pop = { id: ++seq.current, title: a.title, description: a.description };
+          update((x) => ({ ...x, achievementPop: pop }));
+          window.setTimeout(() => update((x) => (x.achievementPop?.id === pop.id ? { ...x, achievementPop: null } : x)), 3200);
+        }, i * 3400),
+      );
       const transferred = result.events.some((e) => e.type === "transferred");
       const important = result.events.some((e) => e.type === "item" || e.type === "quest" || e.type === "transferred" || e.type === "chapter" || e.type === "ending");
       const fadeId = transferred ? ++seq.current : u.fadeId;
@@ -615,7 +632,12 @@ export default function GameScreen({ source }: { source: GameSource }) {
       }
 
       if (u.mode === "ending") {
-        if (key === "ok") update({ ...u, mode: "title", titleCursor: 0, titleLoad: false });
+        if (key === "ok") {
+          // 連載：下一章已經推出時，確定鍵直接接著玩；否則回到標題
+          const next = continueFromEnding(p, u.game);
+          if (next) enterMap(next);
+          else update({ ...u, mode: "title", titleCursor: 0, titleLoad: false });
+        }
         return;
       }
 
@@ -936,7 +958,10 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const textMsg = msg?.kind === "text" ? msg : null;
   const chapterCard = msg?.kind === "chapter" ? project.chapters.find((c) => c.id === msg.chapterId) : undefined;
   // 虛擬按鍵依情境顯示：對話（只有文字）、開場文字、章節標題卡時隱藏，點畫面就繼續；出現選項時只留 ▲▼ 與 A
-  const padVariant: "full" | "choices" | null = textMsg?.choices?.length ? "choices" : textMsg || chapterCard || ui.messages.length > 0 ? null : "full";
+  // 虛擬按鍵依情境顯示：對話、開場文字、章節標題卡只留 A（螢幕觸控在方向鍵模式下是關閉的）；出現選項時留 ▲▼ 與 A
+  const padVariant: "full" | "choices" | "dialog" = textMsg?.choices?.length ? "choices" : textMsg || chapterCard || ui.messages.length > 0 ? "dialog" : "full";
+  /** 方向鍵模式：關閉螢幕觸控，只用虛擬按鍵操作，避免誤觸 */
+  const padOnly = layout.touch && ui.settings.touch === "pad";
   const speaker = textMsg ? messageSpeaker(project, textMsg) : null;
   const choices = textMsg?.choices ?? [];
   const asset = (id?: string) => project.assetManifest.assets.find((a) => a.id === id);
@@ -958,7 +983,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
     >
       <div className="rm-screen-box" style={{ width: SCREEN_W * layout.scale, height: layout.height * layout.scale }}>
         <div
-          className={`rm-screen${layout.height < 400 ? " short" : ""}`}
+          className={`rm-screen${layout.height < 400 ? " short" : ""}${padOnly ? " pad-only" : ""}`}
           style={{ width: SCREEN_W, height: layout.height, transform: `scale(${layout.scale})` }}
           data-testid="game-frame"
           data-mode={ui.mode}
@@ -975,6 +1000,16 @@ export default function GameScreen({ source }: { source: GameSource }) {
             </div>
           )}
 
+          {ui.achievementPop && (
+            <div key={ui.achievementPop.id} className="rm-achv-pop" role="status" data-testid="achievement-pop">
+              <span className="rm-achv-pop-icon">🏆</span>
+              <div>
+                <div className="rm-achv-pop-label">解鎖成就</div>
+                <div className="rm-achv-pop-title">{ui.achievementPop.title}</div>
+                <div className="rm-achv-pop-desc">{ui.achievementPop.description}</div>
+              </div>
+            </div>
+          )}
           <div className="rm-toasts" aria-live="polite">
             {ui.toasts.map((t) => (
               <div key={t.id} className="rm-window rm-toast">
@@ -1019,7 +1054,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
             <div className="rm-chapter" data-testid="chapter-card" onClick={() => act(advance)}>
               <div className="rm-chapter-title">{chapterCard.title}</div>
               {chapterCard.summary && <div className="rm-chapter-summary">{chapterCard.summary}</div>}
-              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 或點一下繼續" : "點一下繼續") : "按確定鍵繼續"}</div>
+              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 繼續" : "點一下繼續") : "按確定鍵繼續"}</div>
             </div>
           )}
 
@@ -1046,7 +1081,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                 {project.chapters.length > 0 && <span>📖 {project.chapters.length} 章</span>}
                 <span>🏁 {project.endings.length} 種結局</span>
               </div>
-              <div className="rm-press-start">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 或點擊畫面開始" : "點擊畫面開始") : "按任意鍵開始"}</div>
+              <div className="rm-press-start">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 開始" : "點擊畫面開始") : "按任意鍵開始"}</div>
             </div>
           )}
 
@@ -1081,7 +1116,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                   ))}
                 </div>
               )}
-              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "▲▼ 選擇・A 確定（也可以直接點）" : "點一下選擇") : `方向鍵選擇・Z／Enter 確認・X／Esc 取消${isStudio ? "・F9 除錯" : ""}`}</div>
+              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "▲▼ 選擇・A 確定" : "點一下選擇") : `方向鍵選擇・Z／Enter 確認・X／Esc 取消${isStudio ? "・F9 除錯" : ""}`}</div>
             </div>
           )}
 
@@ -1234,7 +1269,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                 <div className="rm-the-end">— THE END —</div>
               )}
               <div className="rm-dim">步數 {game.steps}・完成任務 {journal.filter((q) => q.status === "completed").length}</div>
-              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 回到標題" : "點一下回到標題") : "按確定鍵回到標題"}</div>
+              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 繼續" : "點一下回到標題") : "按確定鍵回到標題"}</div>
             </div>
           )}
 
@@ -1307,7 +1342,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
           onClose={() => setDebugOpen(false)}
         />
       )}
-      {layout.touch && ui.settings.touch === "pad" && !(layout.portrait && !portraitOk) && padVariant && (
+      {padOnly && !(layout.portrait && !portraitOk) && (
         <TouchPad
           variant={padVariant}
           lift={Math.round((layout.height < 400 ? 112 : 148) * layout.scale)}

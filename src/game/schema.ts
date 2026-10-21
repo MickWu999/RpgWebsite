@@ -190,6 +190,11 @@ export const mapSchema = z.strictObject({
   terrain: z.array(z.string().max(64)).max(64),
   walkable: z.array(z.array(z.boolean()).max(64)).max(64),
   music: z.enum(MUSIC_MOOD_IDS).optional(),
+  /**
+   * 畫面模式（營造氣氛用）：standard＝RPG 比例（4:3，寬螢幕兩側留黑邊，預設）；wide＝全景（填滿寬螢幕）。
+   * 例如告別式會場用 standard 顯得封閉安靜，海邊的燈籠流水用 wide 顯得開闊。
+   */
+  view: z.enum(["standard", "wide"]).optional(),
   events: z.array(mapEventSchema).max(200),
 });
 

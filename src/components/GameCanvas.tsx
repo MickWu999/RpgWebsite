@@ -4,7 +4,7 @@ import { useEffect, useRef, type RefObject } from "react";
 import type * as PhaserNS from "phaser";
 import { TERRAIN, terrainSheet, terrainUnder } from "@/game/assets";
 import { facedTile, getMap, isBusy, visibleEvents, type PlayerState } from "@/game/engine";
-import type { AssetDefinition, GameProject } from "@/game/schema";
+import type { AssetDefinition, GameProject, MapDefinition } from "@/game/schema";
 
 /**
  * Phaser 3 渲染層：只依 PlayerState 繪製畫面，不處理遊戲邏輯與鍵盤輸入（輸入由 PlayView 統一處理）。
@@ -74,9 +74,7 @@ function createWorldScene(
         resize: (height) => {
           this.scale.resize(VIEW_WIDTH, height);
           if (!this.currentSceneId) return;
-          const scene = getMap(project, this.currentSceneId);
-          const ts = scene.tileSize;
-          this.cameras.main.setBounds(0, 0, Math.max(scene.width * ts, VIEW_WIDTH), Math.max(scene.height * ts, height));
+          this.fitCamera(getMap(project, this.currentSceneId));
         },
       });
     }
@@ -167,20 +165,25 @@ function createWorldScene(
       this.tweens.add({ targets: this.marker, scale: 1.25, yoyo: true, repeat: -1, duration: 350 });
 
       const cam = this.cameras.main;
-      // 地圖比畫面小（例如室內小房間）時放大（最多 1.5 倍）並置中，手機上才不會小小一塊擠在角落
-      const mw = scene.width * ts;
-      const mh = scene.height * ts;
-      const zoom = Math.max(1, Math.min(1.5, this.scale.width / mw, this.scale.height / mh));
-      cam.setZoom(zoom);
-      const vw = this.scale.width / zoom;
-      const vh = this.scale.height / zoom;
-      cam.setBounds(mw < vw ? (mw - vw) / 2 : 0, mh < vh ? (mh - vh) / 2 : 0, Math.max(mw, vw), Math.max(mh, vh));
+      this.fitCamera(scene);
       cam.startFollow(this.player, true, 0.2, 0.2);
       cam.centerOn(px, py);
       for (const n of this.nameLabels) n.label.setVisible(Math.abs(n.x - state.x) + Math.abs(n.y - state.y) <= 2);
       this.currentSceneId = scene.id;
       this.signature = this.signatureOf(state);
       this.last = { x: state.x, y: state.y };
+    }
+
+    /** 地圖比畫面小（例如室內小房間）時放大（最多 1.5 倍）並置中，手機上才不會小小一塊擠在角落；畫面高度改變時重新計算 */
+    private fitCamera(scene: MapDefinition) {
+      const cam = this.cameras.main;
+      const mw = scene.width * scene.tileSize;
+      const mh = scene.height * scene.tileSize;
+      const zoom = Math.max(1, Math.min(1.5, this.scale.width / mw, this.scale.height / mh));
+      cam.setZoom(zoom);
+      const vw = this.scale.width / zoom;
+      const vh = this.scale.height / zoom;
+      cam.setBounds(mw < vw ? (mw - vw) / 2 : 0, mh < vh ? (mh - vh) / 2 : 0, Math.max(mw, vw), Math.max(mh, vh));
     }
 
     private label(x: number, y: number, text: string, color: string) {

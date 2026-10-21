@@ -55,6 +55,7 @@ export const opSchema = z.discriminatedUnion("op", [
     height: z.number().int().min(3).max(64),
     fill: terrainChar.optional(),
     music: z.enum(MUSIC_MOOD_IDS).optional(),
+    view: z.enum(["standard", "wide"]).optional(),
     parentId: idSchema.optional(),
   }),
   z.strictObject({
@@ -62,6 +63,8 @@ export const opSchema = z.discriminatedUnion("op", [
     id: idSchema,
     name: z.string().min(1).max(200).optional(),
     music: z.enum(MUSIC_MOOD_IDS).nullable().optional(),
+    /** 畫面模式：standard＝RPG 比例（兩側黑邊）；wide＝全景；null＝回到預設 */
+    view: z.enum(["standard", "wide"]).nullable().optional(),
     parentId: idSchema.nullable().optional(),
   }),
   z.strictObject({ op: z.literal("map.resize"), id: idSchema, width: z.number().int().min(3).max(64), height: z.number().int().min(3).max(64), fill: terrainChar.optional() }),
@@ -276,6 +279,7 @@ function applyOne(p: GameProject, op: StudioOp) {
         terrain,
         walkable: walkableFromTerrain(terrain),
         ...(op.music ? { music: op.music } : {}),
+        ...(op.view ? { view: op.view } : {}),
         events: [],
       });
       return;
@@ -285,6 +289,8 @@ function applyOne(p: GameProject, op: StudioOp) {
       if (op.name !== undefined) m.name = op.name;
       if (op.music === null) delete m.music;
       else if (op.music !== undefined) m.music = op.music;
+      if (op.view === null) delete m.view;
+      else if (op.view !== undefined) m.view = op.view;
       if (op.parentId === null) delete m.parentId;
       else if (op.parentId !== undefined) {
         if (op.parentId === m.id) throw new Error("地圖不能是自己的上層");

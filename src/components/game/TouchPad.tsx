@@ -12,7 +12,8 @@ type PadKey = Direction | "ok";
  * 依情境顯示（參考 RPG Maker 手機按鍵外掛的做法：對話時隱藏，不擋對話框）：
  * - full：地圖與選單，十字鍵＋A
  * - choices：出現選項時只留 ▲▼ 與 A，抬高到對話框上方的左側（選項視窗在右側）
- * 對話（只有文字）時由呼叫端不顯示，點畫面任何地方就繼續。
+ * - dialog：對話與章節標題卡只留 A
+ * 方向鍵模式下螢幕觸控是關閉的（避免誤觸），所以每個情境都要有按鍵可以操作。
  */
 export default function TouchPad({
   variant,
@@ -21,7 +22,7 @@ export default function TouchPad({
   onPress,
   onRelease,
 }: {
-  variant: "full" | "choices";
+  variant: "full" | "choices" | "dialog";
   /** choices 時抬高的距離（對話框的高度，px） */
   lift: number;
   opacity: number;
@@ -50,6 +51,17 @@ export default function TouchPad({
     onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
   });
   const style = { "--pad-opacity": opacity } as React.CSSProperties;
+  if (variant === "dialog") {
+    // 對話、章節標題卡：只需要 A（繼續）
+    return (
+      <div className="rm-pad dialog" style={style} data-testid="touch-pad" data-variant="dialog">
+        <span />
+        <button className="rm-a" aria-label="A（繼續）" data-testid="pad-a" {...bind("ok")}>
+          A
+        </button>
+      </div>
+    );
+  }
   if (variant === "choices") {
     return (
       <div className="rm-pad choices" style={{ ...style, bottom: lift }} data-testid="touch-pad" data-variant="choices">

@@ -455,6 +455,13 @@ export default function StudioApp({ projectId, initialDb }: { projectId: string;
                   ))}
                 </select>
               </label>
+              <label className="field">
+                畫面模式（氣氛）
+                <select value={map.view ?? "standard"} onChange={(e) => dispatch([{ op: "map.update", id: map.id, view: e.target.value === "standard" ? null : "wide" }])}>
+                  <option value="standard">RPG 比例（寬螢幕兩側留黑邊，較封閉、專注）</option>
+                  <option value="wide">全景（填滿寬螢幕，較開闊）</option>
+                </select>
+              </label>
               <div className="row">
                 <button
                   className="btn small"

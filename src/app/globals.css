@@ -601,6 +601,16 @@ details.card > summary { cursor: pointer; }
 .pipeline.compact .pipeline-line { width: 6px; margin: 0 2px; } .pipeline.compact .pipeline-track { row-gap: 4px; }
 
 /* ---------- 手機：直接觸控（不用虛擬搖桿） ---------- */
+/* 方向鍵模式（預設）：關閉遊戲畫面本身的觸控，只用虛擬按鍵操作（回饋框例外，要能點星星、打字） */
+.rm-screen.pad-only { pointer-events: none; }
+.rm-screen.pad-only .rm-feedback { pointer-events: auto; }
+/* 成就解鎖的橫幅：上方正中央滑入，約 3 秒後淡出 */
+.rm-achv-pop { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 9; display: flex; gap: 12px; align-items: center; min-width: 260px; max-width: 80%; padding: 8px 16px; border-radius: 10px; border: 2px solid #f2c94c; background: linear-gradient(180deg, rgb(44, 36, 12), rgb(22, 18, 6)); color: #fff; box-shadow: 0 6px 20px #000a; pointer-events: none; animation: rm-achv-pop 3.2s ease forwards; }
+.rm-achv-pop-icon { font-size: 30px; }
+.rm-achv-pop-label { font-size: 11px; color: #f2c94c; letter-spacing: 0.1em; }
+.rm-achv-pop-title { font-size: 17px; font-weight: bold; }
+.rm-achv-pop-desc { font-size: 12px; opacity: 0.8; }
+@keyframes rm-achv-pop { 0% { opacity: 0; transform: translate(-50%, -24px); } 10%, 82% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -12px); } }
 .rm-pad { position: fixed; inset: auto 0 0 0; z-index: 30; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 calc(18px + env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) calc(18px + env(safe-area-inset-left)); pointer-events: none; }
 .rm-pad button { pointer-events: auto; touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; font: inherit; color: #fff; border: 2px solid rgba(255, 255, 255, 0.55); background: rgba(30, 44, 98, 0.5); opacity: var(--pad-opacity, 0.6); }
 .rm-pad.choices { justify-content: flex-start; gap: 14px; align-items: center; padding-bottom: 10px; }
