@@ -54,6 +54,7 @@ function possibilities(project: GameProject) {
   const switchesOn = new Set<string>();
   const items = new Set(project.system.initialItems.map((i) => i.itemId));
   const varMax = new Map<string, number>();
+  if (project.system.clock) varMax.set("day", 1);
   const questStatus = new Map<string, Set<string>>();
   /** 每個事件自己會打開的獨立開關（共用事件裡的獨立開關作用在呼叫者身上） */
   const selfOn = new Map<string, Set<string>>();
@@ -65,6 +66,16 @@ function possibilities(project: GameProject) {
         const cur = varMax.get(c.id) ?? 0;
         const next = c.op === "add" && c.value > 0 ? Infinity : c.op === "sub" && c.value < 0 ? Infinity : c.op === "set" ? Math.max(cur, c.value) : cur;
         varMax.set(c.id, next);
+      }
+      // 時間經過：時段可以到最後一個，天數會一直增加
+      if (c.code === "time") {
+        const last = (project.system.clock?.periods.length ?? 1) - 1;
+        if (c.advance) {
+          varMax.set("period", Math.max(varMax.get("period") ?? 0, last));
+          varMax.set("day", Infinity);
+        }
+        if (c.period !== undefined) varMax.set("period", Math.max(varMax.get("period") ?? 0, c.period));
+        if (c.day !== undefined) varMax.set("day", Math.max(varMax.get("day") ?? 1, c.day));
       }
       if (c.code === "quest") {
         const s = questStatus.get(c.questId) ?? new Set<string>();
