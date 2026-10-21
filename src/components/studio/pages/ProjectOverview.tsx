@@ -490,7 +490,7 @@ export default function ProjectOverview() {
                 <div><b>{p.endings.length}</b><span>結局</span></div>
               </div>
               <div className="small muted" style={{ marginTop: 8 }}>
-                預估遊玩時間：{minutes ? `${minutes[0]}～${minutes[1]} 分鐘` : check ? "需要先通過驗證才能估算" : "在你的瀏覽器計算中…"}（目標 60～120 分鐘）
+                預估遊玩時間：{minutes ? `${minutes[0]}～${minutes[1]} 分鐘` : check ? "需要先通過驗證才能估算" : "在你的瀏覽器計算中…"}（長度由故事決定，不設下限）
               </div>
             </section>
             {check && check.validation.errors.length > 0 && (

@@ -201,7 +201,7 @@ export default function Database({
             onTab("chapters", id);
           },
         )}
-        {c ? <ChapterForm key={c.id} project={project} chapter={c} dispatch={dispatch} onTest={onTestChapter} /> : empty("還沒有章節。1～2 小時的遊戲建議分成 4～6 章；每章可以設定「測試起點」，直接從這一章開始測試。")}
+        {c ? <ChapterForm key={c.id} project={project} chapter={c} dispatch={dispatch} onTest={onTestChapter} /> : empty("還沒有章節。依故事分成 1～8 章；每章可以設定「測試起點」，直接從這一章開始測試。")}
       </>
     );
   } else if (tab === "commons") {

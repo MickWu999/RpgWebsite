@@ -87,20 +87,20 @@ export default function RulesContent() {
         <table className="version-table">
           <tbody>
             <tr>
-              <td className="small">全長（完結時）</td>
+              <td className="small">長度</td>
               <td className="small">
-                {Q.targetMinutes[0]}～{Q.targetMinutes[1]} 分鐘；{Q.minChapters}～{Q.maxChapters} 章（建議 {Q.recommendedChapters[0]}～{Q.recommendedChapters[1]} 章）
+                不設下限，由故事決定（寫在改編合約），不為了湊時間灌水；{Q.minChapters}～{Q.maxChapters} 章；全長超過 {Q.maxMinutes} 分鐘只會提醒考慮分部
               </td>
             </tr>
             <tr>
               <td className="small">每一章</td>
               <td className="small">
-                {Q.chapterMinutes[0]}～{Q.chapterMinutes[1]} 分鐘（建議 10～25 分鐘），從章節起點能玩到下一章、沒有卡死
+                從章節起點能玩到下一章、沒有卡死；超過 {Q.maxChapterMinutes} 分鐘只會提醒考慮拆章
               </td>
             </tr>
             <tr>
               <td className="small">連載中</td>
-              <td className="small">至少推出 1 章；全長、章節數與結局數完結時才檢查；「未完待續」結局可以讓玩家在新章推出後接著玩</td>
+              <td className="small">至少推出 1 章；結局數完結時才檢查；「未完待續」結局可以讓玩家在新章推出後接著玩</td>
             </tr>
             <tr>
               <td className="small">規模</td>

@@ -146,7 +146,7 @@ ${SHARED}
 
 ${REVIEW_RUBRIC}`;
 
-const TREATMENT_SYSTEM_PROMPT = `你是資深的 RPG 劇本統籌，負責在動工前審查一份 1～2 小時、分章製作的敘事 RPG（無戰鬥）劇本大綱。
+const TREATMENT_SYSTEM_PROMPT = `你是資深的 RPG 劇本統籌，負責在動工前審查一份分章製作的敘事 RPG（無戰鬥，長度依改編合約）劇本大綱。
 故事不夠好就不應該開始製作：請以「玩家會不會想一章接一章玩下去」為核心嚴格評分。
 
 ${SHARED}
@@ -255,7 +255,7 @@ export async function blindPredict(provider: StoryProvider, treatment: string): 
   return predictionSchema.parse(raw);
 }
 
-const PANEL_PROMPT = `你們是三位不同的玩家，正在試讀（或試玩）一款 1～2 小時、沒有戰鬥的劇情 RPG。你們沒看過任何製作規則，只憑自己的感覺判斷。
+const PANEL_PROMPT = `你們是三位不同的玩家，正在試讀（或試玩）一款沒有戰鬥的劇情 RPG。你們沒看過任何製作規則，只憑自己的感覺判斷。
 - veteran：玩過上百款 RPG 的老玩家，最在意「這我看過嗎？」
 - casual：只想輕鬆玩的玩家，最在意「會不會無聊、想跳過對話」
 - story：重視劇情的玩家，最在意「角色讓不讓人在意、有沒有一幕會記得」

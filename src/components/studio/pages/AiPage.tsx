@@ -206,7 +206,7 @@ export default function AiPage({ tab = "ai" }: { tab?: "ai" | "help" | "rules" }
             <tbody>
               <tr>
                 <td className="mono small">/rpg-new &lt;故事或專案 ID&gt;</td>
-                <td className="small">從零做一款新遊戲（目標 1～2 小時，一章一章製作）</td>
+                <td className="small">從零做一款新遊戲（長度由故事決定，一章一章製作）</td>
               </tr>
               <tr>
                 <td className="mono small">/rpg-expand &lt;專案ID&gt; &lt;內容&gt;</td>

@@ -26,4 +26,4 @@ AI 製作遊戲時查得到、而且會一直累積的參考資料。程式不�
 - `research/narrative-indie-rpg.md`：劇情驅動 RPG 的設計者怎麼想出前提（LISA、Undertale、OMORI、To the Moon、MOTHER、Disco Elysium、Pentiment、DDLC）。已整理成 P 段（W1～W11）與老套清單 CLICHES。
 - `references/gpt-rpg-studio-建議.md`：ChatGPT 對「怎麼寫好玩的 RPG 故事、AI 常犯的錯、AI 協作 Studio 怎麼設計」的建議（沒有出處，只當參考）。其中「角色降智、規模膨脹、秘密不揭曉、拒絕被強迫繞回、悲劇連發、角色知道不該知道的事」整理成 X9～X14。
 - `references/gpt-橫向捲軸與3D網頁RPG.md`：橫向捲軸（LISA）與 3D 網頁 RPG 的討論，以及本平台的結論（目前維持 2D 俯視角，之後可以讓單張地圖改成側面視角）。
-- `references/明天再拯救世界_RPG設定集.docx`：《明天再拯救世界！》原始設定集（使用者用 ChatGPT 產生），遊戲 `content/game-jmcxra/` 依此改編。
+- `references/明天再拯救世界_RPG設定集.docx`：《明天再拯救世界！》原始設定集（使用者用 ChatGPT 產生）。曾做成第一章 Demo，2026-10-21 使用者決定刪除專案、從《最後一個會哭的人》重新開始；設定集留著當參考。

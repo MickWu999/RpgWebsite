@@ -1,5 +1,5 @@
 ---
-description: 依 AI 開發規範，從故事或 Studio 專案製作一款 1～2 小時、分章節的 RPG（大綱審查 → 一章一章製作與審查 → 整體審查 → 發布）
+description: 依 AI 開發規範，從故事或 Studio 專案製作一款分章節的 RPG（長度由故事決定）（大綱審查 → 一章一章製作與審查 → 整體審查 → 發布）
 argument-hint: <故事、題材，或 Studio 專案 ID>
 ---
 
