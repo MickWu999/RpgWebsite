@@ -61,6 +61,8 @@ for (const dir of readdirSync(GAMES_DIR, { withFileTypes: true }).filter((d) => 
     endings: project.endings.length,
     npcs: quality.metrics.people,
     chapters: project.chapters.length,
+    release: project.release?.status ?? "complete",
+    plannedChapters: project.release?.plannedChapters,
     typicalMinutes: quality.metrics.duration?.typicalMinutes ?? null,
     cover: coverDataOf(project),
     path: `/games/${dir}/project.json`,

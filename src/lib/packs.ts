@@ -18,6 +18,9 @@ export type CatalogEntry = {
   npcs: number;
   /** 章節數（舊目錄沒有這個欄位） */
   chapters?: number;
+  /** 連載中或已完結（舊目錄沒有這個欄位＝已完結） */
+  release?: "ongoing" | "complete";
+  plannedChapters?: number;
   typicalMinutes: [number, number] | null;
   cover: CoverData;
   path: string;

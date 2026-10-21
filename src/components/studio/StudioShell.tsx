@@ -42,7 +42,7 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
   const [menu, setMenu] = useState(false);
   const isActive = (href: string) => {
     const [p, q] = href.split("?");
-    if (p === "/studio/ai/" && pathname.startsWith("/studio/help")) return true;
+    if (p === "/studio/ai/" && (pathname.startsWith("/studio/help") || pathname.startsWith("/studio/rules"))) return true;
     if (!pathname.startsWith(p.replace(/\/$/, ""))) return false;
     if (q?.includes("db=")) return Boolean(db);
     if (p.startsWith("/studio/edit") && db) return false;

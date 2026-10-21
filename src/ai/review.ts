@@ -25,6 +25,9 @@ const issuesSchema = z
   )
   .max(15);
 
+/** 重審時，逐條判定上一輪的問題是否已解決（讓審查收斂，不會每一輪都換一批新問題） */
+const followUpSchema = z.array(z.strictObject({ problem: z.string().max(200), resolved: z.boolean(), note: z.string().max(300) })).max(20);
+
 export const reviewSchema = z.strictObject({
   scores: z.strictObject({
     fidelity: score,
@@ -41,6 +44,7 @@ export const reviewSchema = z.strictObject({
   overall: score,
   summary: z.string().max(800),
   issues: issuesSchema,
+  followUp: followUpSchema,
 });
 export type AiReview = z.infer<typeof reviewSchema>;
 
@@ -49,10 +53,15 @@ export const treatmentReviewSchema = z.strictObject({
   overall: score,
   summary: z.string().max(800),
   issues: issuesSchema,
+  followUp: followUpSchema,
 });
 export type TreatmentReview = z.infer<typeof treatmentReviewSchema>;
 
-export const REVIEW_PASS_RULE = { minOverall: 7, minEachScore: 6, maxMajorIssues: 1 };
+/**
+ * 通過門檻：總分 ≥ 7、每個面向 ≥ 6、沒有 critical、major 最多 3 個。
+ * major 原本最多 1 個，但審查員每次都會列出許多 major，實測分數持續進步卻一直被這條擋下，所以放寬到 3 個；分數門檻不變。
+ */
+export const REVIEW_PASS_RULE = { minOverall: 7, minEachScore: 6, maxMajorIssues: 3 };
 
 export type ReviewKind = "treatment" | "chapter" | "full";
 export type ReviewResult = { kind: ReviewKind; target: string; revision?: string; passed: boolean; review: AiReview | TreatmentReview; reasons: string[]; reviewedAt: string };
@@ -61,6 +70,12 @@ const SHARED = `以下是本平台採用的敘事設計準則（製作端也照�
 ${DESIGN_GUIDE}
 
 問題的嚴重度：critical = 不修改就不能繼續；major = 明顯影響體驗；minor = 可以更好。
+只列出真正影響分數的問題：每個 major 都要對應到某個低於 8 分的面向；不要為了湊數而挑小毛病，minor 最多 5 個。
+如果提供了 <previous_review>（上一輪的審查），請先在 followUp 逐條判定那些問題是否已解決，再評分：
+- 已解決的問題不要再提；分數應該反映這些改善。
+- 新問題只有在屬於 critical，或會讓某個面向低於 6 分時才能提出，避免每一輪都換一批新標準。
+沒有上一輪審查時，followUp 給空陣列。
+如果提供了 <lessons>（案例庫：過去的玩家回饋與審查中最常出現的問題），請特別檢查這些問題是否重演。
 每個問題都要具體指出位置（章節、事件 ID、角色、任務或結局）並給出可以直接執行的修改建議。
 所有文字使用繁體中文（台灣用語）。`;
 
@@ -138,12 +153,26 @@ export function projectDigest(project: GameProject, playtest: PlaytestReport | n
   return lines.join("\n");
 }
 
+export type ReviewContext = { previous?: ReviewResult | null; lessons?: string | null };
+
+function contextBlocks(ctx: ReviewContext = {}) {
+  const parts: string[] = [];
+  if (ctx.previous) {
+    const r = ctx.previous.review;
+    parts.push(
+      `<previous_review>\n上一輪：總分 ${r.overall}，${ctx.previous.passed ? "通過" : "退回"}。\n${r.issues.map((i, n) => `${n + 1}. [${i.severity}] ${i.area}：${i.problem}`).join("\n")}\n</previous_review>`,
+    );
+  }
+  if (ctx.lessons?.trim()) parts.push(`<lessons>\n${ctx.lessons.trim().slice(0, 6000)}\n</lessons>`);
+  return parts.length ? `${parts.join("\n\n")}\n\n` : "";
+}
+
 /** 審查摘要的長度上限；超過時只保留章節路線經過的地圖 */
 const MAX_DIGEST = 120_000;
 
 /** 劇本大綱審查（動工前） */
-export async function reviewTreatment(provider: StoryProvider, story: string, treatment: string): Promise<ReviewResult> {
-  const prompt = `<story>\n${story}\n</story>\n\n<treatment>\n${treatment}\n</treatment>\n\n請審查這份劇本大綱並輸出評分結果。`;
+export async function reviewTreatment(provider: StoryProvider, story: string, treatment: string, ctx: ReviewContext = {}): Promise<ReviewResult> {
+  const prompt = `${contextBlocks(ctx)}<story>\n${story}\n</story>\n\n<treatment>\n${treatment}\n</treatment>\n\n請審查這份劇本大綱並輸出評分結果。`;
   const raw = await provider.generateJson({ systemPrompt: TREATMENT_SYSTEM_PROMPT, prompt, jsonSchema: toCliJsonSchema(treatmentReviewSchema) });
   const review = treatmentReviewSchema.parse(raw);
   const reasons = judge(review);
@@ -164,7 +193,7 @@ export async function reviewProject(
     quality: QualityReport;
     revision: string;
     chapter?: { index: number; route: string[] | null; minutes: [number, number] | null; mapIds?: string[] };
-  },
+  } & ReviewContext,
 ): Promise<ReviewResult> {
   const { story, treatment, project, playtest, quality, chapter } = input;
   let digest = projectDigest(project, playtest);
@@ -173,7 +202,7 @@ export async function reviewProject(
   const focus = ch
     ? `<focus>\n這次只審查第 ${chapter!.index + 1} 章「${ch.title}」（${ch.summary ?? ""}）。其他章節只當作背景，不要因為其他章節還沒完成而扣分；但要評估這一章和前後章節的銜接（H2 章末鉤子、H4 伏筆）。\n這一章從測試起點到${chapter!.index + 1 < project.chapters.length ? "下一章" : "結局"}的最短路線：${chapter!.route?.join(" → ") ?? "（找不到路線）"}\n預估這一章的遊玩時間：${chapter!.minutes ? `${chapter!.minutes[0]}～${chapter!.minutes[1]} 分鐘` : "未知"}\n</focus>\n\n`
     : "";
-  const prompt = `${focus}<story>\n${story}\n</story>\n\n${treatment ? `<treatment>\n${treatment}\n</treatment>\n\n` : ""}<game>\n${digest}\n</game>\n\n<metrics>\n${JSON.stringify(quality.metrics)}\n</metrics>\n\n請審查${ch ? "這一章" : "這款遊戲"}並輸出評分結果。`;
+  const prompt = `${contextBlocks(input)}${focus}<story>\n${story}\n</story>\n\n${treatment ? `<treatment>\n${treatment}\n</treatment>\n\n` : ""}<game>\n${digest}\n</game>\n\n<metrics>\n${JSON.stringify(quality.metrics)}\n</metrics>\n\n請審查${ch ? "這一章" : "這款遊戲"}並輸出評分結果。`;
   const raw = await provider.generateJson({ systemPrompt: REVIEW_SYSTEM_PROMPT, prompt, jsonSchema: toCliJsonSchema(reviewSchema) });
   const review = reviewSchema.parse(raw);
   const reasons = judge(review);

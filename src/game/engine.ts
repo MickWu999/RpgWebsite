@@ -286,6 +286,20 @@ export function reconcileState(project: GameProject, input: PlayerState): Player
   return s;
 }
 
+/**
+ * 連載：存檔停在「未完待續」的結局，而遊戲已經推出了下一章時，從下一章的開頭接著玩（保留開關、變數、物品與任務）。
+ * 下一章還沒推出時回傳 null。
+ */
+export function continueFromEnding(project: GameProject, input: PlayerState): PlayerState | null {
+  const ending = project.endings.find((e) => e.id === input.endingId);
+  const chapter = ending?.nextChapterId ? project.chapters.find((c) => c.id === ending.nextChapterId) : undefined;
+  if (!chapter) return null;
+  const s = clone(input);
+  Object.assign(s, { endingId: null, interpreter: null, message: { kind: "chapter", chapterId: chapter.id }, chapterId: chapter.id, erased: [] });
+  if (chapter.testStart) Object.assign(s, { mapId: chapter.testStart.mapId, x: chapter.testStart.x, y: chapter.testStart.y });
+  return reconcileState(project, s);
+}
+
 // ---------- 直譯器 ----------
 
 function clone(state: PlayerState): PlayerState {

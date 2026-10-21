@@ -10,7 +10,7 @@
     "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/games/*"]
+    "run_worker_first": ["/games/*", "/api/*"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "ai-rpg-studio", "database_id": "53669d11-85be-4b33-bcd1-36b453677aed", "migrations_dir": "migrations" }

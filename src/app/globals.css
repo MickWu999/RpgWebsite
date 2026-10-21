@@ -595,3 +595,17 @@ details.card > summary { cursor: pointer; }
 .rm-screen.short .rm-menu-commands { overflow-y: auto; padding: 6px 10px; bottom: 12px; }
 .rm-screen.short .rm-menu-commands .rm-item { padding: 1px 10px; min-height: 0; }
 .rm-screen.short .rm-menu-body { overflow-y: auto; }
+
+/* ---------- 玩完一章的回饋 ---------- */
+.rm-feedback { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.55); padding: 16px; }
+.rm-feedback-box { width: min(480px, 100%); display: flex; flex-direction: column; gap: 10px; color: #fff; }
+.rm-feedback-title { font-size: 18px; font-weight: 700; color: #ffd76a; }
+.rm-stars { display: flex; gap: 6px; }
+.rm-stars button { background: none; border: none; font-size: 32px; color: #4b5585; cursor: pointer; padding: 0 2px; line-height: 1; }
+.rm-stars button.on { color: #ffd76a; text-shadow: 0 0 10px rgba(255, 215, 106, 0.6); }
+.rm-feedback-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.rm-feedback-tags button { background: rgba(10, 16, 46, 0.75); border: 1px solid rgba(255, 255, 255, 0.45); color: #fff; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+.rm-feedback-tags button.on { background: #ffd76a; color: #2a1a00; border-color: #ffd76a; }
+.rm-feedback textarea { width: 100%; background: #0d1020; color: #fff; border: 1px solid #4b5585; border-radius: 6px; padding: 8px; font: inherit; }
+.rm-feedback-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.rm-button:disabled { opacity: 0.4; animation: none; cursor: default; }

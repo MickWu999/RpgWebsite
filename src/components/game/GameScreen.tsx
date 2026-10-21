@@ -9,6 +9,7 @@ import {
   advance,
   choose,
   confirm,
+  continueFromEnding,
   createChapterState,
   createInitialState,
   endingEpilogues,
@@ -47,6 +48,8 @@ import {
 } from "@/lib/settings";
 import CoverArt from "./CoverArt";
 import DebugPanel from "./DebugPanel";
+import FeedbackDialog, { feedbackAsked } from "./FeedbackDialog";
+import { flushPlayEvents, trackPlay } from "@/lib/analytics";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
 
 const GameCanvas = dynamic(() => import("../GameCanvas"), { ssr: false });
@@ -179,6 +182,9 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const [loadInfo, setLoadInfo] = useState<{ bytes?: number; minutes: [number, number] | null }>({ minutes: null });
   const [ui, setUi] = useState<UI | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
+  /** 玩完一章時的回饋（只在玩家網站詢問） */
+  const [feedbackFor, setFeedbackFor] = useState<{ chapterId: string; title: string } | null>(null);
+  const feedbackOpen = useRef(false);
   const [layout, setLayout] = useState({ scale: 1, height: SCREEN_H, touch: false, portrait: false, canFullscreen: false });
   const [portraitOk, setPortraitOk] = useState(false);
   const router = useRouter();
@@ -437,6 +443,16 @@ export default function GameScreen({ source }: { source: GameSource }) {
         savedFlash: important && !source.test ? ++seq.current : u.savedFlash,
       });
       if (transferred) flash({ banner: { text: getMap(p, result.state.mapId).name, id: fadeId } });
+      // 玩完一章（進入下一章或抵達結局）時請玩家留下回饋
+      const finished = result.events.some((e) => e.type === "ending")
+        ? (u.game.chapterId ?? "ending")
+        : result.events.some((e) => e.type === "chapter") && u.game.chapterId && u.game.chapterId !== result.state.chapterId
+          ? u.game.chapterId
+          : null;
+      if (finished && source.kind === "pack" && !feedbackAsked(p.id, finished)) {
+        feedbackOpen.current = true;
+        setFeedbackFor({ chapterId: finished, title: p.chapters.find((c) => c.id === finished)?.title ?? p.title });
+      }
       for (const t of toasts) window.setTimeout(() => update((x) => ({ ...x, toasts: x.toasts.filter((y) => y.id !== t.id) })), 2600);
       if (!source.test) {
         try {
@@ -447,7 +463,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       }
       getAudio().handleEvents(p, result.state, result.events);
     },
-    [update, flash, source.test],
+    [update, flash, source.test, source.kind],
   );
 
   const newGame = useCallback(
@@ -469,7 +485,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         flash({ notice: entry?.notice ?? "這個欄位沒有存檔" }, 2200, "notice");
         return false;
       }
-      enterMap(entry.save.state);
+      enterMap(continueFromEnding(p, entry.save.state) ?? entry.save.state);
       return true;
     },
     [enterMap, flash],
@@ -524,7 +540,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
     const handle = (key: Key) => {
       const u = uiRef.current;
       const p = projectRef.current;
-      if (!u || !p) return;
+      if (!u || !p || feedbackOpen.current) return;
 
       if (u.mode === "splash" || u.mode === "cover") {
         if (u.mode === "cover") sfx(SOUNDS.select);
@@ -545,7 +561,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
           if (command === "新遊戲") newGame();
           else if (command === "繼續") {
             const latest = listSaves(p).filter((s) => s.save).sort((a, b) => b.save!.savedAt.localeCompare(a.save!.savedAt))[0];
-            if (latest) enterMap(latest.save!.state);
+            if (latest) enterMap(continueFromEnding(p, latest.save!.state) ?? latest.save!.state);
             else flash({ notice: "沒有可以繼續的存檔" }, 2200, "notice");
           } else if (command === "讀取存檔") update({ ...u, titleLoad: true, slotCursor: 0 });
           else router.push(isStudio ? `/studio/project/?id=${source.id}` : "/");
@@ -783,6 +799,52 @@ export default function GameScreen({ source }: { source: GameSource }) {
   }, [enterFullscreen]);
 
   // 章節標題卡真正出現在畫面上時才播放音效（開場的章節事件發生在遊戲建立當下）
+  // ---------- 遊玩數據（只在玩家網站；匿名，沒有網路時直接略過） ----------
+  const playRef = useRef<{ chapterId: string | null; endingId: string | null; steps: number; chapterAt: number; startedAt: number } | null>(null);
+  const playing = source.kind === "pack" && project && ui && (ui.mode === "map" || ui.mode === "menu" || ui.mode === "ending") ? ui.game : null;
+  useEffect(() => {
+    if (!playing || !project) return;
+    const now = Date.now();
+    const prev = playRef.current;
+    const chapterId = playing.chapterId ?? null;
+    const minutes = (from: number) => Math.round(((now - from) / 60000) * 10) / 10;
+    if (!prev || (playing.steps === 0 && prev.steps > 0)) {
+      const fresh = playing.steps === 0;
+      trackPlay(project.id, "start", { chapterId, ref: fresh ? "new" : "continue" });
+      if (fresh && chapterId) trackPlay(project.id, "chapter", { chapterId });
+      playRef.current = { chapterId, endingId: playing.endingId, steps: playing.steps, chapterAt: now, startedAt: prev?.startedAt ?? now };
+      return;
+    }
+    if (playing.endingId && !prev.endingId) {
+      if (chapterId) trackPlay(project.id, "chapter_done", { chapterId, value: minutes(prev.chapterAt) });
+      trackPlay(project.id, "ending", { chapterId, ref: playing.endingId });
+      flushPlayEvents();
+    } else if (chapterId !== prev.chapterId) {
+      if (prev.chapterId && !prev.endingId) trackPlay(project.id, "chapter_done", { chapterId: prev.chapterId, value: minutes(prev.chapterAt) });
+      if (chapterId) trackPlay(project.id, "chapter", { chapterId });
+    }
+    const chapterAt = chapterId !== prev.chapterId ? now : prev.chapterAt;
+    playRef.current = { chapterId, endingId: playing.endingId, steps: playing.steps, chapterAt, startedAt: prev.startedAt };
+  }, [playing, project]);
+  // 離開或切到背景時：記下玩到哪裡、玩了多久（用來找出玩家在哪裡放棄）
+  useEffect(() => {
+    if (source.kind !== "pack") return;
+    const onHide = () => {
+      const u = uiRef.current;
+      const p = projectRef.current;
+      const info = playRef.current;
+      if (document.visibilityState !== "hidden" || !u || !p || !info) return;
+      if (!info.endingId) trackPlay(p.id, "leave", { chapterId: info.chapterId, ref: u.game.mapId, value: Math.round(((Date.now() - info.startedAt) / 60000) * 10) / 10 });
+      flushPlayEvents();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onHide);
+    };
+  }, [source.kind]);
+
   const cardKey = ui && ui.mode === "map" && ui.messages.length === 0 && ui.game.message?.kind === "chapter" ? `${ui.game.message.chapterId}:${ui.messageSeq}` : null;
   useEffect(() => {
     if (cardKey) sfx(SOUNDS.levelUp, 0.45);
@@ -947,7 +1009,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                         if (c === "新遊戲") newGame();
                         else if (c === "繼續") {
                           const latest = saves.filter((s) => s.save).sort((a, b) => b.save!.savedAt.localeCompare(a.save!.savedAt))[0];
-                          if (latest) enterMap(latest.save!.state);
+                          if (latest) enterMap(continueFromEnding(project, latest.save!.state) ?? latest.save!.state);
                         } else if (c === "讀取存檔") update((u) => ({ ...u, titleLoad: true, slotCursor: 0 }));
                         else router.push(isStudio ? `/studio/project/?id=${source.id}` : "/");
                       }}
@@ -1081,7 +1143,30 @@ export default function GameScreen({ source }: { source: GameSource }) {
                   {line}
                 </p>
               ))}
-              <div className="rm-the-end">— THE END —</div>
+              {ending.nextChapterId ? (
+                project.chapters.some((c) => c.id === ending.nextChapterId) ? (
+                  <button
+                    className="rm-button primary"
+                    data-testid="next-chapter"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const next = continueFromEnding(project, game);
+                      if (next) enterMap(next);
+                    }}
+                  >
+                    ▶ 繼續「{project.chapters.find((c) => c.id === ending.nextChapterId)!.title}」
+                  </button>
+                ) : (
+                  <div className="rm-the-end" data-testid="to-be-continued">
+                    — 未完待續 —
+                    <div className="rm-dim" style={{ fontSize: 14, marginTop: 6 }}>
+                      下一章推出後，從標題畫面的「繼續」就能接著玩（存檔已保留）
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="rm-the-end">— THE END —</div>
+              )}
               <div className="rm-dim">步數 {game.steps}・完成任務 {journal.filter((q) => q.status === "completed").length}</div>
               <div className="rm-hint">{layout.touch ? "點一下回到標題" : "按確定鍵回到標題"}</div>
             </div>
@@ -1095,6 +1180,17 @@ export default function GameScreen({ source }: { source: GameSource }) {
           )}
         </div>
       </div>
+      {feedbackFor && project && (
+        <FeedbackDialog
+          gameId={project.id}
+          chapterId={feedbackFor.chapterId}
+          title={feedbackFor.title}
+          onDone={() => {
+            feedbackOpen.current = false;
+            setFeedbackFor(null);
+          }}
+        />
+      )}
       {isStudio && (
         <button className="rm-debug-toggle" onClick={() => setDebugOpen((v) => !v)} data-testid="debug-toggle">
           🐞 F9 除錯

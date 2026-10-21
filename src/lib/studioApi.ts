@@ -49,6 +49,16 @@ export type ProjectSummary = {
   chapters_passed: number;
   last_actor: string | null;
 };
+export type PlayAnalytics = {
+  visitors: number;
+  sessions: number;
+  minutes: number | null;
+  chapters: Array<{ chapter_id: string; entered: number; done: number; minutes: number | null }>;
+  endings: Array<{ ref: string; players: number }>;
+  quits: Array<{ chapter_id: string | null; ref: string | null; players: number }>;
+  daily: Array<{ day: string; visitors: number }>;
+};
+export type FeedbackEntry = { chapter_id: string; rating: number; tags: string[]; comment: string; created_at: string };
 export type ProjectDoc = { kind: "story" | "treatment"; content: string; updated_at: string; updated_by: string };
 export type ReviewEntry = {
   id: string;
@@ -59,7 +69,17 @@ export type ReviewEntry = {
   overall: number | null;
   actor: string;
   created_at: string;
-  data: { summary?: string; reasons?: string[]; review: { overall: number; summary: string; scores: Record<string, number>; issues: Array<{ severity: string; area: string; problem: string; suggestion: string }> } };
+  data: {
+    summary?: string;
+    reasons?: string[];
+    review: {
+      overall: number;
+      summary: string;
+      scores: Record<string, number>;
+      issues: Array<{ severity: string; area: string; problem: string; suggestion: string }>;
+      followUp?: Array<{ problem: string; resolved: boolean; note: string }>;
+    };
+  };
 };
 export type VersionEntry = { version: number; label: string; actor: string; created_at: string };
 export type TokenEntry = { id: string; name: string; token_prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
@@ -75,6 +95,8 @@ export const studioApi = {
   docs: (id: string) => call<{ docs: Partial<Record<"story" | "treatment", ProjectDoc>> }>("GET", `/api/projects/${id}/docs`),
   saveDoc: (id: string, kind: "story" | "treatment", content: string) => call("PUT", `/api/projects/${id}/docs/${kind}`, { content }),
   reviews: (id: string) => call<{ reviews: ReviewEntry[] }>("GET", `/api/projects/${id}/reviews`),
+  feedback: (id: string) => call<{ feedback: FeedbackEntry[] }>("GET", `/api/projects/${id}/feedback`),
+  analytics: (id: string) => call<{ analytics: PlayAnalytics }>("GET", `/api/projects/${id}/analytics`),
   importProject: (project: unknown, title?: string) => call<{ id: string }>("POST", "/api/projects", { project, title }),
   getProject: (id: string) => call<{ id: string; version: number; project: GameProject; updatedAt: string }>("GET", `/api/projects/${id}`),
   saveProject: (id: string, project: GameProject, baseVersion: number | undefined, label: string, isValid: boolean) =>

@@ -5,6 +5,7 @@ import { studioApi, type TokenEntry } from "@/lib/studioApi";
 import Link from "next/link";
 import StudioShell, { PageHeader } from "../StudioShell";
 import { HelpContent } from "./HelpPage";
+import RulesContent from "./RulesContent";
 
 /**
  * AI 協作：說明「你 → VS Code 的 AI agent → Studio」的流程，並引導完成設定（產生 Token、設定 .env.local、下指令）。
@@ -48,7 +49,7 @@ function CopyBlock({ text, testId }: { text: string; testId?: string }) {
   );
 }
 
-export default function AiPage({ tab = "ai" }: { tab?: "ai" | "help" }) {
+export default function AiPage({ tab = "ai" }: { tab?: "ai" | "help" | "rules" }) {
   const [tokens, setTokens] = useState<TokenEntry[]>([]);
   const [name, setName] = useState("VS Code Claude Code");
   const [created, setCreated] = useState<string | null>(null);
@@ -79,12 +80,17 @@ export default function AiPage({ tab = "ai" }: { tab?: "ai" | "help" }) {
           <Link href="/studio/ai/" className={`tab${tab === "ai" ? " active" : ""}`}>
             🤖 AI 協作
           </Link>
+          <Link href="/studio/rules/" className={`tab${tab === "rules" ? " active" : ""}`} data-testid="tab-rules">
+            ⚖ 審查規則
+          </Link>
           <Link href="/studio/help/" className={`tab${tab === "help" ? " active" : ""}`} data-testid="tab-help">
             ❓ 使用說明
           </Link>
         </div>
         {tab === "help" ? (
           <HelpContent />
+        ) : tab === "rules" ? (
+          <RulesContent />
         ) : (
           <>
         <section className="card stack" data-testid="ai-flow">

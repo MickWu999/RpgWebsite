@@ -232,6 +232,8 @@ export const endingSchema = z.strictObject({
   mood: z.enum(ENDING_MOOD_IDS).optional(),
   /** 尾聲：依玩家累積的狀態追加描述 */
   epilogues: z.array(z.strictObject({ condition: conditionSchema, text: z.string().min(1).max(300) })).max(12).optional(),
+  /** 連載用的「未完待續」：下一章推出後，停在這個結局的存檔可以直接接著玩這一章（章節可以還不存在） */
+  nextChapterId: idSchema.optional(),
 });
 
 export const chapterSchema = z.strictObject({
@@ -302,6 +304,8 @@ export const gameProjectSchema = z.strictObject({
       tagline: z.string().max(60).optional(),
     })
     .optional(),
+  /** 推出方式：連載中（一章一章推出，玩家更新後存檔接著玩）或已完結 */
+  release: z.strictObject({ status: z.enum(["ongoing", "complete"]), plannedChapters: z.number().int().min(1).max(20).optional() }).optional(),
   system: systemSchema,
   actors: z.array(actorSchema).min(1).max(100),
   items: z.array(itemSchema).max(200),

@@ -10,3 +10,10 @@ next-env.d.ts
 generated
 public/games/index.json
 .wrangler
+
+# 使用者的遊戲原始檔與 AI 案例庫（含故事與玩家留言）不進公開 repo；只保留示範遊戲
+content/*
+!content/demo-lantern/
+
+# 使用者的企劃文件不進 repo
+*.docx

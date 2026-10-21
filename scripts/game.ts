@@ -41,6 +41,7 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- remote inspect <id>            下載並以事件清單形式輸出
  *   npm run game -- remote apply <id> <ops.json>   送出操作（自動帶目前版本號，避免覆蓋人的修改）
  *   npm run game -- remote check <id>
+ *   npm run game -- remote lessons                 AI 案例庫（玩家回饋＋審查常見問題）→ content/lessons.md，製作前必讀
  *   npm run game -- remote story <id>              讀取人在 Studio 寫的故事 → content/<id>/story.md
  *   npm run game -- remote push-docs <id>          上傳 story.md、treatment.md 到 Studio（給人看）
  *   npm run game -- remote review-treatment <id>   （審查結果自動上傳到 Studio）
@@ -96,7 +97,9 @@ function gateStatus(gameId: string, project: GameProject) {
   const treatment = readReview(gameId, "treatment");
   const chapters = project.chapters.map((c, i) => ({ index: i + 1, id: c.id, title: c.title, reviewPassed: Boolean(readReview(gameId, c.id)?.passed) }));
   const full = readReview(gameId, "full");
-  const fullCurrent = Boolean(full?.passed && full.revision === revision);
+  // 連載中：每章通過章節審查就可以推出；完結時才需要整體審查
+  const ongoing = project.release?.status === "ongoing";
+  const fullCurrent = ongoing || Boolean(full?.passed && full.revision === revision);
   const blockers = [
     ...(treatment?.passed ? [] : ["劇本大綱尚未通過審查（review-treatment）"]),
     ...chapters.filter((c) => !c.reviewPassed).map((c) => `第 ${c.index} 章「${c.title}」尚未通過章節審查（review --chapter ${c.id}）`),
@@ -112,13 +115,17 @@ async function provider() {
   return p!;
 }
 
+/** 案例庫（玩家回饋＋歷次審查最常出現的問題），由 remote lessons 產生 */
+const LESSONS_FILE = path.join(CONTENT, "lessons.md");
+const readLessons = () => (existsSync(LESSONS_FILE) ? readFileSync(LESSONS_FILE, "utf8") : null);
+
 const readText = (gameId: string, file: string) => (existsSync(path.join(dir(gameId), file)) ? readFileSync(path.join(dir(gameId), file), "utf8") : null);
 
 async function doReviewTreatment(gameId: string): Promise<ReviewResult> {
   const treatment = readText(gameId, "treatment.md");
   if (!treatment || treatment.length < 400) fail(`找不到 ${path.join(dir(gameId), "treatment.md")}，或內容太短；請依規範第 5 節的格式撰寫劇本大綱`);
   const story = readText(gameId, "story.md") ?? "";
-  const r = await reviewTreatment(await provider(), story, treatment!);
+  const r = await reviewTreatment(await provider(), story, treatment!, { previous: readReview(gameId, "treatment"), lessons: readLessons() });
   writeReview(gameId, r);
   return r;
 }
@@ -150,7 +157,17 @@ async function doReview(gameId: string, project: GameProject): Promise<ReviewRes
     const blocking = quality.blocking.length + (playtest.ok ? 0 : 1);
     if (blocking > 0) return out({ ok: false, stage: "check", message: "整體審查前，check 必須全部通過", blocking: quality.blocking, playtest: playtest.issues }, 2) as never;
   }
-  const r = await reviewProject(await provider(), { story, treatment, project, playtest, quality, revision: projectRevision(project), chapter });
+  const r = await reviewProject(await provider(), {
+    story,
+    treatment,
+    project,
+    playtest,
+    quality,
+    revision: projectRevision(project),
+    chapter,
+    previous: readReview(gameId, values.chapter ?? "full"),
+    lessons: readLessons(),
+  });
   writeReview(gameId, r);
   return r;
 }
@@ -257,6 +274,14 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       }
       return out({ ok: true, written, story: r.data.docs.story?.content ?? null }, 0);
     }
+    case "lessons": {
+      // AI 案例庫：玩家回饋＋歷次審查最常退件的問題 → content/lessons.md（製作與審查都會讀）
+      const res = await fetch(`${base}/api/lessons`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return out({ ok: false, error: `HTTP ${res.status}` }, 2);
+      mkdirSync(CONTENT, { recursive: true });
+      writeFileSync(LESSONS_FILE, await res.text());
+      return out({ ok: true, written: LESSONS_FILE }, 0);
+    }
     case "push-docs":
       need("push-docs <id>");
       await pushDocs(target!);
@@ -297,7 +322,7 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       return done(await api("POST", `/api/projects/${target}/publish`, { check: publishSummary(report) }));
     }
     default:
-      fail("用法：npm run game -- remote <list|create|story|push-docs|pull|inspect|apply|check|review-treatment|review|status|versions|publish> …", 1);
+      fail("用法：npm run game -- remote <list|create|lessons|story|push-docs|pull|inspect|apply|check|review-treatment|review|status|versions|publish> …", 1);
   }
 }
 

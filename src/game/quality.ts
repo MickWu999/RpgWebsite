@@ -139,7 +139,9 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
   need(metrics.quests >= t.minQuests, "quests", `至少需要 ${t.minQuests} 條任務`);
   need(metrics.questSteps >= t.minQuestSteps, "quests", `任務步驟合計至少 ${t.minQuestSteps} 個（目前 ${metrics.questSteps}），主線太短`);
   need(metrics.items >= t.minItems, "items", `至少需要 ${t.minItems} 個物品`);
-  need(metrics.endings >= t.minEndings, "endings", `至少需要 ${t.minEndings} 種結局（目前 ${metrics.endings}）`);
+  const ongoing = project.release?.status === "ongoing";
+  // 連載中：最後推出的一章可以只用「未完待續」的結局收尾，完結時才要求 2 種以上的結局
+  if (!ongoing) need(metrics.endings >= t.minEndings, "endings", `至少需要 ${t.minEndings} 種結局（目前 ${metrics.endings}）`);
   need(metrics.endings <= t.maxEndings, "endings", `結局最多 ${t.maxEndings} 種（目前 ${metrics.endings}），太多容易讓結局文字與玩家路線矛盾`);
   need(metrics.texts >= t.minTexts, "texts", `顯示文字至少 ${t.minTexts} 則（目前 ${metrics.texts}）`);
   need(metrics.texts <= t.maxTexts, "texts", `顯示文字最多 ${t.maxTexts} 則（目前 ${metrics.texts}）`);
@@ -149,7 +151,8 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
   need(endingsHaveDistinctChoices, "endings", "不同結局的通關路線沒有任何不同的選擇，結局分支沒有意義");
   for (const [id, n] of Object.entries(actionsToEnding)) need(n >= t.minActionsToEnding, "endings", `結局「${id}」只要 ${n} 個行動就能達成，流程太短（至少 ${t.minActionsToEnding}）`);
   const typical = metrics.duration?.typicalMinutes;
-  if (options.checkDuration !== false && typical) {
+  // 連載中只看每一章的時長；全長與章節數在完結時才檢查
+  if (options.checkDuration !== false && typical && !ongoing) {
     need(typical[1] >= t.targetMinutes[0], "duration", `預估遊玩時間只有 ${typical[0]}～${typical[1]} 分鐘，目標是 ${t.targetMinutes[0]}～${t.targetMinutes[1]} 分鐘：請增加章節、支線與調查內容`);
     need(typical[0] <= t.targetMinutes[1], "duration", `預估遊玩時間 ${typical[0]}～${typical[1]} 分鐘超過 ${t.targetMinutes[1]} 分鐘上限，請精簡`);
   }
@@ -157,8 +160,9 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
   // 章節（長篇以章為單位製作與把關）
   if (options.checkDuration !== false) {
     const n = project.chapters.length;
-    need(n >= t.minChapters && n <= t.maxChapters, "chapters", `1～2 小時的遊戲要分成 ${t.recommendedChapters[0]}～${t.recommendedChapters[1]} 章（目前 ${n} 章），並在劇情轉折處用「章節」指令進入下一章`);
-    if (n > 0 && (n < t.recommendedChapters[0] || n > t.recommendedChapters[1])) suggestions.push({ path: "chapters", message: `建議 ${t.recommendedChapters[0]}～${t.recommendedChapters[1]} 章（目前 ${n} 章）` });
+    if (ongoing) need(n >= 1 && n <= t.maxChapters, "chapters", `連載至少要推出 1 章（目前 ${n} 章）`);
+    else need(n >= t.minChapters && n <= t.maxChapters, "chapters", `1～2 小時的遊戲要分成 ${t.recommendedChapters[0]}～${t.recommendedChapters[1]} 章（目前 ${n} 章），並在劇情轉折處用「章節」指令進入下一章`);
+    if (!ongoing && n > 0 && (n < t.recommendedChapters[0] || n > t.recommendedChapters[1])) suggestions.push({ path: "chapters", message: `建議 ${t.recommendedChapters[0]}～${t.recommendedChapters[1]} 章（目前 ${n} 章）` });
     for (const c of options.chapters ?? []) {
       need(c.ok, `chapters.${c.id}`, `第 ${c.index + 1} 章「${c.title}」從測試起點無法順利玩到${c.index + 1 < n ? "下一章" : "結局"}：${c.issues[0]?.message ?? "請檢查章節測試起點"}`);
       if (c.minutes) {
@@ -200,6 +204,8 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
     const pageAtoms = s.page?.conditions ? Object.values(s.page.conditions).filter(Boolean).length : 0;
     walkCommands(s.commands, (c, ctx) => {
       if (c.code !== "ending") return;
+      // 連載的「未完待續」結局只是章節的收尾，不套用結局條件的規則
+      if (project.endings.find((e) => e.id === c.endingId)?.nextChapterId) return;
       const atoms = pageAtoms + ctx.ancestors.reduce((n, a) => n + (a.cmd.code === "if" ? conditionAtoms(a.cmd.condition) : 1), 0);
       if (atoms < 2) blocking.push({ path: s.label, message: `結局「${project.endings.find((e) => e.id === c.endingId)?.title ?? c.endingId}」只由不到 2 個條件或選擇決定，應由玩家累積的多個選擇組合決定` });
     });

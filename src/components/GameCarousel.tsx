@@ -102,6 +102,7 @@ export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
             <span className="launcher-item-title">{g.title}</span>
             <span className="launcher-item-meta">
               {GENRE_LABELS[g.genre]}
+              {g.release === "ongoing" ? "・連載中" : ""}
               {saves[g.id] ? "・💾" : ""}
             </span>
           </button>
@@ -121,7 +122,11 @@ export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
               ⏱ 約 {game.typicalMinutes[0]}～{game.typicalMinutes[1]} 分鐘
             </span>
           )}
-          {game.chapters ? <span>📖 {game.chapters} 章</span> : null}
+          {game.release === "ongoing" ? (
+            <span>📖 連載中・已推出 {game.chapters} 章{game.plannedChapters ? `／共 ${game.plannedChapters} 章` : ""}</span>
+          ) : game.chapters ? (
+            <span>📖 {game.chapters} 章</span>
+          ) : null}
           <span>🏁 {game.endings} 種結局</span>
           <span>🎭 {GENRE_LABELS[game.genre]}</span>
           {game.status === "demo" && <span>教學短篇</span>}

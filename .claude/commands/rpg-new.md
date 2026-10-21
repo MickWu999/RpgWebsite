@@ -10,7 +10,9 @@ argument-hint: <故事、題材，或 Studio 專案 ID>
 1. 判斷輸入是什麼：
    - 看起來像 Studio 專案 ID（小寫英數字加連字號，例如 `night-watch-x7k2`），而且 `.env.local` 有 `STUDIO_TOKEN`：執行 `npm run game -- remote story <id>` 讀取使用者寫的故事。
    - 否則把輸入當成故事或題材。有 `STUDIO_TOKEN` 時先 `npm run game -- remote create <名稱>`；沒有時用本機模式 `npm run game -- new <id> --title <名稱>`。
-2. 動工前，先讀 `src/ai/designGuide.ts` 的 H（前輩方法）與 X（常見盲點），以及規範第 5、6、7 節。
+2. 動工前執行 `npm run game -- remote lessons`，讀 `content/lessons.md`（玩家回饋與審查最常退件的問題）；再讀 `src/ai/designGuide.ts` 的 H（前輩方法）與 X（常見盲點），以及規範第 5、6、7 節。
+   大綱送審前，對照 TREATMENT_RUBRIC 逐項自我檢查，在 treatment.md 最後附上「自我檢查表」。
+   建議以連載推出：第 1 章通過章節審查後就可以發布（規範第 3 節「連載推出」），之後一章一章補上。
 3. 依規範第 3 節的順序執行，每一關都要通過才能往下走：
    - 寫 story.md、treatment.md → 大綱審查 `review-treatment`
    - 骨架 → 一次一章：開章（設定 testStart）→ 內容 → `check`（看 chapters[]）→ 章節審查 `review --chapter`

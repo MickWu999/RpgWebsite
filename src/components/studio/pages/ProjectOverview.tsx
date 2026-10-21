@@ -9,7 +9,7 @@ import { walkProject } from "@/game/commands";
 import { coverDataOf } from "@/game/cover";
 import type { GameProject } from "@/game/schema";
 import { projectRevision } from "@/game/engine";
-import { studioApi, type CheckResult, type ProjectDoc, type ReviewEntry, type VersionEntry } from "@/lib/studioApi";
+import { studioApi, type CheckResult, type FeedbackEntry, type PlayAnalytics, type ProjectDoc, type ReviewEntry, type VersionEntry } from "@/lib/studioApi";
 import Pipeline from "../Pipeline";
 import { runCheckAsync } from "@/studio/check";
 import StudioShell, { PageHeader } from "../StudioShell";
@@ -74,6 +74,8 @@ export default function ProjectOverview() {
   const [docs, setDocs] = useState<Partial<Record<"story" | "treatment", ProjectDoc>>>({});
   const [reviews, setReviews] = useState<ReviewEntry[]>([]);
   const [storyDraft, setStoryDraft] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<FeedbackEntry[]>([]);
+  const [analytics, setAnalytics] = useState<PlayAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -89,6 +91,8 @@ export default function ProjectOverview() {
     studioApi.versions(id).then((r) => setVersions(r.versions.slice(0, 8))).catch(() => {});
     studioApi.docs(id).then((r) => setDocs(r.docs)).catch(() => {});
     studioApi.reviews(id).then((r) => setReviews(r.reviews)).catch(() => {});
+    studioApi.feedback(id).then((r) => setFeedback(r.feedback)).catch(() => {});
+    studioApi.analytics(id).then((r) => setAnalytics(r.analytics)).catch(() => {});
     studioApi
       .listProjects()
       .then((r) => setPublished(Boolean(r.projects.find((p) => p.id === id)?.published_version)))
@@ -224,6 +228,11 @@ export default function ProjectOverview() {
                       {chapter ? `：${chapter.title}` : ""}・{r.overall ?? "-"} 分 <span className="small muted">{time(r.created_at)}</span>
                     </summary>
                     <p className="small">{r.data.review.summary}</p>
+                    {r.data.review.followUp && r.data.review.followUp.length > 0 && (
+                      <div className="small muted">
+                        上一輪的問題：已解決 {r.data.review.followUp.filter((f) => f.resolved).length} / {r.data.review.followUp.length}
+                      </div>
+                    )}
                     <div className="score-grid">
                       {Object.entries(r.data.review.scores).map(([k, v]) => (
                         <span key={k} className={v < 6 ? "err-text" : v >= 8 ? "ok-text" : ""}>
@@ -242,6 +251,93 @@ export default function ProjectOverview() {
                   </details>
                 );
               })}
+            </section>
+
+            <section className="card" data-testid="analytics-board">
+              <h2>遊玩數據</h2>
+              {!analytics?.visitors ? (
+                <div className="small muted">還沒有遊玩數據。玩家在玩家網站遊玩時，會匿名記錄開始、章節進度、結局與離開的位置（不保存 IP；沒有網路時不記錄，也不影響遊玩）。</div>
+              ) : (
+                <>
+                  <div className="small">
+                    👤 {analytics.visitors} 位玩家・{analytics.sessions} 次遊玩
+                    {analytics.minutes ? `・累計約 ${Math.round(analytics.minutes)} 分鐘` : ""}
+                    {analytics.daily.length > 0 && <span className="muted">・近 14 天：{analytics.daily.map((d) => `${d.day.slice(5)} ${d.visitors}人`).join("、")}</span>}
+                  </div>
+                  <table className="version-table">
+                    <tbody>
+                      {p.chapters.map((c, i) => {
+                        const row = analytics.chapters.find((x) => x.chapter_id === c.id);
+                        return (
+                          <tr key={c.id}>
+                            <td className="small">
+                              第 {i + 1} 章 {c.title}
+                            </td>
+                            <td className="small">{row ? `完成 ${row.done} / 進入 ${row.entered}（${row.entered ? Math.round((row.done / row.entered) * 100) : 0}%）` : "—"}</td>
+                            <td className="small muted">{row?.minutes ? `平均 ${row.minutes.toFixed(0)} 分鐘` : ""}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {analytics.endings.length > 0 && (
+                    <div className="small" style={{ marginTop: 8 }}>
+                      🏁 結局：{analytics.endings.map((e) => `${p.endings.find((x) => x.id === e.ref)?.title ?? e.ref} ${e.players} 人`).join("、")}
+                    </div>
+                  )}
+                  {analytics.quits.length > 0 && (
+                    <div className="small muted" style={{ marginTop: 4 }}>
+                      🚪 最常離開的地方（還沒破關）：
+                      {analytics.quits
+                        .slice(0, 5)
+                        .map((q) => `${p.chapters.find((c) => c.id === q.chapter_id)?.title ?? q.chapter_id ?? "?"}・${p.maps.find((m) => m.id === q.ref)?.name ?? q.ref ?? "?"} ${q.players} 人`)
+                        .join("、")}
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className="card" data-testid="feedback-board">
+              <h2>玩家回饋</h2>
+              {feedback.length === 0 ? (
+                <div className="small muted">還沒有玩家回饋。玩家在玩家網站玩完一章時，會被邀請留下星等、標籤與一句話；這些回饋也會彙整進 AI 案例庫。</div>
+              ) : (
+                <>
+                  <table className="version-table">
+                    <tbody>
+                      {[...new Set(feedback.map((f) => f.chapter_id))].map((cid) => {
+                        const list = feedback.filter((f) => f.chapter_id === cid);
+                        const tags = new Map<string, number>();
+                        list.forEach((f) => f.tags.forEach((t) => tags.set(t, (tags.get(t) ?? 0) + 1)));
+                        return (
+                          <tr key={cid}>
+                            <td className="small">{p.chapters.find((c) => c.id === cid)?.title ?? cid}</td>
+                            <td className="small">
+                              ★ {(list.reduce((n, f) => n + f.rating, 0) / list.length).toFixed(1)}（{list.length} 則）
+                            </td>
+                            <td className="small muted">
+                              {[...tags]
+                                .sort((a, b) => b[1] - a[1])
+                                .slice(0, 4)
+                                .map(([t, n]) => `${t}×${n}`)
+                                .join("、")}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {feedback
+                    .filter((f) => f.comment.trim())
+                    .slice(0, 8)
+                    .map((f, i) => (
+                      <div key={i} className="version-line small">
+                        <span className="badge">{"★".repeat(f.rating)}</span> {f.comment}
+                      </div>
+                    ))}
+                </>
+              )}
             </section>
 
             <details className="card" data-testid="checklist">

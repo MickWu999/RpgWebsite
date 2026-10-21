@@ -53,11 +53,13 @@ export default function PublishPage() {
     ? [
         { ok: Boolean(latest("treatment")?.passed), label: "劇本大綱審查", detail: latest("treatment") ? `${latest("treatment")!.overall ?? "-"} 分` : "尚未審查" },
         ...project.chapters.map((c, i) => ({ ok: Boolean(latest(c.id)?.passed), label: `第 ${i + 1} 章審查：${c.title}`, detail: latest(c.id) ? `${latest(c.id)!.overall ?? "-"} 分` : "尚未審查" })),
-        {
-          ok: Boolean(latest("full")?.passed && latest("full")!.revision === projectRevision(project)),
-          label: "整體審查",
-          detail: !latest("full") ? "尚未審查" : latest("full")!.revision !== projectRevision(project) ? "審查後內容又改過，需要重新審查" : `${latest("full")!.overall ?? "-"} 分`,
-        },
+        project.release?.status === "ongoing"
+          ? { ok: true, label: "整體審查", detail: "連載中：完結時再進行整體審查" }
+          : {
+              ok: Boolean(latest("full")?.passed && latest("full")!.revision === projectRevision(project)),
+              label: "整體審查",
+              detail: !latest("full") ? "尚未審查" : latest("full")!.revision !== projectRevision(project) ? "審查後內容又改過，需要重新審查" : `${latest("full")!.overall ?? "-"} 分`,
+            },
       ]
     : [];
   const reviewsOk = reviewItems.every((r) => r.ok);

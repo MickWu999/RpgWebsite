@@ -38,6 +38,7 @@ export const opSchema = z.discriminatedUnion("op", [
     cover: z
       .strictObject({ mapId: idSchema.optional(), characterAssetIds: z.array(idSchema).max(3).optional(), tagline: z.string().max(60).optional() })
       .optional(),
+    release: z.strictObject({ status: z.enum(["ongoing", "complete"]), plannedChapters: z.number().int().min(1).max(20).optional() }).optional(),
   }),
   z.strictObject({
     op: z.literal("system.update"),

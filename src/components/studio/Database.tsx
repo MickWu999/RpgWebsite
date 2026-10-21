@@ -441,6 +441,10 @@ function EndingForm({ project, ending, dispatch }: { project: GameProject; endin
           ))}
         </select>
       </label>
+      <label className="field">
+        未完待續：下一章的章節 ID（連載用；這一章推出後，停在這個結局的存檔可以接著玩）
+        <input type="text" value={d.nextChapterId ?? ""} placeholder="例如 ch2（留空＝真正的結局）" onChange={(e) => setD({ ...d, nextChapterId: e.target.value.replace(/[^A-Za-z0-9_-]/g, "") || undefined })} />
+      </label>
       <div className={`small ${where.length ? "muted" : "err-text"}`}>
         觸發位置：{where.length ? where.join("、") : "還沒有任何事件使用「結局」指令觸發這個結局"}
       </div>
@@ -626,6 +630,7 @@ function SystemForm({ project, dispatch }: { project: GameProject; dispatch: (op
   const [cover, setCover] = useState(project.cover ?? {});
   const [playerActorId, setPlayerActorId] = useState(project.system.playerActorId);
   const [initialItems, setInitialItems] = useState(project.system.initialItems);
+  const [release, setRelease] = useState(project.release ?? { status: "complete" as const });
   const coverChars = cover.characterAssetIds ?? [];
   const start = project.system.start;
   return (
@@ -652,6 +657,17 @@ function SystemForm({ project, dispatch }: { project: GameProject; dispatch: (op
           ))}
         </select>
       </label>
+      <h3>推出方式</h3>
+      <div className="logic-row">
+        <select value={release.status} onChange={(e) => setRelease({ ...release, status: e.target.value as "ongoing" | "complete" })} data-testid="release-status">
+          <option value="ongoing">連載中（一章一章推出）</option>
+          <option value="complete">已完結</option>
+        </select>
+        <span className="small">預計共</span>
+        <input type="number" min={1} max={20} value={release.plannedChapters ?? ""} onChange={(e) => setRelease({ ...release, plannedChapters: Number(e.target.value) || undefined })} style={{ width: 70 }} />
+        <span className="small">章</span>
+      </div>
+      <div className="small muted">連載中：至少推出 1 章就能發布，每章通過章節審查即可；章末用「未完待續」結局（設定下一章 ID），新章推出後玩家的存檔可以直接接著玩。</div>
       <h3>主角與起點</h3>
       <div className="logic-row">
         <span>主角</span>
@@ -704,7 +720,7 @@ function SystemForm({ project, dispatch }: { project: GameProject; dispatch: (op
       <FormActions
         onOk={() =>
           dispatch([
-            { op: "project.update", title, description, intro: intro || undefined, genre, cover },
+            { op: "project.update", title, description, intro: intro || undefined, genre, cover, release },
             { op: "system.update", playerActorId, initialItems },
           ])
         }
