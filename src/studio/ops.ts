@@ -6,6 +6,7 @@ import {
   chapterSchema,
   commonEventSchema,
   DIRECTIONS,
+  achievementSchema,
   endingSchema,
   idSchema,
   itemSchema,
@@ -80,6 +81,9 @@ export const opSchema = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("quest.remove"), id: idSchema }),
   z.strictObject({ op: z.literal("ending.upsert"), ending: endingSchema }),
   z.strictObject({ op: z.literal("ending.remove"), id: idSchema }),
+  /** 成就：條件成立時解鎖；結局會自動產生成就，不必另外寫 */
+  z.strictObject({ op: z.literal("achievement.upsert"), achievement: achievementSchema }),
+  z.strictObject({ op: z.literal("achievement.remove"), id: idSchema }),
   /** 新章節加在最後；before 可指定插在哪一章之前 */
   z.strictObject({ op: z.literal("chapter.upsert"), chapter: chapterSchema, before: idSchema.optional() }),
   z.strictObject({ op: z.literal("chapter.remove"), id: idSchema }),
@@ -138,6 +142,10 @@ export function describeOp(op: StudioOp): string {
       return `設定結局「${op.ending.title}」`;
     case "ending.remove":
       return `刪除結局 ${op.id}`;
+    case "achievement.upsert":
+      return `設定成就「${op.achievement.title}」`;
+    case "achievement.remove":
+      return `刪除成就 ${op.id}`;
     case "chapter.upsert":
       return `設定章節「${op.chapter.title}」`;
     case "chapter.remove":
@@ -375,6 +383,13 @@ function applyOne(p: GameProject, op: StudioOp) {
     case "ending.remove":
       if (p.endings.length <= 1) throw new Error("至少要保留一個結局");
       p.endings = remove(p.endings, op.id);
+      return;
+    case "achievement.upsert":
+      p.achievements ??= [];
+      upsert(p.achievements, op.achievement);
+      return;
+    case "achievement.remove":
+      p.achievements = remove(p.achievements ?? [], op.id);
       return;
     case "chapter.upsert": {
       const i = p.chapters.findIndex((c) => c.id === op.chapter.id);

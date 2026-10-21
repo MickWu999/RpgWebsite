@@ -2330,5 +2330,40 @@
   "release": {
     "status": "ongoing",
     "plannedChapters": 3
-  }
+  },
+  "achievements": [
+    {
+      "id": "achv_ghost",
+      "title": "幽靈的朋友",
+      "description": "陪害羞的小幽靈聊了天。",
+      "hint": "村子裡有一位很害羞的居民",
+      "condition": {
+        "type": "switch",
+        "id": "visited_ghost",
+        "value": true
+      }
+    },
+    {
+      "id": "achv_pies",
+      "title": "奶奶的派",
+      "description": "聽完了奶奶的派的故事。",
+      "hint": "老人家的話，多聽一點",
+      "condition": {
+        "type": "switch",
+        "id": "heard_pies",
+        "value": true
+      }
+    },
+    {
+      "id": "achv_wood",
+      "title": "爸爸削的木劍",
+      "description": "放著聖劍不要，留下了爸爸削的木劍。",
+      "hint": "最強的劍，不一定最好",
+      "condition": {
+        "type": "switch",
+        "id": "kept_wooden_sword",
+        "value": true
+      }
+    }
+  ]
 }

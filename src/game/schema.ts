@@ -236,6 +236,22 @@ export const endingSchema = z.strictObject({
   nextChapterId: idSchema.optional(),
 });
 
+/**
+ * 成就：條件成立時解鎖（跨存檔記錄在玩家的裝置上）。結局會自動產生成就，不必另外寫。
+ * 用來讓玩家知道「還有別的分支、別的發現」，獎勵探索與走另一條路，不是刷數量。
+ */
+export const achievementSchema = z.strictObject({
+  id: idSchema,
+  title: shortText,
+  /** 解鎖後顯示的說明 */
+  description: z.string().min(1).max(200),
+  /** 還沒解鎖時顯示的模糊提示（例如「在告別式上，你還可以說更多」）；沒有就顯示「？？？」 */
+  hint: z.string().max(120).optional(),
+  /** 隱藏成就：解鎖前連標題都不顯示 */
+  hidden: z.boolean().optional(),
+  condition: conditionSchema,
+});
+
 export const chapterSchema = z.strictObject({
   id: idSchema,
   title: shortText,
@@ -312,6 +328,7 @@ export const gameProjectSchema = z.strictObject({
   quests: z.array(questSchema).max(60),
   endings: z.array(endingSchema).min(1).max(10),
   chapters: z.array(chapterSchema).max(20),
+  achievements: z.array(achievementSchema).max(60).optional(),
   switches: z.array(namedIdSchema).max(500),
   variables: z.array(namedIdSchema).max(200),
   commonEvents: z.array(commonEventSchema).max(100),
@@ -321,6 +338,7 @@ export const gameProjectSchema = z.strictObject({
 
 export type GameProject = z.infer<typeof gameProjectSchema>;
 export type MapDefinition = z.infer<typeof mapSchema>;
+export type AchievementDefinition = z.infer<typeof achievementSchema>;
 export type MapEvent = z.infer<typeof mapEventSchema>;
 export type EventPage = z.infer<typeof eventPageSchema>;
 export type PageConditions = z.infer<typeof pageConditionsSchema>;

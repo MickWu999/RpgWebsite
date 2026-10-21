@@ -9,7 +9,7 @@ import { walkProject } from "@/game/commands";
 import { coverDataOf } from "@/game/cover";
 import type { GameProject } from "@/game/schema";
 import { projectRevision } from "@/game/engine";
-import { studioApi, type CheckResult, type FeedbackEntry, type NoteEntry, type PlayAnalytics, type ProjectDoc, type ReviewEntry, type VersionEntry } from "@/lib/studioApi";
+import { studioApi, type CheckResult, type FeedbackEntry, type GameInsights, type NoteEntry, type PlayAnalytics, type ProjectDoc, type ReviewEntry, type VersionEntry } from "@/lib/studioApi";
 import Pipeline from "../Pipeline";
 import { runCheckAsync } from "@/studio/check";
 import StudioShell, { PageHeader } from "../StudioShell";
@@ -81,6 +81,7 @@ export default function ProjectOverview() {
   const [feedback, setFeedback] = useState<FeedbackEntry[]>([]);
   const [analytics, setAnalytics] = useState<PlayAnalytics | null>(null);
   const [notes, setNotes] = useState<NoteEntry[]>([]);
+  const [insights, setInsights] = useState<GameInsights | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -99,6 +100,7 @@ export default function ProjectOverview() {
     studioApi.feedback(id).then((r) => setFeedback(r.feedback)).catch(() => {});
     studioApi.analytics(id).then((r) => setAnalytics(r.analytics)).catch(() => {});
     studioApi.notes(id).then((r) => setNotes(r.notes)).catch(() => {});
+    studioApi.insights(id).then((r) => setInsights(r.insights)).catch(() => {});
     studioApi
       .listProjects()
       .then((r) => setPublished(Boolean(r.projects.find((p) => p.id === id)?.published_version)))
@@ -389,6 +391,25 @@ export default function ProjectOverview() {
                   {analytics.endings.length > 0 && (
                     <div className="small" style={{ marginTop: 8 }}>
                       🏁 結局：{analytics.endings.map((e) => `${p.endings.find((x) => x.id === e.ref)?.title ?? e.ref} ${e.players} 人`).join("、")}
+                    </div>
+                  )}
+                  {insights && (insights.choices.some((c) => c.lopsided) || insights.unseen.length > 0 || insights.stuck.length > 0) && (
+                    <div className="small" style={{ marginTop: 8 }} data-testid="insights">
+                      <b>給 AI 的線索</b>（也會放進案例庫）
+                      {insights.choices
+                        .filter((c) => c.lopsided)
+                        .slice(0, 4)
+                        .map((c) => (
+                          <div key={c.locator}>
+                            ⚖ 選項幾乎一面倒（{c.locator}）：{c.options.map((o) => `「${o.text ?? o.value}」${o.pct}%`).join("、")}
+                          </div>
+                        ))}
+                      {insights.unseen.length > 0 && <div>👀 從來沒人觸發：{insights.unseen.slice(0, 6).map((u) => `${u.map}／${u.name}`).join("、")}</div>}
+                      {insights.stuck.slice(0, 3).map((x) => (
+                        <div key={x.place}>
+                          ⏳ 卡關：{x.place}，{x.sessions} 次遊玩停了超過 2 分鐘（平均 {x.avgMinutes} 分鐘）
+                        </div>
+                      ))}
                     </div>
                   )}
                   {analytics.quits.length > 0 && (

@@ -254,6 +254,12 @@ export function lintDesign(project: GameProject): LintReport {
     }
   }
 
+  // 成就：條件永遠不會成立，玩家永遠解鎖不了
+  for (const a of project.achievements ?? []) {
+    const why = impossibleAtom(project, can, a.condition);
+    if (why) errors.push({ path: `achievements.${a.id}`, message: `成就「${a.title}」永遠無法解鎖：${why}` });
+  }
+
   // L5 任務沒有終點
   for (const q of project.quests) {
     const s = can.questStatus.get(q.id);

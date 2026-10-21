@@ -1,4 +1,4 @@
-/** 玩家偏好設定（存在此瀏覽器）：文字速度、背景音樂、對話聲音、手機觸控方式 */
+/** 玩家偏好設定（存在此瀏覽器）：文字速度、背景音樂、對話聲音、手機觸控方式、匿名遊玩紀錄 */
 
 export type TextSpeed = "slow" | "normal" | "fast";
 /** 對話聲音：RPG 式嗶嗶聲、瀏覽器語音朗讀，或關閉 */
@@ -7,10 +7,11 @@ export type VoiceMode = "blip" | "tts" | "off";
 export type TouchMode = "pad" | "tap";
 /** 虛擬按鍵的透明度 */
 export type PadOpacity = "low" | "mid" | "high";
-export type Settings = { textSpeed: TextSpeed; bgm: boolean; voice: VoiceMode; touch: TouchMode; padOpacity: PadOpacity };
+/** analytics：匿名遊玩紀錄（幫助改善遊戲；玩家可以關閉） */
+export type Settings = { textSpeed: TextSpeed; bgm: boolean; voice: VoiceMode; touch: TouchMode; padOpacity: PadOpacity; analytics: boolean };
 
 const KEY = "rpg:settings";
-const DEFAULTS: Settings = { textSpeed: "normal", bgm: true, voice: "blip", touch: "pad", padOpacity: "mid" };
+const DEFAULTS: Settings = { textSpeed: "normal", bgm: true, voice: "blip", touch: "pad", padOpacity: "mid", analytics: true };
 export const PAD_OPACITIES: PadOpacity[] = ["low", "mid", "high"];
 export const PAD_OPACITY_LABEL: Record<PadOpacity, string> = { low: "淡", mid: "普通", high: "清楚" };
 export const PAD_OPACITY_VALUE: Record<PadOpacity, number> = { low: 0.35, mid: 0.6, high: 0.9 };

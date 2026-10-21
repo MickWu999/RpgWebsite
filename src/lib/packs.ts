@@ -15,6 +15,8 @@ export type CatalogEntry = {
   genre: GameProject["genre"];
   status: "demo" | "approved";
   endings: number;
+  /** 成就數（作者寫的成就＋真正的結局） */
+  achievements?: number;
   npcs: number;
   /** 章節數（舊目錄沒有這個欄位） */
   chapters?: number;

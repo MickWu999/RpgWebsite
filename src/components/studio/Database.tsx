@@ -9,6 +9,7 @@ import {
   ENDING_MOOD_IDS,
   GENRE_LABELS,
   QUEST_STATUSES,
+  type AchievementDefinition,
   type Actor,
   type ChapterDefinition,
   type CommonEvent,
@@ -29,12 +30,13 @@ import { AssetPicker, AssetThumb, ConditionEditor, defaultCondition, ItemSelect,
  * 每一頁左邊是清單、右邊是表單；按「確定」才送出操作（可以復原）。
  */
 
-export type DbTab = "actors" | "items" | "quests" | "endings" | "chapters" | "commons" | "switches" | "variables" | "system" | "assets" | "validation";
+export type DbTab = "actors" | "items" | "quests" | "endings" | "achievements" | "chapters" | "commons" | "switches" | "variables" | "system" | "assets" | "validation";
 const TABS: Array<[DbTab, string]> = [
   ["actors", "角色"],
   ["items", "物品"],
   ["quests", "任務"],
   ["endings", "結局"],
+  ["achievements", "成就"],
   ["chapters", "章節"],
   ["commons", "共用事件"],
   ["switches", "開關"],
@@ -165,6 +167,25 @@ export default function Database({
           },
         )}
         {e && <EndingForm key={e.id} project={project} ending={e} dispatch={dispatch} />}
+      </>
+    );
+  } else if (tab === "achievements") {
+    const a = pick(project.achievements ?? []);
+    body = (
+      <>
+        {list(
+          (project.achievements ?? []).map((x) => ({ id: x.id, label: x.title })),
+          () => {
+            const id = uniqueId("achv", ids);
+            dispatch([{ op: "achievement.upsert", achievement: { id, title: "新成就", description: "解鎖後顯示的說明", hint: "還沒解鎖時的提示", condition: defaultCondition("switch", project) } }]);
+            onTab("achievements", id);
+          },
+        )}
+        {a ? (
+          <AchievementForm key={a.id} project={project} achievement={a} dispatch={dispatch} />
+        ) : (
+          empty("成就讓玩家知道「還有別的分支、別的發現」：條件成立時解鎖，跨存檔記錄在玩家的裝置上。每個結局會自動產生成就，不必另外寫。建議每章 2～4 個，獎勵探索與走另一條路。")
+        )}
       </>
     );
   } else if (tab === "chapters") {
@@ -465,6 +486,33 @@ function EndingForm({ project, ending, dispatch }: { project: GameProject; endin
         ＋ 尾聲
       </button>
       <FormActions onOk={() => dispatch([{ op: "ending.upsert", ending: { ...d, epilogues: epilogues.length ? epilogues : undefined } }])} onDelete={() => dispatch([{ op: "ending.remove", id: ending.id }])} />
+    </div>
+  );
+}
+
+function AchievementForm({ project, achievement, dispatch }: { project: GameProject; achievement: AchievementDefinition; dispatch: (ops: StudioOp[]) => void }) {
+  const [d, setD] = useState(achievement);
+  return (
+    <div className="db-form stack">
+      <label className="field">
+        成就名稱
+        <input type="text" value={d.title} onChange={(e) => setD({ ...d, title: e.target.value })} />
+      </label>
+      <label className="field">
+        解鎖後的說明
+        <input type="text" value={d.description} onChange={(e) => setD({ ...d, description: e.target.value })} />
+      </label>
+      <label className="field">
+        還沒解鎖時的提示（模糊地暗示怎麼解鎖；留空顯示「？？？」）
+        <input type="text" value={d.hint ?? ""} onChange={(e) => setD({ ...d, hint: e.target.value || undefined })} />
+      </label>
+      <label className="small">
+        <input type="checkbox" checked={Boolean(d.hidden)} onChange={(e) => setD({ ...d, hidden: e.target.checked || undefined })} /> 隱藏成就（解鎖前連名稱都不顯示）
+      </label>
+      <div className="small muted">解鎖條件</div>
+      <ConditionEditor project={project} value={d.condition} onChange={(condition) => setD({ ...d, condition })} />
+      <div className="small muted">{describeCondition(project, d.condition)}</div>
+      <FormActions onOk={() => dispatch([{ op: "achievement.upsert", achievement: d }])} onDelete={() => dispatch([{ op: "achievement.remove", id: achievement.id }])} />
     </div>
   );
 }

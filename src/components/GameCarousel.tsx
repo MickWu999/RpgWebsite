@@ -7,6 +7,7 @@ import CoverArt from "@/components/game/CoverArt";
 import { SOUNDS } from "@/game/assets";
 import { GENRE_LABELS } from "@/game/schema";
 import { getAudio } from "@/lib/audio";
+import { captureInvite, getNickname, setNickname } from "@/lib/analytics";
 import type { CatalogEntry } from "@/lib/packs";
 
 /**
@@ -15,7 +16,7 @@ import type { CatalogEntry } from "@/lib/packs";
  * 右邊是遊戲資訊視窗：封面、標語、時長、章節、結局數，以及這台裝置上的存檔。
  */
 
-type SaveInfo = { savedAt: string; ended: boolean } | null;
+type SaveInfo = { savedAt: string; ended: boolean; achievements: number } | null;
 
 /** 只讀取 localStorage 的自動存檔時間，不必先下載整款遊戲 */
 function readSave(id: string): SaveInfo {
@@ -24,7 +25,8 @@ function readSave(id: string): SaveInfo {
     if (!raw) return null;
     const data = JSON.parse(raw) as { savedAt?: string; state?: { schemaVersion?: string; endingId?: string | null } };
     if (data.state?.schemaVersion !== "2.0" || !data.savedAt) return null;
-    return { savedAt: data.savedAt, ended: Boolean(data.state.endingId) };
+    const achievements = Object.keys(JSON.parse(window.localStorage.getItem(`rpg:achv:${id}`) ?? "{}") as object).length;
+    return { savedAt: data.savedAt, ended: Boolean(data.state.endingId), achievements };
   } catch {
     return null;
   }
@@ -47,8 +49,13 @@ export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
   const [saves, setSaves] = useState<Record<string, SaveInfo>>({});
   const game = games[active];
 
+  const [nickname, setNick] = useState<string | null>(null);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setSaves(Object.fromEntries(games.map((g) => [g.id, readSave(g.id)]))));
+    captureInvite();
+    const frame = requestAnimationFrame(() => {
+      setSaves(Object.fromEntries(games.map((g) => [g.id, readSave(g.id)])));
+      setNick(getNickname());
+    });
     return () => cancelAnimationFrame(frame);
   }, [games]);
 
@@ -108,6 +115,21 @@ export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
           </button>
         ))}
         <div className="launcher-soon">⌛ 更多冒險製作中</div>
+        <div className="launcher-privacy">
+          本站會匿名記錄遊玩過程（不含任何個人資料），用來讓遊戲越做越好；可以在遊戲的「設定」關閉。
+          <button
+            className="launcher-nickname"
+            data-testid="set-nickname"
+            onClick={() => {
+              const name = window.prompt("留個暱稱讓作者認識你吧（選填，最多 20 字；留空就是匿名）", nickname ?? "");
+              if (name === null) return;
+              if (setNickname(name)) setNick(name.trim() || null);
+              else window.alert("暱稱只能用文字、數字、空白、底線或連字號，最多 20 字");
+            }}
+          >
+            {nickname ? `👤 ${nickname}` : "👤 留個暱稱"}
+          </button>
+        </div>
       </nav>
 
       <section className="launcher-detail rm-panel" aria-live="polite">
@@ -128,6 +150,12 @@ export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
             <span>📖 {game.chapters} 章</span>
           ) : null}
           {game.release !== "ongoing" && <span>🏁 {game.endings} 種結局</span>}
+          {game.achievements ? (
+            <span>
+              🏆 {save ? `${save.achievements}／` : ""}
+              {game.achievements} 個成就
+            </span>
+          ) : null}
           <span>🎭 {GENRE_LABELS[game.genre]}</span>
           {game.status === "demo" && <span>教學短篇</span>}
         </div>

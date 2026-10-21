@@ -27,6 +27,7 @@ import {
 } from "@/game/engine";
 import { pathToFace, pathToTile } from "@/game/pathfinding";
 import { currentLocator } from "@/game/refs";
+import { achievementList, loadUnlocked, newlyUnlocked, saveUnlocked } from "@/game/achievements";
 import type { GameProject } from "@/game/schema";
 import { coverDataOf } from "@/game/cover";
 import { listSaves, savePlayerState, type SaveSlot } from "@/game/storage";
@@ -56,7 +57,7 @@ import CoverArt from "./CoverArt";
 import DebugPanel from "./DebugPanel";
 import FeedbackDialog, { feedbackAsked } from "./FeedbackDialog";
 import TouchPad from "./TouchPad";
-import { flushPlayEvents, trackPlay } from "@/lib/analytics";
+import { flushPlayEvents, trackErrors, trackPlay } from "@/lib/analytics";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
 
 const GameCanvas = dynamic(() => import("../GameCanvas"), { ssr: false });
@@ -102,13 +103,15 @@ type UI = {
   /** 自動存檔提示（重要事件後短暫顯示） */
   savedFlash: number;
   settings: Settings;
+  /** 已解鎖的成就（ID → 解鎖時間），跨存檔保存在這台裝置上 */
+  achievements: Record<string, string>;
 };
 
 const TITLE_COMMANDS = ["新遊戲", "繼續", "讀取存檔", "離開"] as const;
 const MENU_COMMANDS: Array<[MenuPage, string]> = [
   ["items", "道具"],
   ["quests", "任務"],
-  ["status", "狀態"],
+  ["status", "成就"],
   ["save", "存檔"],
   ["load", "讀檔"],
   ["options", "設定"],
@@ -253,6 +256,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         notice,
         savedFlash: 0,
         settings: loadSettings(),
+        achievements: loadUnlocked(source.kind === "studio" ? `studio-${project.id}` : project.id),
       };
       uiRef.current = initial;
       setProject(project);
@@ -285,6 +289,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         .then(({ project, bytes, entry }) => {
           if (cancelled) return;
           setLoadInfo({ bytes, minutes: entry?.typicalMinutes ?? null });
+          trackPlay(project.id, "load", { value: Math.round(bytes / 1024) });
           start(project);
         })
         .catch((e: Error) => !cancelled && setLoadError(e.message));
@@ -438,7 +443,18 @@ export default function GameScreen({ source }: { source: GameSource }) {
       }
       if (result.state === u.game) return;
       const before = u.game.message;
-      const toasts = result.events.map((e) => eventToast(p, e)).filter((t): t is string => Boolean(t)).map((text) => ({ id: ++seq.current, text }));
+      // 成就：條件成立或抵達結局時解鎖（測試遊玩另外記錄，不影響玩家版）
+      const unlockedNow = newlyUnlocked(p, result.state, u.achievements);
+      const achievements = unlockedNow.length ? { ...u.achievements, ...Object.fromEntries(unlockedNow.map((a) => [a.id, new Date().toISOString()])) } : u.achievements;
+      if (unlockedNow.length) {
+        saveUnlocked(source.kind === "studio" ? `studio-${p.id}` : p.id, achievements);
+        sfx(SOUNDS.questComplete, 0.5);
+        if (source.kind === "pack") unlockedNow.forEach((a) => trackPlay(p.id, "achievement", { chapterId: result.state.chapterId, ref: a.id.slice(0, 64) }));
+      }
+      const toasts = [
+        ...result.events.map((e) => eventToast(p, e)).filter((t): t is string => Boolean(t)),
+        ...unlockedNow.map((a) => `🏆 解鎖成就：${a.title}`),
+      ].map((text) => ({ id: ++seq.current, text }));
       const transferred = result.events.some((e) => e.type === "transferred");
       const important = result.events.some((e) => e.type === "item" || e.type === "quest" || e.type === "transferred" || e.type === "chapter" || e.type === "ending");
       const fadeId = transferred ? ++seq.current : u.fadeId;
@@ -452,6 +468,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         toasts: [...u.toasts, ...toasts].slice(-4),
         fadeId,
         savedFlash: important && !source.test ? ++seq.current : u.savedFlash,
+        achievements,
       });
       if (transferred) flash({ banner: { text: getMap(p, result.state.mapId).name, id: fadeId } });
       // 玩完一章（進入下一章或抵達結局）時請玩家留下回饋
@@ -463,6 +480,23 @@ export default function GameScreen({ source }: { source: GameSource }) {
       if (finished && source.kind === "pack" && !feedbackAsked(p.id, finished)) {
         feedbackOpen.current = true;
         setFeedbackFor({ chapterId: finished, title: p.chapters.find((c) => c.id === finished)?.title ?? p.title });
+      }
+      // 遊玩紀錄（只在玩家網站）：觸發的事件、選了什麼、換地圖、物品、任務
+      if (source.kind === "pack") {
+        const chapterId = u.game.chapterId;
+        for (const e of result.events) {
+          if (e.type === "event_started") trackPlay(p.id, "interact", { chapterId, ref: `${e.mapId}/${e.eventId}` });
+          else if (e.type === "transferred") trackPlay(p.id, "transfer", { chapterId, ref: e.mapId });
+          else if (e.type === "item") trackPlay(p.id, "item", { chapterId, ref: e.itemId, value: e.delta });
+          else if (e.type === "quest") trackPlay(p.id, "quest", { chapterId, ref: e.questId, detail: e.action });
+        }
+        // choiceLog 的格式是「來源@指令路徑#選項」，轉成位置代碼
+        for (const entry of result.state.choiceLog.slice(u.game.choiceLog?.length ?? 0)) {
+          const cut = entry.lastIndexOf("#");
+          const index = Number(entry.slice(cut + 1));
+          const text = u.game.message?.kind === "text" ? u.game.message.choices?.find((c) => c.index === index)?.text : undefined;
+          trackPlay(p.id, "choice", { chapterId, ref: entry.slice(0, cut).replace("@", "#"), value: index, detail: text ?? null });
+        }
       }
       for (const t of toasts) window.setTimeout(() => update((x) => ({ ...x, toasts: x.toasts.filter((y) => y.id !== t.id) })), 2600);
       if (!source.test) {
@@ -497,9 +531,10 @@ export default function GameScreen({ source }: { source: GameSource }) {
         return false;
       }
       enterMap(continueFromEnding(p, entry.save.state) ?? entry.save.state);
+      if (source.kind === "pack") trackPlay(p.id, "load_save", { chapterId: entry.save.state.chapterId, ref: slot });
       return true;
     },
-    [enterMap, flash],
+    [enterMap, flash, source.kind],
   );
 
   const saveToSlot = useCallback(
@@ -507,11 +542,12 @@ export default function GameScreen({ source }: { source: GameSource }) {
       const u = uiRef.current;
       if (!u) return;
       savePlayerState(u.game, slot);
+      if (source.kind === "pack" && projectRef.current) trackPlay(projectRef.current.id, "save", { chapterId: u.game.chapterId, ref: slot });
       sfx(SOUNDS.objective);
       flash({ notice: `已儲存到「${SAVE_LABEL[slot]}」` }, 2200, "notice");
       update((x) => ({ ...x }));
     },
-    [flash, update],
+    [flash, update, source.kind],
   );
 
   // ---------- 手機的返回鍵：在遊戲中開關選單，不會意外離開（標題畫面以前照常返回上一頁） ----------
@@ -645,7 +681,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         update({ ...u, menuPage: "root" });
         return;
       }
-      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 6, title: 2 }[u.menuPage];
+      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 7, title: 2 }[u.menuPage];
       if (vertical) {
         update({ ...u, subCursor: wrap(u.subCursor + delta, count) });
         return;
@@ -662,6 +698,10 @@ export default function GameScreen({ source }: { source: GameSource }) {
         if (u.subCursor === 3) s.voice = VOICE_MODES[wrap(VOICE_MODES.indexOf(s.voice) + (key === "left" ? -1 : 1), VOICE_MODES.length)];
         if (u.subCursor === 4) s.touch = TOUCH_MODES[wrap(TOUCH_MODES.indexOf(s.touch) + 1, TOUCH_MODES.length)];
         if (u.subCursor === 5) s.padOpacity = PAD_OPACITIES[wrap(PAD_OPACITIES.indexOf(s.padOpacity) + (key === "left" ? -1 : 1), PAD_OPACITIES.length)];
+        if (u.subCursor === 6) s.analytics = !s.analytics;
+        // 先記錄再存：關閉遊玩紀錄的那一下也要記到（之後就不再記錄）
+        const settingKey = ["textSpeed", "sound", "bgm", "voice", "touch", "padOpacity", "analytics"][u.subCursor];
+        if (source.kind === "pack" && settingKey) trackPlay(p.id, "setting", { ref: settingKey, detail: settingKey === "sound" ? String(!getAudio().muted) : String(s[settingKey as keyof typeof s]) });
         saveSettings(s);
         sfx(SOUNDS.select);
         update({ ...u, settings: s });
@@ -839,6 +879,15 @@ export default function GameScreen({ source }: { source: GameSource }) {
     const chapterAt = chapterId !== prev.chapterId ? now : prev.chapterAt;
     playRef.current = { chapterId, endingId: playing.endingId, steps: playing.steps, chapterAt, startedAt: prev.startedAt };
   }, [playing, project]);
+  // 開了哪些選單頁（任務日誌被打開很多次，可能代表玩家不知道下一步）
+  const menuPage = source.kind === "pack" && ui?.mode === "menu" ? ui.menuPage : null;
+  useEffect(() => {
+    const p = projectRef.current;
+    if (menuPage && p) trackPlay(p.id, "menu", { chapterId: uiRef.current?.game.chapterId, ref: menuPage });
+  }, [menuPage]);
+  // 頁面錯誤
+  const errorGameId = source.kind === "pack" ? project?.id : undefined;
+  useEffect(() => (errorGameId ? trackErrors(errorGameId) : undefined), [errorGameId]);
   // 離開或切到背景時：記下玩到哪裡、玩了多久（用來找出玩家在哪裡放棄）
   useEffect(() => {
     if (source.kind !== "pack") return;
@@ -1066,6 +1115,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                     <div className="rm-dim">完成任務：{journal.filter((q) => q.status === "completed").length}／{project.quests.length}</div>
                   </div>
                 )}
+                {ui.menuPage === "status" && <AchievementPanel project={project} unlocked={ui.achievements} />}
                 {ui.menuPage === "items" &&
                   (Object.keys(game.items).length === 0 ? (
                     <div className="rm-dim">沒有任何道具。</div>
@@ -1117,6 +1167,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                     ["對話聲音", VOICE_MODE_LABEL[ui.settings.voice]],
                     ["觸控操作", TOUCH_MODE_LABEL[ui.settings.touch]],
                     ["按鍵透明度", PAD_OPACITY_LABEL[ui.settings.padOpacity]],
+                    ["匿名遊玩紀錄", ui.settings.analytics ? "開" : "關"],
                   ].map(([label, value], i) => (
                     <button
                       key={label}
@@ -1329,5 +1380,31 @@ function SlotRow({
         <span className="rm-dim">{entry?.notice ?? "（空）"}</span>
       )}
     </button>
+  );
+}
+
+/** 成就頁：已解鎖的顯示說明，沒解鎖的顯示模糊提示，讓玩家知道還有別的分支與發現 */
+function AchievementPanel({ project, unlocked }: { project: GameProject; unlocked: Record<string, string> }) {
+  const list = achievementList(project);
+  if (list.length === 0) return null;
+  const done = list.filter((a) => unlocked[a.id]).length;
+  return (
+    <div className="rm-achievements" data-testid="achievements">
+      <div className="rm-heading">
+        🏆 成就 {done}／{list.length}
+      </div>
+      {list.map((a) => {
+        const got = Boolean(unlocked[a.id]);
+        return (
+          <div key={a.id} className={`rm-achievement${got ? " got" : ""}`}>
+            <span className="rm-achievement-icon">{got ? "🏆" : "🔒"}</span>
+            <div>
+              <div>{got || !a.hidden ? a.title : "？？？"}</div>
+              <div className="rm-dim">{got ? a.description : (a.hint ?? "？？？")}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }

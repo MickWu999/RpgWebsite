@@ -61,6 +61,11 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   if (!actor) return error(401, "請先登入，或在 Authorization 標頭提供有效的 API Token");
 
   if (path === "/api/auth/me" && method === "GET") return json({ ok: true, user: { id: actor.userId, username: actor.username }, operator: actor.operator ?? null, via: actor.kind, tokenName: actor.tokenName });
+  if (path === "/api/auth/logins" && method === "GET") {
+    if (actor.kind !== "user") return error(403, "登入紀錄只能在 Studio 登入後查看");
+    const { results } = await env.DB.prepare("SELECT username, operator, ip, country, device, success, created_at FROM studio_logins ORDER BY id DESC LIMIT 100").all();
+    return json({ ok: true, logins: results });
+  }
   if (path === "/api/auth/operator" && method === "POST") {
     if (actor.kind !== "user") return error(403, "API Token 的操作者就是 Token 名稱，不能修改");
     const body = await readJson<{ name?: string }>(req);
@@ -117,6 +122,16 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
     return json({ ok: true, projects: results });
   }
   if (path === "/api/projects" && method === "POST") return createProject(req, env, actor);
+  // 營運數據（只限瀏覽器登入的使用者；API Token 看不到個別玩家的紀錄）
+  if (path.startsWith("/api/admin/")) {
+    if (actor.kind !== "user") return error(403, "營運數據只能在 Studio 登入後查看");
+    if (path === "/api/admin/overview" && method === "GET") return json({ ok: true, overview: await adminOverview(env) });
+    const u = new URL(req.url);
+    if (path === "/api/admin/players" && method === "GET") return json({ ok: true, ...(await adminPlayers(env, Math.min(Number(u.searchParams.get("limit")) || 50, 200), Number(u.searchParams.get("offset")) || 0)) });
+    const pm = path.match(/^\/api\/admin\/players\/([\w-]{1,64})$/);
+    if (pm && method === "GET") return json({ ok: true, ...(await adminPlayer(env, pm[1])) });
+    return error(404, "找不到這個營運 API");
+  }
   if (path === "/api/lessons" && method === "GET") return lessons(env, actor, new URL(req.url).searchParams.get("game"));
 
   const m = path.match(/^\/api\/projects\/([\w-]+)(?:\/(.+))?$/);
@@ -191,6 +206,8 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
         .run();
       return json({ ok: true });
     }
+    // 玩家行為洞察（給 AI：選擇比例、沒人發現的事件、卡關的地方、成就解鎖率…）
+    if (sub === "insights" && method === "GET") return json({ ok: true, insights: await gameInsights(env, row.id) });
     // 遊玩數據（前台匿名事件的統計）
     if (sub === "analytics" && method === "GET") return json({ ok: true, analytics: await playAnalytics(env, row.id) });
     // 故事原文與劇本大綱（人寫故事交給 AI；AI 寫的大綱放上來給人看）
@@ -332,8 +349,10 @@ async function login(req: Request, env: Env) {
   const hash = await hashPassword(password, user?.password_salt ?? "no-user", user?.password_iterations ?? PASSWORD_ITERATIONS);
   if (!user || !safeEqual(hash, user.password_hash)) {
     await recordFailure(env, lockKeys);
+    await logLogin(env, req, username, body.operator, false);
     return error(401, "帳號或密碼錯誤");
   }
+  await logLogin(env, req, user.username, body.operator, true);
   await env.DB.batch(lockKeys.map((k) => env.DB.prepare("DELETE FROM login_attempts WHERE key = ?").bind(k)));
   const remember = body.remember !== false;
   const maxAge = remember ? REMEMBER_DAYS * 86400 : SHORT_SESSION_HOURS * 3600;
@@ -348,6 +367,25 @@ async function login(req: Request, env: Env) {
     200,
     { "Set-Cookie": `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}` },
   );
+}
+
+/** 後台登入紀錄（安全用途）：Studio 帳號是共用的，記錄 IP 才能發現陌生人登入；保留 90 天 */
+async function logLogin(env: Env, req: Request, username: string, operator: unknown, success: boolean) {
+  const ua = req.headers.get("User-Agent") ?? "";
+  const device = `${/Mobile|Android|iPhone/.test(ua) ? "手機" : "電腦"}・${/iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Windows/.test(ua) ? "Windows" : /Mac OS X/.test(ua) ? "macOS" : "其他"}・${/Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : "其他"}`;
+  const country = (req as Request & { cf?: { country?: string } }).cf?.country ?? req.headers.get("CF-IPCountry");
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM studio_logins WHERE created_at < date('now', '-90 days')"),
+    env.DB.prepare("INSERT INTO studio_logins (username, operator, ip, country, device, success, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(
+      username.slice(0, 64),
+      operatorName(operator),
+      req.headers.get("CF-Connecting-IP") ?? "local",
+      country ?? null,
+      device,
+      success ? 1 : 0,
+      nowIso(),
+    ),
+  ]);
 }
 
 async function logout(req: Request, env: Env) {
@@ -452,6 +490,7 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
     genre: project.genre,
     status: "approved",
     endings: project.endings.length,
+    achievements: (project.achievements ?? []).length + project.endings.filter((e) => !e.nextChapterId).length,
     npcs: project.actors.length - 1,
     chapters: project.chapters.length,
     release: project.release?.status ?? "complete",
@@ -516,6 +555,7 @@ async function lessons(env: Env, actor: Actor, gameId: string | null) {
       const quit = a.quits.slice(0, 3).map((x) => `${x.chapter_id ?? "?"}／${x.ref ?? "?"}（${x.players} 人）`).join("、");
       lines.push(`- 遊玩數據：${a.visitors} 位玩家。${ch}${quit ? `。最常放棄的地方：${quit}` : ""}`);
     }
+    lines.push(...insightLines(await gameInsights(env, gameId)));
     const issues = rv.results.filter((r) => r.project_id === gameId).flatMap((r) => issuesOf(r.data));
     const seen = new Set<string>();
     for (const i of issues) {
@@ -550,6 +590,143 @@ async function playAnalytics(env: Env, gameId: string) {
   return { ...totals[0], chapters, endings, quits, daily };
 }
 
+/**
+ * 玩家行為洞察（給 AI 的）：把遊玩紀錄整理成「哪裡要改」的線索，放進案例庫，也可以用 remote insights 讀取。
+ * - 選擇比例：某個選項幾乎沒人選（或幾乎全選）時，可能是假抉擇或選項不吸引人
+ * - 沒人發現的事件：有圖像、可以按確定鍵的事件從來沒被觸發
+ * - 卡關：兩次進度之間隔了很久（玩家沒有離開頁面）的位置
+ * - 成就解鎖率、選單使用、設定、錯誤
+ */
+async function gameInsights(env: Env, gameId: string) {
+  const all = async <T>(sql: string, ...binds: unknown[]) => (await env.DB.prepare(sql).bind(gameId, ...binds).all<T>()).results;
+  const starters = (await all<{ n: number }>("SELECT COUNT(DISTINCT visitor) AS n FROM play_events WHERE game_id = ?1 AND type = 'start'"))[0]?.n ?? 0;
+
+  // 選擇比例
+  const choiceRows = await all<{ ref: string; value: number; detail: string | null; n: number }>(
+    "SELECT ref, value, MAX(detail) AS detail, COUNT(DISTINCT visitor) AS n FROM play_events WHERE game_id = ?1 AND type = 'choice' AND ref IS NOT NULL GROUP BY ref, value",
+  );
+  const byRef = new Map<string, Array<{ value: number; text: string | null; n: number }>>();
+  for (const r of choiceRows) byRef.set(r.ref, [...(byRef.get(r.ref) ?? []), { value: r.value, text: r.detail, n: r.n }]);
+  const choices = [...byRef].map(([locator, options]) => {
+    const total = options.reduce((a, o) => a + o.n, 0);
+    const top = options.reduce((a, o) => (o.n > a.n ? o : a), options[0]);
+    return { locator, total, options: options.sort((a, b) => a.value - b.value).map((o) => ({ ...o, pct: Math.round((o.n / total) * 100) })), lopsided: total >= 5 && top.n / total >= 0.85 };
+  });
+
+  // 沒人發現的事件（對照已發布的遊戲內容）
+  const published = await env.DB.prepare("SELECT data FROM published_games WHERE id = ?").bind(gameId).first<{ data: string }>();
+  const interacted = new Set((await all<{ ref: string }>("SELECT DISTINCT ref FROM play_events WHERE game_id = ?1 AND type = 'interact'")).map((r) => r.ref));
+  const unseen: Array<{ ref: string; name: string; map: string }> = [];
+  if (published && starters >= 3) {
+    const project = JSON.parse(published.data) as GameProject;
+    for (const m of project.maps)
+      for (const e of m.events)
+        if (e.pages.some((pg) => pg.trigger === "action" && pg.commands.length > 0) && !interacted.has(`${m.id}/${e.id}`)) unseen.push({ ref: `${m.id}/${e.id}`, name: e.name, map: m.name });
+  }
+
+  // 卡關：同一個遊玩階段裡，兩次進度之間超過 2 分鐘、中間沒有離開頁面
+  const rows = await all<{ session: string; type: string; ref: string | null; chapter_id: string | null; created_at: string }>(
+    "SELECT session, type, ref, chapter_id, created_at FROM play_events WHERE game_id = ?1 ORDER BY session, id LIMIT 30000",
+  );
+  const stuckAt = new Map<string, { sessions: Set<string>; total: number; max: number }>();
+  let cur = "";
+  let lastAt = 0;
+  let where = "";
+  for (const r of rows) {
+    if (r.session !== cur) {
+      cur = r.session;
+      lastAt = 0;
+      where = "";
+    }
+    const t = Date.parse(r.created_at);
+    if (r.type === "leave") {
+      lastAt = 0;
+      continue;
+    }
+    if (r.type === "transfer" && r.ref) where = r.ref;
+    if (["interact", "transfer", "item", "quest", "chapter", "choice", "achievement", "ending"].includes(r.type)) {
+      const gap = lastAt ? (t - lastAt) / 1000 : 0;
+      if (gap > 120 && gap < 3600) {
+        const key = `${r.chapter_id ?? "?"}／${where || "起點"}`;
+        const s = stuckAt.get(key) ?? { sessions: new Set<string>(), total: 0, max: 0 };
+        s.sessions.add(r.session);
+        s.total += gap;
+        s.max = Math.max(s.max, gap);
+        stuckAt.set(key, s);
+      }
+      lastAt = t;
+    }
+  }
+  const stuck = [...stuckAt]
+    .map(([place, s]) => ({ place, sessions: s.sessions.size, avgMinutes: Math.round((s.total / s.sessions.size / 60) * 10) / 10, maxMinutes: Math.round((s.max / 60) * 10) / 10 }))
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, 8);
+
+  const achievements = await all<{ ref: string; players: number }>("SELECT ref, COUNT(DISTINCT visitor) AS players FROM play_events WHERE game_id = ?1 AND type = 'achievement' GROUP BY ref ORDER BY players DESC");
+  const menus = await all<{ ref: string; opens: number }>("SELECT ref, COUNT(*) AS opens FROM play_events WHERE game_id = ?1 AND type = 'menu' GROUP BY ref ORDER BY opens DESC");
+  const settings = await all<{ ref: string; detail: string; n: number }>("SELECT ref, detail, COUNT(DISTINCT visitor) AS n FROM play_events WHERE game_id = ?1 AND type = 'setting' GROUP BY ref, detail ORDER BY n DESC LIMIT 20");
+  const errors = await all<{ detail: string; n: number }>("SELECT detail, COUNT(*) AS n FROM play_events WHERE game_id = ?1 AND type = 'error' GROUP BY detail ORDER BY n DESC LIMIT 10");
+  return { starters, choices, unseen, stuck, achievements, menus, settings, errors, funnel: await playAnalytics(env, gameId) };
+}
+
+/** 洞察轉成給 AI 讀的 Markdown（案例庫的「這款遊戲」段落） */
+function insightLines(i: Awaited<ReturnType<typeof gameInsights>>) {
+  const lines: string[] = [];
+  if (!i.starters) return lines;
+  lines.push(`- 玩家行為（${i.starters} 位玩家開始玩）：`);
+  for (const c of i.choices.filter((x) => x.lopsided).slice(0, 6))
+    lines.push(`  - 選項幾乎一面倒（${c.locator}）：${c.options.map((o) => `「${o.text ?? o.value}」${o.pct}%`).join("、")}。可能是假抉擇，或其他選項不吸引人`);
+  if (i.unseen.length) lines.push(`  - 從來沒人觸發的事件（${i.unseen.length} 個）：${i.unseen.slice(0, 8).map((u) => `${u.map}／${u.name}`).join("、")}。可能太隱密、沒有引導，或玩家不知道可以調查`);
+  for (const s of i.stuck.slice(0, 4)) lines.push(`  - 卡關：${s.place}，${s.sessions} 次遊玩在這裡停了超過 2 分鐘（平均 ${s.avgMinutes} 分鐘）。檢查引導與提示（G3、H17）`);
+  if (i.achievements.length) lines.push(`  - 成就解鎖人數：${i.achievements.slice(0, 8).map((a) => `${a.ref} ${a.players} 人`).join("、")}`);
+  const quests = i.menus.find((m) => m.ref === "quests");
+  if (quests) lines.push(`  - 任務日誌被打開 ${quests.opens} 次（很多時代表玩家常不知道下一步）`);
+  for (const e of i.errors.slice(0, 3)) lines.push(`  - 頁面錯誤（${e.n} 次）：${e.detail}`);
+  return lines;
+}
+
+/** 後台營運總覽：玩家數、遊玩次數、裝置、地區、各遊戲玩家數、近 30 天每日玩家 */
+async function adminOverview(env: Env) {
+  const one = async <T>(sql: string) => (await env.DB.prepare(sql).first<T>())!;
+  const all = async <T>(sql: string) => (await env.DB.prepare(sql).all<T>()).results;
+  const [totals, groups, games, daily, recent] = await Promise.all([
+    one<{ visitors: number; today: number; week: number; month: number; sessions: number; avgMinutes: number | null }>(
+      "SELECT (SELECT COUNT(*) FROM play_visitors) AS visitors, (SELECT COUNT(*) FROM play_visitors WHERE last_seen >= date('now')) AS today, (SELECT COUNT(*) FROM play_visitors WHERE last_seen >= date('now', '-6 days')) AS week, (SELECT COUNT(*) FROM play_visitors WHERE last_seen >= date('now', '-29 days')) AS month, (SELECT COUNT(*) FROM play_sessions) AS sessions, (SELECT AVG((julianday(last_at) - julianday(started_at)) * 1440) FROM play_sessions) AS avgMinutes",
+    ),
+    all<{ k: string; v: string | null; n: number }>(
+      "SELECT 'device' AS k, device AS v, COUNT(*) AS n FROM play_visitors GROUP BY device UNION ALL SELECT 'os', os, COUNT(*) FROM play_visitors GROUP BY os UNION ALL SELECT 'browser', browser, COUNT(*) FROM play_visitors GROUP BY browser UNION ALL SELECT 'country', country, COUNT(*) FROM play_visitors GROUP BY country",
+    ),
+    all<{ game_id: string; visitors: number; sessions: number }>("SELECT game_id, COUNT(DISTINCT visitor) AS visitors, COUNT(*) AS sessions FROM play_sessions GROUP BY game_id ORDER BY visitors DESC"),
+    all<{ day: string; visitors: number }>("SELECT substr(started_at, 1, 10) AS day, COUNT(DISTINCT visitor) AS visitors FROM play_sessions WHERE started_at >= date('now', '-29 days') GROUP BY day ORDER BY day"),
+    all<{ detail: string; game_id: string; n: number }>("SELECT detail, game_id, COUNT(*) AS n FROM play_events WHERE type = 'error' AND created_at >= date('now', '-6 days') GROUP BY detail, game_id ORDER BY n DESC LIMIT 10"),
+  ]);
+  return { ...totals, groups, games, daily, recentErrors: recent };
+}
+
+/** 玩家列表：匿名代號、裝置、地區、第一次與最後一次來、玩過哪些遊戲、目前進度 */
+async function adminPlayers(env: Env, limit: number, offset: number) {
+  const { results } = await env.DB.prepare(
+    `SELECT v.visitor, v.nickname, v.invite, v.device, v.os, v.browser, v.lang, v.country, v.first_seen, v.last_seen, v.sessions,
+       (SELECT GROUP_CONCAT(DISTINCT game_id) FROM play_sessions s WHERE s.visitor = v.visitor) AS games,
+       (SELECT COUNT(*) FROM play_events e WHERE e.visitor = v.visitor) AS events,
+       (SELECT chapter_id FROM play_events e WHERE e.visitor = v.visitor AND chapter_id IS NOT NULL ORDER BY id DESC LIMIT 1) AS last_chapter,
+       (SELECT COUNT(*) FROM play_events e WHERE e.visitor = v.visitor AND e.type = 'ending') AS endings
+     FROM play_visitors v ORDER BY v.last_seen DESC LIMIT ? OFFSET ?`,
+  )
+    .bind(limit, offset)
+    .all();
+  const total = (await env.DB.prepare("SELECT COUNT(*) AS n FROM play_visitors").first<{ n: number }>())?.n ?? 0;
+  return { total, players: results };
+}
+
+/** 單一玩家的完整時間軸（最近 1000 筆操作） */
+async function adminPlayer(env: Env, visitor: string) {
+  const info = await env.DB.prepare("SELECT * FROM play_visitors WHERE visitor = ?").bind(visitor).first();
+  const sessions = (await env.DB.prepare("SELECT * FROM play_sessions WHERE visitor = ? ORDER BY started_at DESC LIMIT 100").bind(visitor).all()).results;
+  const events = (await env.DB.prepare("SELECT session, game_id, type, chapter_id, ref, value, detail, created_at FROM play_events WHERE visitor = ? ORDER BY id DESC LIMIT 1000").bind(visitor).all()).results;
+  return { info, sessions, events };
+}
+
 /** 審查關卡：每個目標最新一次審查是否通過 */
 async function reviewBlockers(env: Env, projectId: string, project: GameProject) {
   const { results } = await env.DB.prepare(
@@ -577,6 +754,7 @@ const API_DOCS = `# AI RPG Studio API
 | 方法與路徑 | 說明 |
 |---|---|
 | GET /api/auth/me | 確認 token 有效 |
+| GET /api/auth/logins | 後台登入紀錄（最近 100 筆，含 IP；只限瀏覽器登入的使用者） |
 | POST /api/auth/operator | 共用帳號時設定這次登入的操作者名稱 \`{name}\`（只限瀏覽器登入） |
 | GET /api/projects | 專案列表 |
 | POST /api/projects \`{title, template: "blank"\\|"demo"}\` 或 \`{project}\` | 建立或匯入專案 |
@@ -592,6 +770,7 @@ const API_DOCS = `# AI RPG Studio API
 | GET /api/projects/:id/notes | 修改清單（人在測試遊玩時按 📌 標記的意見，含位置代碼與當下狀態） |
 | POST /api/projects/:id/notes \`{body, locator?, mapId?, x?, y?, chapterId?, excerpt?, state?}\` | 新增一筆修改意見 |
 | PATCH /api/projects/:id/notes/:noteId \`{status: "resolved"\|"wontfix"\|"open", resolution}\` | 標成已處理（寫明怎麼改的）或不處理 |
+| GET /api/projects/:id/insights | 玩家行為洞察（選擇比例、沒人發現的事件、卡關的地方、成就解鎖率、選單、設定、錯誤） |
 | GET /api/projects/:id/analytics | 遊玩數據（玩家數、每章完成率與時間、結局分布、最常離開的地方） |
 | GET /api/lessons?game=<id> | AI 案例庫（Markdown）：玩家回饋與審查最常退件的問題，製作前必讀 |
 | POST /api/projects/:id/publish \`{check}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標與審查關卡。建議用 \`npm run game -- remote publish <id>\` |

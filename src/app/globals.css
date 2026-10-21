@@ -253,6 +253,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid #f2b84b55; border
 .rm-cover-meta span { background: rgba(10, 16, 46, 0.75); border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 999px; padding: 3px 12px; font-size: 13px; text-shadow: 1px 1px 0 #000; }
 .rm-screen.short .rm-cover-meta { margin-top: 8px; }
 .game-card-time { position: absolute; right: 10px; top: 104px; background: rgba(10, 16, 46, 0.8); border: 1px solid rgba(255, 255, 255, 0.45); color: #fff; font-size: 12px; padding: 2px 10px; border-radius: 999px; }
+.launcher-nickname { display: block; margin-top: 6px; background: none; border: 1px solid rgba(255, 255, 255, 0.35); color: inherit; border-radius: 999px; padding: 2px 10px; font: inherit; cursor: pointer; }
+.launcher-privacy { margin-top: 10px; font-size: 11px; line-height: 1.5; opacity: 0.6; }
+.rm-achievements { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.rm-achievement { display: flex; gap: 10px; align-items: flex-start; opacity: 0.6; }
+.rm-achievement.got { opacity: 1; }
+.rm-achievement-icon { font-size: 20px; line-height: 1.2; }
 .rm-autosave { position: absolute; left: 12px; bottom: 12px; z-index: 5; font-size: 13px; color: #fff; background: rgba(10, 16, 46, 0.75); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 999px; padding: 2px 12px; pointer-events: none; animation: rm-autosave 2.2s ease forwards; }
 .rm-autosave { left: 50% !important; bottom: auto !important; top: 10px; transform: translateX(-50%); }
 /* 對話框不透明：地圖上的物件不會透出來干擾閱讀 */
@@ -624,6 +630,15 @@ details.card > summary { cursor: pointer; }
 .rm-feedback-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .rm-feedback-tags button { background: rgba(10, 16, 46, 0.75); border: 1px solid rgba(255, 255, 255, 0.45); color: #fff; border-radius: 999px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
 .rm-feedback-tags button.on { background: #ffd76a; color: #2a1a00; border-color: #ffd76a; }
-.rm-feedback textarea { width: 100%; background: #0d1020; color: #fff; border: 1px solid #4b5585; border-radius: 6px; padding: 8px; font: inherit; }
+.rm-feedback textarea, .rm-feedback input[type="text"] { width: 100%; background: #0d1020; color: #fff; border: 1px solid #4b5585; border-radius: 6px; padding: 8px; font: inherit; }
 .rm-feedback-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .rm-button:disabled { opacity: 0.4; animation: none; cursor: default; }
+
+/* 營運頁 */
+.stats-row { display: flex; flex-wrap: wrap; gap: 18px; }
+.stat-value { font-size: 22px; font-weight: 600; }
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 120px; overflow-x: auto; }
+.bar { flex: 1 0 18px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.bar-fill { width: 100%; min-height: 2px; background: #6c8cff; border-radius: 3px 3px 0 0; }
+.bar-label { font-size: 10px; opacity: 0.6; margin-top: 2px; }
+.timeline { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; max-height: 420px; overflow-y: auto; }

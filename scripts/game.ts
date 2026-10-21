@@ -55,6 +55,7 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- remote review <id> [--chapter <章節ID>]
  *   npm run game -- remote status <id>
  *   npm run game -- remote versions <id>
+ *   npm run game -- remote insights <id>           玩家行為洞察（選擇比例、沒人發現的事件、卡關的地方、成就解鎖率），修改或擴充前先看
  *   npm run game -- remote notes <id> [--all]      修改清單：人在測試遊玩時按 📌 標記的意見（含位置代碼、當下台詞與狀態）
  *   npm run game -- remote resolve <id> <noteId> --reply "怎麼改的" [--wontfix]   改完後標成已處理
  *   npm run game -- remote refs <id> <ID 或文字>
@@ -369,6 +370,10 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       const hits = findRefs(r.data.project, file!);
       return out({ ok: true, query: file, count: hits.length, hits }, 0);
     }
+    case "insights":
+      // 玩家行為洞察：選擇比例、沒人發現的事件、卡關的地方、成就解鎖率（擴充或修改遊戲前先看）
+      need("insights <id>");
+      return done(await api("GET", `/api/projects/${target}/insights`));
     case "notes": {
       // 修改清單：每一筆附上位置代碼指到的指令，AI 不必再搜尋「在哪裡」
       need("notes <id>");
@@ -406,7 +411,7 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       return done(await api("POST", `/api/projects/${target}/publish`, { check: publishSummary(report) }));
     }
     default:
-      fail("用法：npm run game -- remote <list|create|lessons|story|push-docs|pull|inspect|refs|apply|check|review-treatment|review|status|versions|notes|resolve|publish> …", 1);
+      fail("用法：npm run game -- remote <list|create|lessons|story|push-docs|pull|inspect|refs|apply|check|review-treatment|review|status|versions|insights|notes|resolve|publish> …", 1);
   }
 }
 

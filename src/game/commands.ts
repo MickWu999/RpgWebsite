@@ -112,5 +112,6 @@ export function allConditions(project: GameProject): GameCondition[] {
     if (cmd.code === "choices") cmd.options.forEach((o) => o.condition && out.push(o.condition));
   });
   project.endings.forEach((e) => e.epilogues?.forEach((x) => out.push(x.condition)));
+  (project.achievements ?? []).forEach((a) => out.push(a.condition));
   return out;
 }

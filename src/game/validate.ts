@@ -58,6 +58,7 @@ export function validateLogic(project: GameProject): ValidationReport {
     return seen;
   };
   const actors = ids("actors", project.actors);
+  ids("achievements", project.achievements ?? []);
   const items = ids("items", project.items);
   const quests = new Map(project.quests.map((q) => [q.id, q]));
   ids("quests", project.quests);

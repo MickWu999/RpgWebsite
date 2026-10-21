@@ -59,6 +59,7 @@ for (const dir of readdirSync(GAMES_DIR, { withFileTypes: true }).filter((d) => 
     genre: project.genre,
     status: meta.status,
     endings: project.endings.length,
+    achievements: (project.achievements ?? []).length + project.endings.filter((e) => !e.nextChapterId).length,
     npcs: quality.metrics.people,
     chapters: project.chapters.length,
     release: project.release?.status ?? "complete",

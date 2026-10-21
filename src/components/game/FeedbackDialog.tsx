@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { isAutomated } from "@/lib/analytics";
+import { getNickname, isAutomated, setNickname } from "@/lib/analytics";
 
 /**
  * 玩完一章時的玩家回饋（星等＋快速標籤＋一句話）。
@@ -31,6 +31,7 @@ export default function FeedbackDialog({ gameId, chapterId, title, onDone }: { g
   const [rating, setRating] = useState(0);
   const [tags, setTags] = useState<string[]>([]);
   const [comment, setComment] = useState("");
+  const [nickname, setNick] = useState(() => getNickname() ?? "");
   const [sent, setSent] = useState(false);
   const close = () => {
     markAsked(gameId, chapterId);
@@ -65,6 +66,7 @@ export default function FeedbackDialog({ gameId, chapterId, title, onDone }: { g
               ))}
             </div>
             <textarea rows={2} maxLength={500} placeholder="想對製作者說的話（選填）" value={comment} onChange={(e) => setComment(e.target.value)} data-testid="feedback-comment" />
+            <input type="text" maxLength={20} placeholder="你的暱稱（選填，讓作者認識你）" value={nickname} onChange={(e) => setNick(e.target.value)} data-testid="feedback-nickname" />
             <div className="rm-feedback-actions">
               <button className="rm-button" onClick={close}>
                 略過
@@ -74,6 +76,7 @@ export default function FeedbackDialog({ gameId, chapterId, title, onDone }: { g
                 disabled={rating === 0}
                 data-testid="feedback-send"
                 onClick={async () => {
+                  setNickname(nickname);
                   // 自動化測試不送出，避免假回饋進入 AI 案例庫
                   if (!isAutomated())
                     await fetch("/api/feedback", {

@@ -58,6 +58,50 @@ export type PlayAnalytics = {
   quits: Array<{ chapter_id: string | null; ref: string | null; players: number }>;
   daily: Array<{ day: string; visitors: number }>;
 };
+export type GameInsights = {
+  starters: number;
+  choices: Array<{ locator: string; total: number; lopsided: boolean; options: Array<{ value: number; text: string | null; n: number; pct: number }> }>;
+  unseen: Array<{ ref: string; name: string; map: string }>;
+  stuck: Array<{ place: string; sessions: number; avgMinutes: number; maxMinutes: number }>;
+  achievements: Array<{ ref: string; players: number }>;
+  menus: Array<{ ref: string; opens: number }>;
+  settings: Array<{ ref: string; detail: string; n: number }>;
+  errors: Array<{ detail: string; n: number }>;
+};
+export type AdminOverview = {
+  visitors: number;
+  today: number;
+  week: number;
+  month: number;
+  sessions: number;
+  avgMinutes: number | null;
+  groups: Array<{ k: "device" | "os" | "browser" | "country"; v: string | null; n: number }>;
+  games: Array<{ game_id: string; visitors: number; sessions: number }>;
+  daily: Array<{ day: string; visitors: number }>;
+  recentErrors: Array<{ detail: string; game_id: string; n: number }>;
+};
+export type AdminPlayerRow = {
+  visitor: string;
+  nickname: string | null;
+  invite: string | null;
+  device: string | null;
+  os: string | null;
+  browser: string | null;
+  lang: string | null;
+  country: string | null;
+  first_seen: string;
+  last_seen: string;
+  sessions: number;
+  games: string | null;
+  events: number;
+  last_chapter: string | null;
+  endings: number;
+};
+export type AdminPlayerDetail = {
+  info: AdminPlayerRow | null;
+  sessions: Array<{ session: string; game_id: string; started_at: string; last_at: string; events: number; screen: string | null; touch_mode: string | null }>;
+  events: Array<{ session: string; game_id: string; type: string; chapter_id: string | null; ref: string | null; value: number | null; detail: string | null; created_at: string }>;
+};
 export type NoteEntry = {
   id: string;
   locator: string | null;
@@ -112,6 +156,7 @@ export type { CheckReport as CheckResult } from "@/studio/check";
 export const studioApi = {
   me: () => call<{ user: { id: string; username: string }; operator: string | null }>("GET", "/api/auth/me"),
   login: (username: string, password: string, remember = true, operator = "") => call<{ user: { username: string } }>("POST", "/api/auth/login", { username, password, remember, operator }),
+  logins: () => call<{ logins: Array<{ username: string; operator: string | null; ip: string; country: string | null; device: string; success: number; created_at: string }> }>("GET", "/api/auth/logins"),
   setOperator: (name: string) => call<{ operator: string | null }>("POST", "/api/auth/operator", { name }),
   logout: () => call("POST", "/api/auth/logout", {}),
   changePassword: (current: string, next: string) => call<{ notice: string }>("POST", "/api/auth/password", { current, next }),
@@ -122,6 +167,10 @@ export const studioApi = {
   reviews: (id: string) => call<{ reviews: ReviewEntry[] }>("GET", `/api/projects/${id}/reviews`),
   feedback: (id: string) => call<{ feedback: FeedbackEntry[] }>("GET", `/api/projects/${id}/feedback`),
   acceptReview: (id: string, target: string, note: string) => call<{ ok: true }>("POST", `/api/projects/${id}/reviews/accept`, { target, note }),
+  insights: (id: string) => call<{ insights: GameInsights }>("GET", `/api/projects/${id}/insights`),
+  adminOverview: () => call<{ overview: AdminOverview }>("GET", "/api/admin/overview"),
+  adminPlayers: (limit = 50, offset = 0) => call<{ total: number; players: AdminPlayerRow[] }>("GET", `/api/admin/players?limit=${limit}&offset=${offset}`),
+  adminPlayer: (visitor: string) => call<AdminPlayerDetail>("GET", `/api/admin/players/${visitor}`),
   notes: (id: string) => call<{ notes: NoteEntry[] }>("GET", `/api/projects/${id}/notes`),
   addNote: (id: string, note: { body: string; locator: string | null; mapId: string; x: number; y: number; chapterId: string | null; excerpt: string; state: unknown }) =>
     call<{ id: string }>("POST", `/api/projects/${id}/notes`, note),

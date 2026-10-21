@@ -5,7 +5,7 @@ import { sha256hex, type Env } from "./lib";
  * - /games/index.json：內建遊戲（靜態檔）＋ Studio 已發布的遊戲（D1 published_games）
  * - /games/<id>/project.json：先查 D1 已發布的遊戲，沒有再回傳靜態檔
  * - POST /api/feedback：玩完一章時的回饋（同一位玩家同一章只保留最新一筆；不保存 IP）
- * - POST /api/events：匿名遊玩數據（開始、章節、結局、離開；一次最多 50 筆）
+ * - POST /api/events：匿名遊玩紀錄（每個操作：對話、選擇、換地圖、物品、任務、選單、設定、錯誤…；一次最多 100 筆），並更新匿名玩家與遊玩階段
  * 除了回饋與遊玩數據之外，前台不提供任何寫入或後台功能。
  */
 export default {
@@ -32,31 +32,49 @@ export default {
     }
 
     if (url.pathname === "/api/events" && req.method === "POST") {
-      const body = (await req.json().catch(() => null)) as { visitor?: unknown; session?: unknown; events?: unknown } | null;
+      const body = (await req.json().catch(() => null)) as { visitor?: unknown; session?: unknown; device?: Record<string, unknown>; invite?: unknown; nickname?: unknown; events?: unknown } | null;
       const id = /^[\w-]{1,64}$/;
       if (!body || typeof body.visitor !== "string" || !id.test(body.visitor) || typeof body.session !== "string" || !id.test(body.session) || !Array.isArray(body.events)) {
         return new Response(JSON.stringify({ ok: false, error: "格式錯誤" }), { status: 400, headers });
       }
-      const types = new Set(["start", "chapter", "chapter_done", "ending", "leave"]);
+      const types = new Set(["load", "start", "chapter", "chapter_done", "ending", "leave", "achievement", "interact", "choice", "transfer", "item", "quest", "menu", "save", "load_save", "setting", "error"]);
       const opt = (v: unknown) => (typeof v === "string" && id.test(v) ? v : null);
+      // ref 可以是位置代碼（含 / # . :），只允許安全的字元
+      const ref = (v: unknown) => (typeof v === "string" && /^[\w\-/#.:]{1,120}$/.test(v) ? v : null);
+      const text = (v: unknown, n: number) => (typeof v === "string" && v ? v.replace(/[\u0000-\u001f]/g, " ").slice(0, n) : null);
       const now = new Date().toISOString();
-      const rows = (body.events as Array<Record<string, unknown>>)
-        .slice(0, 50)
-        .filter((e) => e && typeof e.gameId === "string" && id.test(e.gameId) && typeof e.type === "string" && types.has(e.type))
-        .map((e) =>
-          env.DB.prepare("INSERT INTO play_events (game_id, visitor, session, type, chapter_id, ref, value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(
-            e.gameId,
-            body.visitor,
-            body.session,
-            e.type,
-            opt(e.chapterId),
-            opt(e.ref),
-            typeof e.value === "number" && Number.isFinite(e.value) ? Math.min(Math.max(e.value, 0), 1440) : null,
-            typeof e.at === "string" && !Number.isNaN(Date.parse(e.at)) && Math.abs(Date.parse(e.at) - Date.now()) < 864e5 ? new Date(e.at).toISOString() : now,
-          ),
+      const events = (body.events as Array<Record<string, unknown>>).slice(0, 100).filter((e) => e && typeof e.gameId === "string" && id.test(e.gameId) && typeof e.type === "string" && types.has(e.type));
+      const at = (e: Record<string, unknown>) => (typeof e.at === "string" && !Number.isNaN(Date.parse(e.at)) && Math.abs(Date.parse(e.at) - Date.now()) < 864e5 ? new Date(e.at).toISOString() : now);
+      const stmts = events.map((e) =>
+        env.DB.prepare("INSERT INTO play_events (game_id, visitor, session, type, chapter_id, ref, value, detail, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(
+          e.gameId,
+          body.visitor,
+          body.session,
+          e.type,
+          opt(e.chapterId),
+          ref(e.ref),
+          typeof e.value === "number" && Number.isFinite(e.value) ? Math.min(Math.max(e.value, -9999), 99999) : null,
+          text(e.detail, 200),
+          at(e),
+        ),
+      );
+      if (stmts.length) {
+        // 匿名玩家與遊玩階段：裝置只記粗略分類，地區只記 Cloudflare 判斷的國家代碼，不保存 IP
+        const d = body.device ?? {};
+        const country = text((req as Request & { cf?: { country?: string } }).cf?.country ?? req.headers.get("CF-IPCountry"), 8);
+        const gameId = events[0].gameId as string;
+        stmts.push(
+          env.DB.prepare(
+            "INSERT INTO play_visitors (visitor, first_seen, last_seen, device, os, browser, lang, country, sessions, invite, nickname) VALUES (?1, ?2, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9) ON CONFLICT(visitor) DO UPDATE SET last_seen = ?2, device = COALESCE(?3, device), os = COALESCE(?4, os), browser = COALESCE(?5, browser), lang = COALESCE(?6, lang), country = COALESCE(?7, country), invite = COALESCE(invite, ?8), nickname = ?9",
+          ).bind(body.visitor, now, text(d.device, 16), text(d.os, 16), text(d.browser, 16), text(d.lang, 10), country, text(body.invite, 20), text(body.nickname, 20)),
+          env.DB.prepare(
+            "INSERT INTO play_sessions (session, visitor, game_id, started_at, last_at, events, screen, touch_mode) VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, ?7) ON CONFLICT(session) DO UPDATE SET last_at = ?4, events = events + ?5, screen = COALESCE(?6, screen), touch_mode = COALESCE(?7, touch_mode)",
+          ).bind(body.session, body.visitor, gameId, now, events.length, text(d.screen, 16), text(d.touchMode, 8)),
+          env.DB.prepare("UPDATE play_visitors SET sessions = (SELECT COUNT(*) FROM play_sessions WHERE visitor = ?1) WHERE visitor = ?1").bind(body.visitor),
         );
-      if (rows.length) await env.DB.batch(rows);
-      return new Response(JSON.stringify({ ok: true, saved: rows.length }), { headers });
+        await env.DB.batch(stmts);
+      }
+      return new Response(JSON.stringify({ ok: true, saved: events.length }), { headers });
     }
 
     if (url.pathname === "/games/index.json") {

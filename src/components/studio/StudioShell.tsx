@@ -80,6 +80,10 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
             <span className="shell-icon">📁</span>
             <span className="shell-label">專案</span>
           </Link>
+          <Link href="/studio/players/" className={`shell-nav-item${pathname.startsWith("/studio/players") ? " active" : ""}`} title="玩家與營運數據" data-testid="nav-營運">
+            <span className="shell-icon">📊</span>
+            <span className="shell-label">營運</span>
+          </Link>
           {projectNav.length > 0 && (
             <>
               <div className="shell-section shell-label">{title ?? "目前專案"}</div>
