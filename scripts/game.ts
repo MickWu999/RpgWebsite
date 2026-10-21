@@ -4,12 +4,15 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { z } from "zod";
 import { providerFromEnv } from "@/ai/claudeCodeProvider";
+import { CLICHES } from "@/ai/designGuide";
+import { drawSeeds } from "@/ai/seeds";
 import { ASSET_CATALOG, MUSIC, TERRAIN } from "@/game/assets";
 import { projectDigest, reviewProject, reviewTreatment, type ReviewResult } from "@/ai/review";
 import { chapterPlaytest, checkChapters } from "@/game/chapters";
 import { projectRevision } from "@/game/engine";
 import { applyAction, settle } from "@/game/playtest";
 import { runPlaytest } from "@/game/playtest";
+import { lintDesign } from "@/game/lint";
 import { assessQuality } from "@/game/quality";
 import { gameProjectSchema, type GameProject } from "@/game/schema";
 import { validateProject } from "@/game/validate";
@@ -23,6 +26,7 @@ import { loadLocalEnv } from "./env";
  *
  *   npm run game -- schema                                       輸出操作 API 的 JSON Schema
  *   npm run game -- assets                                       列出可用素材（地形字元、角色圖、圖示、音樂）
+ *   npm run game -- seeds [n]                                    抽 n 組故事種子（世界規則×主角處境×情緒問題×語氣），發想提案用
  *   npm run game -- new <id> --title <名稱> [--genre fantasy]   建立空白專案（一張起始地圖、主角、一個佔位結局）
  *   npm run game -- inspect <id>                                 以 RPG Maker 事件清單的形式輸出目前內容
  *   npm run game -- apply <id> <ops.json>                        套用操作（每筆都成功才寫檔）
@@ -247,7 +251,7 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       const local = applyOps(cur.data.project, list);
       if (!local.results.every((x) => x.ok)) return out({ ok: false, stage: "local", results: local.results.filter((x) => !x.ok) }, 2);
       const r = await api("POST", `/api/projects/${target}/ops`, { ops: list, baseVersion: cur.data.version });
-      return out({ ...r.data, report: local.report }, r.ok ? 0 : 2);
+      return out({ ...r.data, report: local.report, lint: lintDelta(cur.data.project, local.project) }, r.ok ? 0 : 2);
     }
     case "check": {
       // 伺服器不執行檢查（CPU 限制）：下載目前版本，在本機驗證＋自動試玩＋品質指標
@@ -326,6 +330,29 @@ async function remote(sub: string | undefined, target: string | undefined, file:
   }
 }
 
+/**
+ * 設計防呆：每次 apply 之後立刻比對前後，只回報「這批操作新產生的」問題，讓 agent 當場修正。
+ * 製作途中有些問題是暫時的（例如先寫了讀取開關的事件、打開開關的事件下一批才做），所以 apply 不擋，check／publish 才擋。
+ */
+function lintDelta(before: GameProject, after: GameProject) {
+  try {
+    const key = (x: { path: string; message: string }) => `${x.path}|${x.message}`;
+    const old = lintDesign(before);
+    const now = lintDesign(after);
+    const had = new Set([...old.errors, ...old.warnings].map(key));
+    const newErrors = now.errors.filter((x) => !had.has(key(x)));
+    const newWarnings = now.warnings.filter((x) => !had.has(key(x)));
+    return {
+      newErrors,
+      newWarnings,
+      openErrors: now.errors.length,
+      ...(newErrors.length ? { hint: "這批操作新產生了設計錯誤（卡關或永遠不會出現的事件頁）。如果只是還沒做完的部分，下一批補上即可；check／publish 時仍有錯誤會被擋下" } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** 製作中的專案允許暫時不完整（例如結局還沒接上），所以只檢查 schema 格式；完整驗證由 check／publish 把關 */
 function load(gameId: string): GameProject {
   if (!existsSync(projectFile(gameId))) fail(`找不到 ${projectFile(gameId)}，請先執行 npm run game -- new ${gameId}`);
@@ -342,6 +369,10 @@ async function main() {
     const terrain = Object.entries(TERRAIN).map(([ch, d]) => ({ ch, name: d.name, group: d.group ?? "village", walkable: d.walkable, ...(d.examine ? { examine: d.examine } : {}) }));
     const pick = (kind: string) => ASSET_CATALOG.filter((a) => a.kind === kind).map((a) => ({ id: a.id, name: a.name, tags: a.tags }));
     return out({ terrain, characters: pick("character"), icons: pick("icon"), music: Object.entries(MUSIC).map(([mood, m]) => ({ mood, title: m.title })), note: "地形字元用在 map.terrain／map.paint；角色圖用在 actor.spriteAssetId 與事件頁 graphic；圖示用在 item.iconAssetId；音樂情緒用在 map.music 與 music 指令" }, 0);
+  }
+  if (command === "seeds") {
+    // 發想提案用：強迫離開 AI 最先想到的老套點子（規範第 3 節「提案」）
+    return out({ seeds: drawSeeds(Math.min(Math.max(Number(id) || 3, 1), 8)), cliches: CLICHES, note: "種子只是起點：可以換牌、混搭，但每個提案都要說明它避開了哪些老套" }, 0);
   }
   if (!command || !id) fail("用法：npm run game -- <schema|new|inspect|apply|check|review-treatment|review|status|publish> <id> …", 1);
   if (!/^[a-z0-9-]{3,48}$/.test(id)) fail("遊戲 ID 只能用小寫英數字與連字號（3～48 字）", 1);
@@ -368,7 +399,7 @@ async function main() {
       const allOk = result.results.every((r) => r.ok);
       // 中途允許暫時不合法（例如結局還沒寫好），但每筆操作都必須成功；驗證錯誤會回報給 agent 處理
       if (allOk) writeFileSync(projectFile(id), JSON.stringify(result.project, null, 2) + "\n");
-      return out({ ok: allOk, written: allOk, results: result.results.filter((r) => !r.ok || result.results.length <= 20), report: result.report }, allOk ? 0 : 2);
+      return out({ ok: allOk, written: allOk, results: result.results.filter((r) => !r.ok || result.results.length <= 20), report: result.report, ...(allOk ? { lint: lintDelta(base, result.project) } : {}) }, allOk ? 0 : 2);
     }
     case "check": {
       const report = runCheck(load(id), { demo: values.demo });

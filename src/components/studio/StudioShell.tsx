@@ -18,11 +18,15 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
   const projectId = params.get("id");
   const db = params.get("db");
   const [user, setUser] = useState<string | null>(null);
+  const [operator, setOperator] = useState<string | null>(null);
 
   useEffect(() => {
     studioApi
       .me()
-      .then((r) => setUser(r.user.username))
+      .then((r) => {
+        setUser(r.user.username);
+        setOperator(r.operator);
+      })
       .catch(() => {
         // 401 時 studioApi 會自動導向登入頁
       });
@@ -88,11 +92,30 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
           <div className="shell-user-wrap">
             <button className={`shell-user${menu ? " open" : ""}`} onClick={() => setMenu((v) => !v)} data-testid="user-menu">
               <span className="shell-icon">👤</span>
-              <span className="shell-label">{user ?? "…"}</span>
+              <span className="shell-label">{user ? (operator ? `${operator}（${user}）` : user) : "…"}</span>
               <span className="shell-label shell-caret">▾</span>
             </button>
             {menu && (
               <div className="shell-user-menu" role="menu">
+                <button
+                  className="shell-user-item"
+                  role="menuitem"
+                  data-testid="set-operator"
+                  onClick={async () => {
+                    const name = window.prompt("你的名字（多人共用帳號時，用來記錄是誰做的修改；留空就只顯示帳號）", operator ?? "");
+                    if (name === null) return;
+                    const r = await studioApi.setOperator(name).catch(() => null);
+                    if (!r) return;
+                    setOperator(r.operator);
+                    try {
+                      window.localStorage.setItem("studio:operator", r.operator ?? "");
+                    } catch {
+                      // 記不住也沒關係
+                    }
+                  }}
+                >
+                  ✎ 操作者：{operator ?? "未填寫"}
+                </button>
                 <Link href="/studio/settings/" className="shell-user-item" role="menuitem">
                   ⚙ 帳號設定
                 </Link>

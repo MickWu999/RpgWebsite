@@ -78,7 +78,9 @@ export type ReviewEntry = {
       scores: Record<string, number>;
       issues: Array<{ severity: string; area: string; problem: string; suggestion: string }>;
       followUp?: Array<{ problem: string; resolved: boolean; note: string }>;
+      players?: Array<{ persona: "veteran" | "casual" | "story"; wouldContinue: boolean; reason: string }>;
     };
+    prediction?: { guesses: Array<{ about: string; guess: string }>; feelsLike: string[] } | null;
   };
 };
 export type VersionEntry = { version: number; label: string; actor: string; created_at: string };
@@ -86,8 +88,9 @@ export type TokenEntry = { id: string; name: string; token_prefix: string; creat
 export type { CheckReport as CheckResult } from "@/studio/check";
 
 export const studioApi = {
-  me: () => call<{ user: { id: string; username: string } }>("GET", "/api/auth/me"),
-  login: (username: string, password: string, remember = true) => call<{ user: { username: string } }>("POST", "/api/auth/login", { username, password, remember }),
+  me: () => call<{ user: { id: string; username: string }; operator: string | null }>("GET", "/api/auth/me"),
+  login: (username: string, password: string, remember = true, operator = "") => call<{ user: { username: string } }>("POST", "/api/auth/login", { username, password, remember, operator }),
+  setOperator: (name: string) => call<{ operator: string | null }>("POST", "/api/auth/operator", { name }),
   logout: () => call("POST", "/api/auth/logout", {}),
   changePassword: (current: string, next: string) => call<{ notice: string }>("POST", "/api/auth/password", { current, next }),
   listProjects: (archived = false) => call<{ projects: ProjectSummary[] }>("GET", `/api/projects${archived ? "?archived=1" : ""}`),

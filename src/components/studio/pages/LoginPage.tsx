@@ -12,13 +12,26 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [remember, setRemember] = useState(true);
+  // 共用帳號時的操作者名稱：記在這台裝置上，下次登入自動帶入
+  const [operator, setOperator] = useState(() => {
+    try {
+      return window.localStorage.getItem("studio:operator") ?? "";
+    } catch {
+      return "";
+    }
+  });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      await studioApi.login(username, password, remember);
+      try {
+        window.localStorage.setItem("studio:operator", operator.trim());
+      } catch {
+        // 記不住就下次再填
+      }
+      await studioApi.login(username, password, remember, operator);
       window.location.href = next.startsWith("/studio") ? next : "/studio/";
     } catch (err) {
       setError((err as Error).message);
@@ -40,6 +53,10 @@ export default function LoginPage() {
         <label className="field">
           密碼
           <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </label>
+        <label className="field">
+          你的名字（選填）
+          <input type="text" maxLength={20} value={operator} onChange={(e) => setOperator(e.target.value)} placeholder="多人共用帳號時，用來記錄是誰做的修改" data-testid="login-operator" />
         </label>
         <label className="small">
           <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} /> 保持登入（30 天內自動登入）

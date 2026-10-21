@@ -62,7 +62,11 @@ const SCORE_LABEL: Record<string, string> = {
   hook: "開場鉤子",
   variety: "玩法變化",
   budget: "時長預算",
+  premise: "前提新鮮度",
+  surprise: "不好猜",
+  soul: "故事靈魂",
 };
+const PERSONA_LABEL = { veteran: "老玩家", casual: "休閒玩家", story: "劇情派" } as const;
 const time = (iso: string) => new Date(iso).toLocaleString("zh-TW", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export default function ProjectOverview() {
@@ -232,6 +236,26 @@ export default function ProjectOverview() {
                       <div className="small muted">
                         上一輪的問題：已解決 {r.data.review.followUp.filter((f) => f.resolved).length} / {r.data.review.followUp.length}
                       </div>
+                    )}
+                    {r.data.review.players && (
+                      <div className="small">
+                        {r.data.review.players.map((x) => (
+                          <div key={x.persona}>
+                            {x.wouldContinue ? "👍" : "👎"} {PERSONA_LABEL[x.persona]}：{x.reason}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {r.data.prediction && (
+                      <details className="small muted">
+                        <summary>盲猜測試：只看開頭的老玩家這樣猜</summary>
+                        {r.data.prediction.guesses.map((g, i) => (
+                          <div key={i}>
+                            {g.about}：{g.guess}
+                          </div>
+                        ))}
+                        {r.data.prediction.feelsLike.length > 0 && <div>覺得像：{r.data.prediction.feelsLike.join("、")}</div>}
+                      </details>
                     )}
                     <div className="score-grid">
                       {Object.entries(r.data.review.scores).map(([k, v]) => (

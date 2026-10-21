@@ -25,11 +25,38 @@
 2. **章節審查**（`review --chapter`）：每章做完，從章節起點自動試玩通過後，用 `REVIEW_RUBRIC` 只審這一章。沒通過就不能新增下一章。
 3. **整體審查**（`review`）：全部章節完成、`check` 全部通過後審查整款遊戲。通過之後內容又改過，要重新審查才能發布。
 
-通過門檻：總分 ≥ 7、每個面向 ≥ 6、沒有 critical、major 最多 1 個。
+通過門檻：總分 ≥ 7；故事面向 ≥ 6；技術面向（結構、任務、回饋、節奏、玩法變化、時長預算）≥ 5；沒有 critical；major 最多 3 個；玩家評審團（老玩家、休閒玩家、劇情派）至少 2 人想繼續玩。大綱審查前還會先做盲猜測試：另一位 AI 只看劇透線以上的內容猜後面的劇情。
+
+## 設計防呆（程式靜態檢查，不需要 AI）
+
+`src/game/lint.ts` 在每次 `apply` 之後與 `check` 時執行，幾毫秒就跑完。錯誤會擋下發布。
+
+| 規則 | 抓什麼 |
+|---|---|
+| L1 被蓋掉的事件頁 | 後面的頁條件比較寬（或沒有條件），前面的頁永遠不會被使用 |
+| L2 永遠不成立的條件 | 需要的開關從沒被打開、物品拿不到、變數到不了、任務不會進入該狀態、獨立開關沒被打開 |
+| L3 走不到的事件 | 從地圖的任何入口都走不到（或走不到旁邊）的事件；會推進劇情的算錯誤 |
+| L4 困住玩家的區域 | 從入口進來後，走得到的範圍內沒有傳送、章節或結局可以離開 |
+| L5 沒有反應 | 確定鍵事件頁沒有指令、選項選了沒有回應、任務開始後沒有終點（警告） |
 
 ## 一、準則
 
-A～G 沿用基礎敘事設計原則（來源 S1～S14），H 是長篇與章節的前輩方法（來源 R1～R20），X 是 AI 常見盲點。
+**P 是主角**：P 段（故事的靈魂）來自劇情驅動 RPG 設計者本人的訪談（來源 W1～W11），審查時最重要的面向是 premise、surprise、soul。A～G 沿用基礎敘事設計原則（來源 S1～S14），H 是長篇與章節的前輩方法（來源 R1～R20），X 是 AI 常見盲點；這些是輔助與安全網，規則和「好玩」衝突時以 P 為準。
+
+### P. 故事的靈魂（前輩作品怎麼想出前提）
+
+| 作品 | 核心前提 | 為什麼新鮮 | 設計者怎麼說 |
+|---|---|---|---|
+| LISA（Austin Jorgensen） | 末日後世界沒有女人，一個中年男人保護撿到的女嬰 | 一條世界規則讓每個角色都有理由搶她，衝突自己產生 | 「好故事的關鍵是高賭注」「犧牲是為了讓玩家真的感覺到什麼」〔W1〕；「像是我的數位日記」〔W2〕 |
+| Undertale（Toby Fox） | 一款不必殺任何人也能通關的 RPG | 把「打怪升級」反過來 | 官方：「殺戮不是必要的」「重視幽默、角色豐富」〔W3〕；腦袋像調酒器，把喜歡的遊戲混在一起；主題交給玩家詮釋〔W4〕 |
+| OMORI（OMOCAT） | 繭居少年躲進繽紛夢境，逃避一件不敢面對的往事 | 可愛包著創傷，夢境的規則就是主角在逃避什麼 | 角色都取材自自己和身邊的人；恐怖採用「可能真的會發生」的點子〔W5〕 |
+| To the Moon（Kan Gao） | 醫生進入臨終老人的記憶，倒著走回童年實現他的願望 | 記憶就是關卡，謎底是「他為什麼想去月球」 | 把真實的不幸變成有意義的東西；曾想加戰鬥，最後決定不硬塞玩法〔W6〕 |
+| MOTHER（糸井重里） | 現代郊區的普通男孩對抗外星人 | 把冒險搬到日常 | 重點是和現代生活、現代場所的連結〔W7〕 |
+| Disco Elysium（Robert Kurvitz） | 宿醉失憶的警探，腦中的技能是一個個會說話的人格 | 技能變成角色，失敗本身就是內容 | 「搞砸讓遊戲更好玩」「永遠不阻止玩家進入遊戲的某一部分」〔W8〕；每一場戲都寫到全力〔W9〕 |
+| Pentiment（Josh Sawyer） | 修道院謀殺案，你必須指控一個人，但永遠不知道對不對 | 抉擇的代價是不確定 | 「沒有官方的真兇」「你只能接受不確定」〔W10〕 |
+| Doki Doki Literature Club（Dan Salvato） | 表面是戀愛遊戲，其實是心理恐怖 | 先把類型外殼做得很真，再從內部崩壞 | 受影響的是作品給人的感受，而不是內容〔W11〕 |
+
+跨作品的共同方法已整理成 `designGuide.ts` 的 P1～P12；AI 最容易寫出的老套與反過來的用法整理成 `CLICHES`（N1～N15，本平台歸納）。OFF、Yume Nikki 沒有找到設計者本人談前提的訪談，所以沒有納入。
 
 ### A. 結構與分支
 
@@ -157,6 +184,22 @@ A～G 沿用基礎敘事設計原則（來源 S1～S14），H 是長篇與章節
 - [S12] Weather Factory, Embed the ending in the middle — https://weatherfactory.biz/embed-the-ending-in-the-middle-or-crush-it-up-and-stir-it-into-the-rest-of-the-game/
 - [S13] inkle, Just being there — https://www.inklestudios.com/2012/10/12/just-being-there.html
 - [S14] GDC Vault, Environmental Narrative: Your World is Your Story（只確認到場次簡介） — https://gdcvault.com/play/1012712/Environmental-Narrative-Your-World-is
+
+### 故事的靈魂（W）
+
+研究 agent 實際開啟確認過原文。原頁無法開啟、只看過摘要的來源（RPGamer、GameSpot、Mary Sue 等）沒有列入。
+
+- [W1] Siliconera, Finding Humour In LISA's World Of Violent Masculinity And Perverts（Austin Jorgensen 訪談） — https://www.siliconera.com/finding-humour-lisas-world-violent-masculinity-perverts/
+- [W2] Phudgin Interactive, An Interview with Austin Jorgensen — https://phudginteractive.wordpress.com/2015/01/26/an-interview-with-austin-jorgensen/
+- [W3] Undertale 官方 Steam 頁面 — https://store.steampowered.com/app/391540/Undertale/
+- [W4] AUTOMATON, Toby Fox 訪談（日文） — https://automaton-media.com/articles/interviewsjp/undertale-developer-toby-fox-interview/
+- [W5] マイナビニュース, OMOCAT 訪談（日文） — https://news.mynavi.jp/article/20230612-2702569/
+- [W6] RPGFan, Kan Gao Interview — https://www.classic.rpgfan.com/features/kanrgaointerview/
+- [W7] Tuxedo Unmasked, Interview with Shigesato Itoi — https://www.tuxedounmasked.com/interview-with-shigesato-itoi-of-mother-and-hobonichi-11212015/
+- [W8] ZA/UM, Choose Your Own Misadventure Part 2（Disco Elysium 官方 devblog） — https://discoelysium.com/devblog/2019/07/23/choose-your-own-misadventure-part-2
+- [W9] GameAnalytics, Disco Elysium Rezzed 2018 Interview — https://www.gameanalytics.com/blog/disco-elysium-rezzed-2018-interview
+- [W10] TheGamer, Josh Sawyer Pentiment Interview — https://www.thegamer.com/interview-obsidian-josh-sawyer-pentiment/
+- [W11] Siliconera, Doki Doki Literature Club Creator Listed Yume Nikki As An Inspiration — https://www.siliconera.com/doki-doki-literature-club-creator-listed-yume-nikki-as-an-inspiration-monika-ssbu/
 
 ### 長篇與章節的前輩方法（R）
 

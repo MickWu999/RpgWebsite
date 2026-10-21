@@ -39,6 +39,11 @@ import { STUDIO_CHANNEL, type StudioBroadcast } from "@/lib/studioChannel";
 import {
   loadSettings,
   saveSettings,
+  PAD_OPACITIES,
+  PAD_OPACITY_LABEL,
+  PAD_OPACITY_VALUE,
+  TOUCH_MODE_LABEL,
+  TOUCH_MODES,
   TEXT_SPEED_FACTOR,
   TEXT_SPEED_LABEL,
   VOICE_MODE_LABEL,
@@ -49,6 +54,7 @@ import {
 import CoverArt from "./CoverArt";
 import DebugPanel from "./DebugPanel";
 import FeedbackDialog, { feedbackAsked } from "./FeedbackDialog";
+import TouchPad from "./TouchPad";
 import { flushPlayEvents, trackPlay } from "@/lib/analytics";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
 
@@ -333,15 +339,19 @@ export default function GameScreen({ source }: { source: GameSource }) {
   }, [source.test]);
 
   // ---------- 縮放 ----------
+  const padMode = ui?.settings.touch === "pad";
   useEffect(() => {
     const resize = () => {
       const touch = window.matchMedia("(pointer: coarse)").matches;
       const portrait = window.innerHeight > window.innerWidth;
       const canFullscreen = touch && Boolean(document.documentElement.requestFullscreen);
       if (touch && !portrait) {
-        // 手機橫向：畫面寬度填滿螢幕，高度依螢幕比例決定，鏡頭跟著角色捲動
-        const height = Math.round(Math.min(SCREEN_H, Math.max(MIN_SCREEN_H, (SCREEN_W * window.innerHeight) / window.innerWidth)));
-        const scale = Math.min(window.innerWidth / SCREEN_W, window.innerHeight / height);
+        // 手機橫向：畫面寬度填滿螢幕，高度依螢幕比例決定，鏡頭跟著角色捲動。
+        // 「方向鍵＋A」模式像掌機一樣左右各留一條按鍵區，按鍵不會蓋住對話框
+        const side = padMode ? Math.min(170, Math.round(window.innerWidth * 0.17)) : 0;
+        const width = window.innerWidth - side * 2;
+        const height = Math.round(Math.min(SCREEN_H, Math.max(MIN_SCREEN_H, (SCREEN_W * window.innerHeight) / width)));
+        const scale = Math.min(width / SCREEN_W, window.innerHeight / height);
         setLayout({ scale, height, touch, portrait, canFullscreen });
         return;
       }
@@ -356,7 +366,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [padMode]);
 
   useEffect(() => {
     (window as unknown as { __RPG_DEBUG__?: unknown }).__RPG_DEBUG__ = {
@@ -634,7 +644,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         update({ ...u, menuPage: "root" });
         return;
       }
-      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 4, title: 2 }[u.menuPage];
+      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 6, title: 2 }[u.menuPage];
       if (vertical) {
         update({ ...u, subCursor: wrap(u.subCursor + delta, count) });
         return;
@@ -649,6 +659,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
         if (u.subCursor === 1) getAudio().setMuted(!getAudio().muted);
         if (u.subCursor === 2) s.bgm = !s.bgm;
         if (u.subCursor === 3) s.voice = VOICE_MODES[wrap(VOICE_MODES.indexOf(s.voice) + (key === "left" ? -1 : 1), VOICE_MODES.length)];
+        if (u.subCursor === 4) s.touch = TOUCH_MODES[wrap(TOUCH_MODES.indexOf(s.touch) + 1, TOUCH_MODES.length)];
+        if (u.subCursor === 5) s.padOpacity = PAD_OPACITIES[wrap(PAD_OPACITIES.indexOf(s.padOpacity) + (key === "left" ? -1 : 1), PAD_OPACITIES.length)];
         saveSettings(s);
         sfx(SOUNDS.select);
         update({ ...u, settings: s });
@@ -875,6 +887,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const msg = ui.mode !== "title" ? game.message : null;
   const textMsg = msg?.kind === "text" ? msg : null;
   const chapterCard = msg?.kind === "chapter" ? project.chapters.find((c) => c.id === msg.chapterId) : undefined;
+  // 虛擬按鍵依情境顯示：對話（只有文字）、開場文字、章節標題卡時隱藏，點畫面就繼續；出現選項時只留 ▲▼ 與 A
+  const padVariant: "full" | "choices" | null = textMsg?.choices?.length ? "choices" : textMsg || chapterCard || ui.messages.length > 0 ? null : "full";
   const speaker = textMsg ? messageSpeaker(project, textMsg) : null;
   const choices = textMsg?.choices ?? [];
   const asset = (id?: string) => project.assetManifest.assets.find((a) => a.id === id);
@@ -957,7 +971,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
             <div className="rm-chapter" data-testid="chapter-card" onClick={() => act(advance)}>
               <div className="rm-chapter-title">{chapterCard.title}</div>
               {chapterCard.summary && <div className="rm-chapter-summary">{chapterCard.summary}</div>}
-              <div className="rm-hint">{layout.touch ? "點一下繼續" : "按確定鍵繼續"}</div>
+              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 或點一下繼續" : "點一下繼續") : "按確定鍵繼續"}</div>
             </div>
           )}
 
@@ -984,7 +998,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                 {project.chapters.length > 0 && <span>📖 {project.chapters.length} 章</span>}
                 <span>🏁 {project.endings.length} 種結局</span>
               </div>
-              <div className="rm-press-start">{layout.touch ? "點擊畫面開始" : "按任意鍵開始"}</div>
+              <div className="rm-press-start">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 或點擊畫面開始" : "點擊畫面開始") : "按任意鍵開始"}</div>
             </div>
           )}
 
@@ -1019,7 +1033,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                   ))}
                 </div>
               )}
-              <div className="rm-hint">{layout.touch ? "點一下選擇" : `方向鍵選擇・Z／Enter 確認・X／Esc 取消${isStudio ? "・F9 除錯" : ""}`}</div>
+              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "▲▼ 選擇・A 確定（也可以直接點）" : "點一下選擇") : `方向鍵選擇・Z／Enter 確認・X／Esc 取消${isStudio ? "・F9 除錯" : ""}`}</div>
             </div>
           )}
 
@@ -1100,6 +1114,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
                     ["音效", getAudio().muted ? "關" : "開"],
                     ["背景音樂", ui.settings.bgm ? "開" : "關"],
                     ["對話聲音", VOICE_MODE_LABEL[ui.settings.voice]],
+                    ["觸控操作", TOUCH_MODE_LABEL[ui.settings.touch]],
+                    ["按鍵透明度", PAD_OPACITY_LABEL[ui.settings.padOpacity]],
                   ].map(([label, value], i) => (
                     <button
                       key={label}
@@ -1168,7 +1184,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                 <div className="rm-the-end">— THE END —</div>
               )}
               <div className="rm-dim">步數 {game.steps}・完成任務 {journal.filter((q) => q.status === "completed").length}</div>
-              <div className="rm-hint">{layout.touch ? "點一下回到標題" : "按確定鍵回到標題"}</div>
+              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "按 A 回到標題" : "點一下回到標題") : "按確定鍵回到標題"}</div>
             </div>
           )}
 
@@ -1206,6 +1222,15 @@ export default function GameScreen({ source }: { source: GameSource }) {
           }}
           onStartChapter={(chapterId) => newGame(chapterId)}
           onClose={() => setDebugOpen(false)}
+        />
+      )}
+      {layout.touch && ui.settings.touch === "pad" && !(layout.portrait && !portraitOk) && padVariant && (
+        <TouchPad
+          variant={padVariant}
+          lift={Math.round((layout.height < 400 ? 112 : 148) * layout.scale)}
+          opacity={PAD_OPACITY_VALUE[ui.settings.padOpacity]}
+          onPress={(k) => inputRef.current.press(k)}
+          onRelease={(k) => inputRef.current.release(k)}
         />
       )}
       {layout.touch && ui.mode === "map" && !msg && ui.messages.length === 0 && (

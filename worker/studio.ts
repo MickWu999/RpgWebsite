@@ -26,7 +26,8 @@ const LOCK_MINUTES = 15;
 const VERSION_KEEP = 60;
 const PASSWORD_ITERATIONS = 100_000;
 
-type Actor = { userId: string; username: string; kind: "user" | "token"; tokenName?: string; label: string };
+/** label 會寫進版本紀錄、審查與文件：共用帳號時顯示「操作者（帳號）」，API Token 顯示 Token 名稱 */
+type Actor = { userId: string; username: string; kind: "user" | "token"; tokenName?: string; operator?: string | null; label: string };
 type ProjectRow = { id: string; owner_id: string; title: string; data: string; version: number; is_valid: number; created_at: string; updated_at: string; archived_at: string | null };
 
 export default {
@@ -58,7 +59,14 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
   const actor = await authenticate(req, env);
   if (!actor) return error(401, "請先登入，或在 Authorization 標頭提供有效的 API Token");
 
-  if (path === "/api/auth/me" && method === "GET") return json({ ok: true, user: { id: actor.userId, username: actor.username }, via: actor.kind, tokenName: actor.tokenName });
+  if (path === "/api/auth/me" && method === "GET") return json({ ok: true, user: { id: actor.userId, username: actor.username }, operator: actor.operator ?? null, via: actor.kind, tokenName: actor.tokenName });
+  if (path === "/api/auth/operator" && method === "POST") {
+    if (actor.kind !== "user") return error(403, "API Token 的操作者就是 Token 名稱，不能修改");
+    const body = await readJson<{ name?: string }>(req);
+    const name = operatorName(body.name);
+    await env.DB.prepare("UPDATE sessions SET operator = ? WHERE token_hash = ?").bind(name, await sha256hex(getCookie(req, SESSION_COOKIE) ?? "")).run();
+    return json({ ok: true, operator: name });
+  }
   if (path === "/api/auth/password" && method === "POST") return changePassword(req, env, actor);
 
   // ---------- API Token（只能用登入工作階段管理，token 不能再產生 token） ----------
@@ -235,11 +243,20 @@ async function authenticate(req: Request, env: Env): Promise<Actor | null> {
   }
   const session = getCookie(req, SESSION_COOKIE);
   if (!session) return null;
-  const row = await env.DB.prepare("SELECT u.id, u.username, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?")
+  const row = await env.DB.prepare("SELECT u.id, u.username, s.expires_at, s.operator FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?")
     .bind(await sha256hex(session))
-    .first<{ id: string; username: string; expires_at: string }>();
+    .first<{ id: string; username: string; expires_at: string; operator: string | null }>();
   if (!row || row.expires_at < nowIso()) return null;
-  return { userId: row.id, username: row.username, kind: "user", label: row.username };
+  return { userId: row.id, username: row.username, kind: "user", operator: row.operator, label: row.operator ? `${row.operator}（${row.username}）` : row.username };
+}
+
+/** 操作者名稱：去掉控制字元，最多 20 字；空白視為沒有填 */
+function operatorName(v: unknown) {
+  const name = String(v ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, "")
+    .trim()
+    .slice(0, 20);
+  return name || null;
 }
 
 /** 防暴力破解：同一帳號或同一 IP 在 15 分鐘內失敗 5 次就暫時鎖定 */
@@ -263,7 +280,7 @@ async function recordFailure(env: Env, keys: string[]) {
 }
 
 async function login(req: Request, env: Env) {
-  const body = await readJson<{ username?: string; password?: string; remember?: boolean }>(req);
+  const body = await readJson<{ username?: string; password?: string; remember?: boolean; operator?: string }>(req);
   const username = String(body.username ?? "").trim();
   const password = String(body.password ?? "");
   const lockKeys = [`user:${username.toLowerCase()}`, `ip:${req.headers.get("CF-Connecting-IP") ?? "unknown"}`];
@@ -284,7 +301,7 @@ async function login(req: Request, env: Env) {
   const expires = new Date(Date.now() + maxAge * 1000).toISOString();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ?").bind(nowIso()),
-    env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)").bind(await sha256hex(token), user.id, expires, nowIso()),
+    env.DB.prepare("INSERT INTO sessions (token_hash, user_id, expires_at, created_at, operator) VALUES (?, ?, ?, ?, ?)").bind(await sha256hex(token), user.id, expires, nowIso(), operatorName(body.operator)),
   ]);
   return json(
     { ok: true, user: { id: user.id, username: user.username } },
@@ -513,6 +530,7 @@ const API_DOCS = `# AI RPG Studio API
 | 方法與路徑 | 說明 |
 |---|---|
 | GET /api/auth/me | 確認 token 有效 |
+| POST /api/auth/operator | 共用帳號時設定這次登入的操作者名稱 \`{name}\`（只限瀏覽器登入） |
 | GET /api/projects | 專案列表 |
 | POST /api/projects \`{title, template: "blank"\\|"demo"}\` 或 \`{project}\` | 建立或匯入專案 |
 | GET /api/projects/:id | 讀取專案與目前版本號 |
