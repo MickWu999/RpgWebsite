@@ -11,7 +11,7 @@ import type { GameProject } from "@/game/schema";
 import { projectRevision } from "@/game/engine";
 import { studioApi, type CheckResult, type FeedbackEntry, type GameInsights, type NoteEntry, type PlayAnalytics, type ProjectDoc, type ReviewEntry, type VersionEntry } from "@/lib/studioApi";
 import Pipeline from "../Pipeline";
-import { runCheckAsync } from "@/studio/check";
+import { runCheckAsync } from "@/studio/checkClient";
 import StudioShell, { PageHeader } from "../StudioShell";
 
 /**
@@ -82,6 +82,9 @@ export default function ProjectOverview() {
   const [analytics, setAnalytics] = useState<PlayAnalytics | null>(null);
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [insights, setInsights] = useState<GameInsights | null>(null);
+  /** 各區塊的資料是否已經回來：還沒回來時顯示「載入中…」，不要先顯示「還沒有資料」 */
+  const [loaded, setLoaded] = useState<Record<string, boolean>>({});
+  const done = (key: string) => () => setLoaded((x) => ({ ...x, [key]: true }));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -95,11 +98,11 @@ export default function ProjectOverview() {
       })
       .catch((e: Error) => setError(e.message));
     studioApi.versions(id).then((r) => setVersions(r.versions.slice(0, 8))).catch(() => {});
-    studioApi.docs(id).then((r) => setDocs(r.docs)).catch(() => {});
-    studioApi.reviews(id).then((r) => setReviews(r.reviews)).catch(() => {});
-    studioApi.feedback(id).then((r) => setFeedback(r.feedback)).catch(() => {});
-    studioApi.analytics(id).then((r) => setAnalytics(r.analytics)).catch(() => {});
-    studioApi.notes(id).then((r) => setNotes(r.notes)).catch(() => {});
+    studioApi.docs(id).then((r) => setDocs(r.docs)).catch(() => {}).finally(done("docs"));
+    studioApi.reviews(id).then((r) => setReviews(r.reviews)).catch(() => {}).finally(done("reviews"));
+    studioApi.feedback(id).then((r) => setFeedback(r.feedback)).catch(() => {}).finally(done("feedback"));
+    studioApi.analytics(id).then((r) => setAnalytics(r.analytics)).catch(() => {}).finally(done("analytics"));
+    studioApi.notes(id).then((r) => setNotes(r.notes)).catch(() => {}).finally(done("notes"));
     studioApi.insights(id).then((r) => setInsights(r.insights)).catch(() => {});
     studioApi
       .listProjects()
@@ -226,7 +229,8 @@ export default function ProjectOverview() {
 
             <section className="card" data-testid="review-board">
               <h2>審查紀錄</h2>
-              {reviews.length === 0 && <div className="small muted">還沒有審查紀錄。AI 每次審查（大綱、章節、整體）的分數與意見都會出現在這裡。</div>}
+              {!loaded.reviews && <div className="small muted">載入中…</div>}
+              {loaded.reviews && reviews.length === 0 && <div className="small muted">還沒有審查紀錄。AI 每次審查（大綱、章節、整體）的分數與意見都會出現在這裡。</div>}
               {reviews.slice(0, 12).map((r, idx) => {
                 const chapter = p.chapters.find((c) => c.id === r.target);
                 // 每個目標只有最新一筆、而且沒通過時，可以人工接受
@@ -326,7 +330,9 @@ export default function ProjectOverview() {
               <h2>
                 修改清單 <span className="badge">{notes.filter((n) => n.status === "open").length} 筆待處理</span>
               </h2>
-              {notes.length === 0 ? (
+              {!loaded.notes ? (
+                <div className="small muted">載入中…</div>
+              ) : notes.length === 0 ? (
                 <div className="small muted">
                   測試遊玩時看到要改的地方，按右上角的「📌 標記修改」寫一句意見。系統會附上位置代碼、當下的台詞與開關狀態，AI 執行 <code>npm run game -- remote notes {id}</code> 就能直接找到那裡修改，改完標成已處理。
                 </div>
@@ -363,7 +369,9 @@ export default function ProjectOverview() {
 
             <section className="card" data-testid="analytics-board">
               <h2>遊玩數據</h2>
-              {!analytics?.visitors ? (
+              {!loaded.analytics ? (
+                <div className="small muted">載入中…</div>
+              ) : !analytics?.visitors ? (
                 <div className="small muted">還沒有遊玩數據。玩家在玩家網站遊玩時，會匿名記錄開始、章節進度、結局與離開的位置（不保存 IP；沒有網路時不記錄，也不影響遊玩）。</div>
               ) : (
                 <>
@@ -427,7 +435,9 @@ export default function ProjectOverview() {
 
             <section className="card" data-testid="feedback-board">
               <h2>玩家回饋</h2>
-              {feedback.length === 0 ? (
+              {!loaded.feedback ? (
+                <div className="small muted">載入中…</div>
+              ) : feedback.length === 0 ? (
                 <div className="small muted">還沒有玩家回饋。玩家在玩家網站玩完一章時，會被邀請留下星等、標籤與一句話；這些回饋也會彙整進 AI 案例庫。</div>
               ) : (
                 <>
@@ -548,6 +558,8 @@ export default function ProjectOverview() {
                 <textarea rows={8} value={storyDraft} onChange={(e) => setStoryDraft(e.target.value)} />
               ) : docs.story ? (
                 <div className="doc-text small">{docs.story.content}</div>
+              ) : !loaded.docs ? (
+                <div className="small muted">載入中…</div>
               ) : (
                 <div className="small muted">還沒有故事。按「編輯」寫下故事或題材，AI 會從這裡讀取。</div>
               )}

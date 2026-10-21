@@ -6,7 +6,7 @@ import IssueList from "@/components/IssueList";
 import { projectRevision } from "@/game/engine";
 import type { GameProject } from "@/game/schema";
 import { PLAYER_SITE_URL, studioApi, type CheckResult, type ReviewEntry } from "@/lib/studioApi";
-import { runCheckAsync } from "@/studio/check";
+import { runCheckAsync } from "@/studio/checkClient";
 import StudioShell, { PageHeader } from "../StudioShell";
 
 /** 發布：逐項顯示檢查結果，通過後發布到玩家網站（玩家網址只顯示成文字，前後台不互相連結） */

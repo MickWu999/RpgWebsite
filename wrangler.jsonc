@@ -19,6 +19,8 @@
     "studio": {
       "name": "ai-rpg-studio",
       "main": "worker/studio.ts",
+      // 後台每個請求都要查好幾次資料庫（D1 在亞太區）：讓 Cloudflare 把 Worker 放在靠近資料庫的地方執行，減少跨區往返
+      "placement": { "mode": "smart" },
       "assets": {
         "directory": "./out",
         "binding": "ASSETS",
