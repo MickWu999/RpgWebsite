@@ -624,6 +624,8 @@ details.card > summary { cursor: pointer; }
 .rm-dpad .left { grid-area: 2 / 1; }
 .rm-dpad .right { grid-area: 2 / 3; }
 .rm-dpad .down { grid-area: 3 / 2; }
+.rm-ab-keys { display: flex; align-items: flex-end; gap: 12px; }
+.rm-b { width: 52px; height: 52px; border-radius: 50%; font-size: 20px; font-weight: bold; margin-bottom: 4px; }
 .rm-a { width: 68px; height: 68px; border-radius: 50%; font-size: 24px; font-weight: bold; margin-bottom: 10px; }
 .rm-menu-button { position: fixed; top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); z-index: 31; width: 44px; height: 44px; border-radius: 8px; border: 2px solid rgba(255, 255, 255, 0.6); background: rgba(30, 44, 98, 0.7); color: #fff; font-size: 24px; line-height: 1; -webkit-tap-highlight-color: transparent; }
 .rm-menu-close { color: #ffd76a; margin-bottom: 4px; }

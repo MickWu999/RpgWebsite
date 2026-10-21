@@ -2,12 +2,13 @@
 
 import type { Direction } from "@/game/engine";
 
-type PadKey = Direction | "ok";
+type PadKey = Direction | "ok" | "cancel";
 
 /**
  * 手機的虛擬按鍵（設定「觸控操作：方向鍵＋A」時顯示）：
  * - 左下十字鍵：按住持續移動；在對話選項與選單中用上下選擇
  * - 右下 A 鍵：等於空白鍵／Enter，用來對話、調查、繼續、確定
+ * - A 左邊的 B 鍵：取消（等於 Esc）。在地圖上打開選單，在選單裡回到上一層、關閉選單
  * 直接點擊畫面的操作仍然有效，兩種方式可以混用。
  * 依情境顯示（參考 RPG Maker 手機按鍵外掛的做法：對話時隱藏，不擋對話框）：
  * - full：地圖與選單，十字鍵＋A
@@ -83,9 +84,14 @@ export default function TouchPad({
         <button className="right" aria-label="右" {...bind("right")}>▶</button>
         <button className="down" aria-label="下" {...bind("down")}>▼</button>
       </div>
-      <button className="rm-a" aria-label="A（確定）" data-testid="pad-a" {...bind("ok")}>
-        A
-      </button>
+      <div className="rm-ab-keys">
+        <button className="rm-b" aria-label="B（取消）" data-testid="pad-b" {...bind("cancel")}>
+          B
+        </button>
+        <button className="rm-a" aria-label="A（確定）" data-testid="pad-a" {...bind("ok")}>
+          A
+        </button>
+      </div>
     </div>
   );
 }

@@ -1116,7 +1116,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                   ))}
                 </div>
               )}
-              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "▲▼ 選擇・A 確定" : "點一下選擇") : `方向鍵選擇・Z／Enter 確認・X／Esc 取消${isStudio ? "・F9 除錯" : ""}`}</div>
+              <div className="rm-hint">{layout.touch ? (ui.settings.touch === "pad" ? "▲▼ 選擇・A 確定・B 返回" : "點一下選擇") : `方向鍵選擇・Z／Enter 確認・X／Esc 取消${isStudio ? "・F9 除錯" : ""}`}</div>
             </div>
           )}
 
