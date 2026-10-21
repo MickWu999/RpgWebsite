@@ -58,7 +58,7 @@ npm run dev            # http://localhost:3000
 
 | | 前台（玩家） | 後台（AI RPG Studio） |
 |---|---|---|
-| 網址 | https://ai-rpg-builder.<你的子網域>.workers.dev | https://ai-rpg-studio.<你的子網域>.workers.dev |
+| 網址 | `https://ai-rpg-builder.<你的子網域>.workers.dev` | `https://ai-rpg-studio.<你的子網域>.workers.dev` |
 | 內容 | 遊戲選單與遊戲畫面 | 需要登入：專案管理、總覽與製作清單、RPG Maker 式編輯器、資料庫、測試遊玩、版本紀錄、發布、AI 協作（API Token）、設定、說明 |
 | 部署 | `npm run deploy` | `npm run deploy:studio` |
 
@@ -116,8 +116,9 @@ public/games/index.json          自動產生的遊戲目錄，內含封面資�
 
 `npm run deploy` 會先 build，再用 wrangler 部署到 Cloudflare Workers 靜態資源，設定寫在 `wrangler.jsonc`。
 
-- 玩家版：https://ai-rpg-builder.<你的子網域>.workers.dev（`npm run deploy`）
-- 開發者版：https://ai-rpg-builder-dev.<你的子網域>.workers.dev（`npm run deploy:dev`，wrangler 的 `env.dev`，另一個 Worker）
+- 玩家版：`npm run deploy`，部署成 Worker `ai-rpg-builder`
+- 開發者版：`npm run deploy:dev`（wrangler 的 `env.dev`，另一個 Worker `ai-rpg-builder-dev`）
+- 實際網址是 `https://<Worker 名稱>.<你的 Cloudflare 子網域>.workers.dev`。網址只寫在本機的 `.env.local`（`STUDIO_URL`、`NEXT_PUBLIC_PLAYER_URL`），不要寫進 repo
   - 線上開發者版的「AI 生成」需要在本機執行 `npm run ai`，並把開發者版網址加進 `AI_BRIDGE_ALLOWED_ORIGINS`（建議用 Chrome）
 - 快取設定寫在 `public/_headers`：`sw.js` 和遊戲目錄不快取，素材快取 7 天。
 
