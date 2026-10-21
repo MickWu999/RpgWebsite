@@ -26,6 +26,11 @@ function walk(commands: EventCommand[], visit: (c: EventCommand) => void) {
       walk(c.then, visit);
       if (c.else) walk(c.else, visit);
     } else if (c.code === "choices") for (const o of c.options) walk(o.commands, visit);
+    else if (c.code === "present") {
+      for (const o of c.options) walk(o.commands, visit);
+      walk(c.otherwise, visit);
+      if (c.cancel) walk(c.cancel, visit);
+    }
   }
 }
 
@@ -231,6 +236,8 @@ export function lintDesign(project: GameProject): LintReport {
             const why = impossibleAtom(project, can, c.condition, owner);
             if (why) warnings.push({ path: at(w), message: `事件「${e.name}」有一個條件分支永遠不會成立：${why}` });
           }
+          if (c.code === "present" && c.otherwise.length === 0)
+            warnings.push({ path: at(w), message: `事件「${e.name}」的出示物品沒有「拿出其他物品時」的回應（玩家拿錯東西時要有一句反應）` });
           if (c.code === "choices")
             c.options.forEach((o) => {
               if (o.commands.length === 0) warnings.push({ path: at(w), message: `事件「${e.name}」的選項「${o.text}」選了沒有任何回應（B4：至少一句專屬回應）` });

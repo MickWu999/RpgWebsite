@@ -46,6 +46,8 @@ export const opSchema = z.discriminatedUnion("op", [
     start: z.strictObject({ mapId: idSchema, x: coord, y: coord, direction: z.enum(DIRECTIONS).optional() }).optional(),
     playerActorId: idSchema.optional(),
     initialItems: z.array(z.strictObject({ itemId: idSchema, count: z.number().int().min(1).max(999) })).max(50).optional(),
+    /** 時段與日程：{periods: ["早上", "中午", "傍晚", "晚上"]}；null 關閉 */
+    clock: z.strictObject({ periods: z.array(z.string().min(1).max(12)).min(2).max(12) }).nullable().optional(),
   }),
   z.strictObject({
     op: z.literal("map.add"),
@@ -262,6 +264,13 @@ function applyOne(p: GameProject, op: StudioOp) {
       }
       if (op.playerActorId) p.system.playerActorId = op.playerActorId;
       if (op.initialItems) p.system.initialItems = op.initialItems;
+      if (op.clock === null) delete p.system.clock;
+      else if (op.clock) {
+        p.system.clock = op.clock;
+        // 內建變數：第幾天、第幾個時段（事件頁與條件分支用一般的變數條件讀取）
+        for (const [id, name] of [["day", "第幾天（時段與日程）"], ["period", "目前的時段（0 起算）"]] as const)
+          if (!p.variables.some((v) => v.id === id)) p.variables.push({ id, name });
+      }
       return;
     case "map.add": {
       if (p.maps.some((m) => m.id === op.id)) throw new Error(`地圖 ID「${op.id}」已存在`);

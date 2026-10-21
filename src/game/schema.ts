@@ -73,12 +73,21 @@ export const conditionSchema: z.ZodType<GameCondition> = z.lazy(() =>
 // ---------- 事件指令 ----------
 
 export type ChoiceOption = { text: string; condition?: GameCondition; commands: EventCommand[] };
+/** 出示物品：玩家拿出這個物品時執行 commands */
+export type PresentOption = { itemId: string; commands: EventCommand[] };
 
 export type EventCommand =
   /** 顯示文字：actorId 會帶出名字、頭像與講話聲；也可以只寫 speaker（旁白、路人） */
   | { code: "text"; text: string; actorId?: string; speaker?: string }
   /** 顯示選項：緊接在顯示文字後面時，會和文字一起顯示 */
   | { code: "choices"; options: ChoiceOption[] }
+  /**
+   * 出示物品：打開道具欄讓玩家挑一樣拿出來（推理對質、送禮、用鑰匙開門）。緊接在顯示文字後面時，會和文字一起顯示。
+   * 拿出 options 裡的物品 → 執行那一項；拿出其他物品 → otherwise；什麼都不拿（或身上沒有東西）→ cancel
+   */
+  | { code: "present"; options: PresentOption[]; otherwise: EventCommand[]; cancel?: EventCommand[] }
+  /** 時間經過：前進 advance 個時段（過了最後一個時段就到下一天），或直接設定成第 day 天、第 period 個時段（需要先在系統設定時段） */
+  | { code: "time"; advance?: number; day?: number; period?: number }
   | { code: "if"; condition: GameCondition; then: EventCommand[]; else?: EventCommand[] }
   | { code: "switch"; ids: string[]; value: boolean }
   | { code: "selfSwitch"; key: SelfSwitchKey; value: boolean }
@@ -116,6 +125,15 @@ export const commandSchema: z.ZodType<EventCommand> = z.lazy(() =>
         .min(1)
         .max(8),
     }),
+    z.strictObject({
+      code: z.literal("present"),
+      options: z.array(z.strictObject({ itemId: idSchema, commands: z.array(commandSchema).max(400) })).max(12),
+      otherwise: z.array(commandSchema).max(400),
+      cancel: z.array(commandSchema).max(400).optional(),
+    }),
+    z
+      .strictObject({ code: z.literal("time"), advance: z.number().int().min(1).max(50).optional(), day: z.number().int().min(1).max(999).optional(), period: z.number().int().min(0).max(11).optional() })
+      .refine((c) => c.advance !== undefined || c.day !== undefined || c.period !== undefined, "時間指令要指定 advance（經過幾個時段）或 day／period（設定成第幾天、第幾個時段）"),
     z.strictObject({ code: z.literal("if"), condition: conditionSchema, then: z.array(commandSchema).max(400), else: z.array(commandSchema).max(400).optional() }),
     z.strictObject({ code: z.literal("switch"), ids: z.array(idSchema).min(1).max(20), value: z.boolean() }),
     z.strictObject({ code: z.literal("selfSwitch"), key: z.enum(SELF_SWITCHES), value: z.boolean() }),
@@ -292,6 +310,12 @@ export const systemSchema = z.strictObject({
   /** 主角（資料庫角色 ID） */
   playerActorId: idSchema,
   initialItems: z.array(z.strictObject({ itemId: idSchema, count: z.number().int().min(1).max(999) })).max(50),
+  /**
+   * 時段與日程（選用）：例如 ["早上", "中午", "傍晚", "晚上"]。
+   * 目前的時間存在內建變數 day（第幾天，從 1 開始）與 period（第幾個時段，從 0 開始），事件頁與條件分支用一般的變數條件讀取；
+   * 用「時間」指令讓時間經過。畫面上會顯示「第 2 天・傍晚」。
+   */
+  clock: z.strictObject({ periods: z.array(z.string().min(1).max(12)).min(2).max(12) }).optional(),
 });
 
 export const assetSrcSchema = z

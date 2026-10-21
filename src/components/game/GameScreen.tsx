@@ -8,6 +8,7 @@ import { DEFAULT_MUSIC, MUSIC, SOUNDS, TERRAIN, type MusicMood } from "@/game/as
 import {
   advance,
   choose,
+  clockOf,
   confirm,
   continueFromEnding,
   createChapterState,
@@ -166,6 +167,8 @@ function eventToast(project: GameProject, e: GameEvent): string | null {
   switch (e.type) {
     case "item":
       return e.delta > 0 ? `獲得了「${item(e.itemId)}」${e.delta > 1 ? `×${e.delta}` : ""}！` : `交出了「${item(e.itemId)}」`;
+    case "time":
+      return `🕒 第 ${e.day} 天・${project.system.clock?.periods[e.period] ?? ""}`;
     case "quest":
       if (e.action === "start") return `新任務：${quest?.title ?? e.questId}`;
       if (e.action === "complete") return `任務完成：${quest?.title ?? e.questId}`;
@@ -489,7 +492,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         }, i * 3400),
       );
       const transferred = result.events.some((e) => e.type === "transferred");
-      const important = result.events.some((e) => e.type === "item" || e.type === "quest" || e.type === "transferred" || e.type === "chapter" || e.type === "ending");
+      const important = result.events.some((e) => e.type === "item" || e.type === "quest" || e.type === "transferred" || e.type === "chapter" || e.type === "ending" || e.type === "time");
       const fadeId = transferred ? ++seq.current : u.fadeId;
       if (!before && result.state.message?.kind === "text") sfx(SOUNDS.dialogueOpen, 0.3);
       if (before && !result.state.message && !result.state.endingId) sfx(SOUNDS.dialogueClose, 0.25);
@@ -1044,6 +1047,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const msg = ui.mode !== "title" ? game.message : null;
   const textMsg = msg?.kind === "text" ? msg : null;
   const chapterCard = msg?.kind === "chapter" ? project.chapters.find((c) => c.id === msg.chapterId) : undefined;
+  const clock = clockOf(project, game);
   // 虛擬按鍵依情境顯示：對話（只有文字）、開場文字、章節標題卡時隱藏，點畫面就繼續；出現選項時只留 ▲▼ 與 A
   // 虛擬按鍵依情境顯示：對話、開場文字、章節標題卡只留 A（螢幕觸控在方向鍵模式下是關閉的）；出現選項時留 ▲▼ 與 A
   const padVariant: "full" | "choices" | "dialog" = textMsg?.choices?.length ? "choices" : textMsg || chapterCard || ui.messages.length > 0 ? "dialog" : "full";
@@ -1085,6 +1089,11 @@ export default function GameScreen({ source }: { source: GameSource }) {
 
           {ui.mode !== "title" && ui.mode !== "cover" && ui.mode !== "splash" && <div className="rm-vignette" aria-hidden />}
 
+          {clock && (ui.mode === "map" || ui.mode === "menu") && !chapterCard && (
+            <div className="rm-window rm-clock" data-testid="clock">
+              🕒 {clock.label}
+            </div>
+          )}
           {ui.banner && ui.mode === "map" && !chapterCard && (
             <div key={`banner-${ui.banner.id}`} className="rm-window rm-banner" data-testid="map-name">
               {ui.banner.text}
@@ -1125,7 +1134,8 @@ export default function GameScreen({ source }: { source: GameSource }) {
             <MessageWindow
               key={`${game.interpreter ? JSON.stringify(game.interpreter.frames.at(-1)) : ""}:${game.choiceLog.length}:${textMsg.text}`}
               speaker={speaker?.name}
-              text={textMsg.text}
+              text={textMsg.text || (textMsg.present ? "（要拿出什麼？）" : "")}
+              present={textMsg.present}
               voice={speaker?.voice}
               portrait={asset(speaker?.spriteAssetId)}
               portraitSize={layout.height < 400 ? 52 : 72}

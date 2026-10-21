@@ -3,11 +3,12 @@ import type { EventCommand, EventPage, GameCondition, GameProject } from "./sche
 /**
  * 事件指令樹的共用工具：定位巢狀指令列、走訪所有指令、列出專案中所有的指令來源。
  *
- * 指令列的位置用 path 表示：每兩個元素一組 [指令索引, 分支]，分支是 "then"／"else"（條件分支）或選項編號（顯示選項）。
+ * 指令列的位置用 path 表示：每兩個元素一組 [指令索引, 分支]，分支是 "then"／"else"（條件分支）、選項編號（顯示選項、出示物品），
+ * 或 "otherwise"／"cancel"（出示物品：拿出其他物品、什麼都不拿）。
  * 例如 [3, "then", 0, 1] ＝ 第 3 個指令（條件分支）的「成立時」裡，第 0 個指令（顯示選項）的第 1 個選項。
  */
 
-export type Branch = "then" | "else" | number;
+export type Branch = "then" | "else" | "otherwise" | "cancel" | number;
 export type CommandPath = Array<number | Branch>;
 
 export type CommandSource =
@@ -27,6 +28,11 @@ export function sourceRoot(project: GameProject, s: CommandSource): EventCommand
 export function branchList(cmd: EventCommand, branch: Branch): EventCommand[] | null {
   if (cmd.code === "if") return branch === "then" ? cmd.then : branch === "else" ? (cmd.else ?? []) : null;
   if (cmd.code === "choices" && typeof branch === "number") return cmd.options[branch]?.commands ?? null;
+  if (cmd.code === "present") {
+    if (typeof branch === "number") return cmd.options[branch]?.commands ?? null;
+    if (branch === "otherwise") return cmd.otherwise;
+    if (branch === "cancel") return cmd.cancel ?? [];
+  }
   return null;
 }
 
@@ -53,7 +59,8 @@ export type WalkContext = {
 export function walkCommands(list: EventCommand[], visit: (cmd: EventCommand, ctx: WalkContext) => void, ctx: Omit<WalkContext, "index"> = { path: [], ancestors: [] }) {
   list.forEach((cmd, index) => {
     visit(cmd, { ...ctx, index });
-    const branches: Branch[] = cmd.code === "if" ? ["then", "else"] : cmd.code === "choices" ? cmd.options.map((_, i) => i) : [];
+    const branches: Branch[] =
+      cmd.code === "if" ? ["then", "else"] : cmd.code === "choices" ? cmd.options.map((_, i) => i) : cmd.code === "present" ? [...cmd.options.map((_, i) => i), "otherwise", "cancel"] : [];
     for (const b of branches) {
       const sub = branchList(cmd, b);
       if (sub) walkCommands(sub, visit, { path: [...ctx.path, index, b], ancestors: [...ctx.ancestors, { cmd, branch: b }] });

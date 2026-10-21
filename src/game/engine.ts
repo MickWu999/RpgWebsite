@@ -1,4 +1,4 @@
-import { resolveList, sourceKey, sourceRoot, type CommandPath, type CommandSource } from "./commands";
+import { resolveList, sourceKey, sourceRoot, type Branch, type CommandPath, type CommandSource } from "./commands";
 import type { Direction, EventCommand, EventPage, GameCondition, GameProject, MapDefinition, MapEvent, PageConditions, QuestStatus } from "./schema";
 
 /**
@@ -21,7 +21,8 @@ export type Frame = { source: CommandSource; path: CommandPath; index: number };
 export type Interpreter = { frames: Frame[]; event: { mapId: string; eventId: string } | null };
 
 export type Message =
-  | { kind: "text"; text: string; actorId?: string; speaker?: string; choices?: Array<{ index: number; text: string }> }
+  /** present：選項是道具欄裡的物品（出示物品）；index 是物品在資料庫裡的順序，PRESENT_CANCEL＝什麼都不拿 */
+  | { kind: "text"; text: string; actorId?: string; speaker?: string; choices?: Array<{ index: number; text: string }>; present?: boolean }
   | { kind: "chapter"; chapterId: string };
 
 export type PlayerState = {
@@ -62,11 +63,26 @@ export type GameEvent =
   | { type: "quest"; questId: string; action: "start" | "step" | "complete" | "fail" }
   | { type: "chapter"; chapterId: string }
   | { type: "music"; mood: string | null }
+  | { type: "time"; day: number; period: number }
   | { type: "ending"; endingId: string };
 
 export type ActionResult = { state: PlayerState; events: GameEvent[] };
 
 export class EngineError extends Error {}
+
+/** 出示物品時「什麼都不拿」的選項編號 */
+export const PRESENT_CANCEL = -1;
+
+/** 時段與日程：內建變數 day（第幾天，從 1 開始）、period（第幾個時段，從 0 開始） */
+export const DAY_VARIABLE = "day";
+export const PERIOD_VARIABLE = "period";
+export function clockOf(project: GameProject, state: PlayerState): { day: number; period: number; label: string } | null {
+  const periods = project.system.clock?.periods;
+  if (!periods) return null;
+  const day = state.variables[DAY_VARIABLE] ?? 1;
+  const period = Math.min(Math.max(state.variables[PERIOD_VARIABLE] ?? 0, 0), periods.length - 1);
+  return { day, period, label: `第 ${day} 天・${periods[period]}` };
+}
 
 const DELTA: Record<Direction, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const MAX_STEPS_PER_RUN = 20000;
@@ -218,7 +234,7 @@ function blankState(project: GameProject): PlayerState {
     y: start.y,
     facing: start.direction ?? "down",
     switches: {},
-    variables: {},
+    variables: project.system.clock ? { [DAY_VARIABLE]: 1, [PERIOD_VARIABLE]: 0 } : {},
     selfSwitches: {},
     items,
     quests: {},
@@ -325,6 +341,12 @@ function startEvent(s: PlayerState, mapId: string, event: MapEvent, page: number
   events.push({ type: "event_started", mapId, eventId: event.id });
 }
 
+/** 出示物品的選項：道具欄裡的每一樣物品（依資料庫順序），最後是「什麼都不拿」 */
+function presentOptions(project: GameProject, s: PlayerState) {
+  const held = project.items.flatMap((it, index) => ((s.items[it.id] ?? 0) > 0 ? [{ index, text: it.name }] : []));
+  return [...held, { index: PRESENT_CANCEL, text: held.length ? "（什麼都不拿）" : "（身上沒有能拿出來的東西）" }];
+}
+
 function visibleOptions(s: PlayerState, cmd: Extract<EventCommand, { code: "choices" }>, ctx: EventContext) {
   return cmd.options.flatMap((o, index) => (!o.condition || evaluateCondition(s, o.condition, ctx) ? [{ index, text: o.text }] : []));
 }
@@ -376,6 +398,10 @@ function exec(project: GameProject, s: PlayerState, cmd: EventCommand, frame: Fr
         const options = visibleOptions(s, next, ctx);
         frame.index++;
         if (options.length > 0) msg.choices = options;
+      } else if (next?.code === "present") {
+        frame.index++;
+        msg.choices = presentOptions(project, s);
+        msg.present = true;
       }
       s.message = msg;
       events.push({ type: "message" });
@@ -386,6 +412,25 @@ function exec(project: GameProject, s: PlayerState, cmd: EventCommand, frame: Fr
       if (options.length === 0) return;
       s.message = { kind: "text", text: "", choices: options };
       events.push({ type: "message" });
+      return;
+    }
+    case "present":
+      s.message = { kind: "text", text: "", choices: presentOptions(project, s), present: true };
+      events.push({ type: "message" });
+      return;
+    case "time": {
+      const periods = project.system.clock?.periods;
+      if (!periods) return;
+      let day = cmd.day ?? s.variables[DAY_VARIABLE] ?? 1;
+      let period = Math.min(cmd.period ?? s.variables[PERIOD_VARIABLE] ?? 0, periods.length - 1);
+      period += cmd.advance ?? 0;
+      while (period >= periods.length) {
+        period -= periods.length;
+        day++;
+      }
+      s.variables[DAY_VARIABLE] = day;
+      s.variables[PERIOD_VARIABLE] = period;
+      events.push({ type: "time", day, period });
       return;
     }
     case "if": {
@@ -543,7 +588,16 @@ export function choose(project: GameProject, input: PlayerState, optionIndex: nu
   const at = frame.index - 1;
   s.message = null;
   s.choiceLog.push(`${sourceKey(frame.source)}@${[...frame.path, at].join(".")}#${optionIndex}`);
-  pushFrame(interp, { source: frame.source, path: [...frame.path, at, optionIndex], index: 0 });
+  let branch: Branch = optionIndex;
+  if (msg.present) {
+    // 出示物品：拿出的物品有對應的反應就走那一項，否則走「其他物品」；什麼都不拿走「取消」
+    const root = sourceRoot(project, frame.source);
+    const cmd = root ? resolveList(root, frame.path)?.[at] : undefined;
+    const itemId = project.items[optionIndex]?.id;
+    const k = cmd?.code === "present" ? cmd.options.findIndex((o) => o.itemId === itemId) : -1;
+    branch = optionIndex === PRESENT_CANCEL ? "cancel" : k >= 0 ? k : "otherwise";
+  }
+  pushFrame(interp, { source: frame.source, path: [...frame.path, at, branch], index: 0 });
   run(project, s, events);
   return { state: s, events };
 }

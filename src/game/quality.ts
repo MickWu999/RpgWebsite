@@ -65,7 +65,7 @@ export type QualityMetrics = {
 export type QualityReport = { metrics: QualityMetrics; blocking: ValidationIssue[]; suggestions: ValidationIssue[] };
 
 const PLACEHOLDER = /\b(todo|tbd|lorem|placeholder)\b|待補|範例文字|xxx/i;
-const STATE_CODES = new Set<EventCommand["code"]>(["switch", "selfSwitch", "variable", "item", "quest", "ending", "transfer", "jump", "text", "if", "common", "chapter"]);
+const STATE_CODES = new Set<EventCommand["code"]>(["switch", "selfSwitch", "variable", "item", "quest", "ending", "transfer", "jump", "text", "if", "common", "chapter", "present", "time"]);
 
 function isCharacter(project: GameProject, assetId: string | undefined) {
   if (!assetId) return false;
@@ -97,6 +97,7 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
     walkCommands(s.commands, (c) => {
       if (c.code === "text") texts.push(c.text);
       if (c.code === "choices") meaningfulChoices += c.options.filter((o) => o.commands.some((x) => STATE_CODES.has(x.code))).length;
+      if (c.code === "present") meaningfulChoices += c.options.filter((o) => o.commands.some((x) => STATE_CODES.has(x.code))).length;
     });
   const avgTextChars = texts.length ? Math.round(texts.reduce((n, x) => n + [...x].length, 0) / texts.length) : 0;
 

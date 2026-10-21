@@ -23,6 +23,7 @@ export default function MessageWindow({
   speedFactor,
   voiceMode = "blip",
   choices,
+  present = false,
   cursor,
   controlRef,
   onChoose,
@@ -36,6 +37,8 @@ export default function MessageWindow({
   speedFactor: number;
   voiceMode?: VoiceMode;
   choices: Array<{ index: number; text: string }>;
+  /** 出示物品：選項是道具欄裡的物品 */
+  present?: boolean;
   cursor: number;
   controlRef: RefObject<TypingControl>;
   onChoose: (index: number) => void;
@@ -72,7 +75,8 @@ export default function MessageWindow({
   return (
     <>
       {!typing && choices.length > 0 && (
-        <div className="rm-window rm-choices" role="listbox" aria-label="選項">
+        <div className={`rm-window rm-choices${present ? " present" : ""}`} role="listbox" aria-label={present ? "要拿出的物品" : "選項"} data-testid={present ? "present-items" : undefined}>
+          {present && <div className="rm-choices-title">🎒 拿出……</div>}
           {choices.map((c, i) => (
             <button key={c.index} className={`rm-item${i === cursor ? " selected" : ""}`} data-choice-index={c.index} onClick={() => onChoose(c.index)}>
               {c.text}

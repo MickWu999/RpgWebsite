@@ -678,6 +678,8 @@ function SystemForm({ project, dispatch }: { project: GameProject; dispatch: (op
   const [cover, setCover] = useState(project.cover ?? {});
   const [playerActorId, setPlayerActorId] = useState(project.system.playerActorId);
   const [initialItems, setInitialItems] = useState(project.system.initialItems);
+  const [clockText, setClockText] = useState((project.system.clock?.periods ?? []).join("、"));
+  const clockPeriods = clockText.split(/[、,，\s]+/).map((x) => x.trim()).filter(Boolean);
   const [release, setRelease] = useState(project.release ?? { status: "complete" as const });
   const coverChars = cover.characterAssetIds ?? [];
   const start = project.system.start;
@@ -743,6 +745,15 @@ function SystemForm({ project, dispatch }: { project: GameProject; dispatch: (op
       <button className="btn small" disabled={project.items.length === 0} onClick={() => setInitialItems([...initialItems, { itemId: project.items[0].id, count: 1 }])}>
         ＋ 初始物品
       </button>
+      <h3>時段與日程（選用）</h3>
+      <div className="small muted">
+        例如「早上、中午、傍晚、晚上」。設定後畫面會顯示「第 1 天・早上」，用「時間經過」指令讓時間流動；事件頁與條件分支用內建變數「day」（第幾天）與「period」（第幾個時段，0 起算）判斷。留空＝不使用。
+      </div>
+      <label className="field">
+        時段（用頓號分隔，2～12 個）
+        <input type="text" value={clockText} placeholder="早上、中午、傍晚、晚上" onChange={(e) => setClockText(e.target.value)} data-testid="clock-periods" />
+      </label>
+      {clockText.trim() !== "" && (clockPeriods.length < 2 || clockPeriods.length > 12) && <div className="notice err small">時段要 2～12 個</div>}
       <h3>封面</h3>
       <div className="logic-row">
         <span>背景地圖</span>
@@ -769,7 +780,12 @@ function SystemForm({ project, dispatch }: { project: GameProject; dispatch: (op
         onOk={() =>
           dispatch([
             { op: "project.update", title, description, intro: intro || undefined, genre, cover, release },
-            { op: "system.update", playerActorId, initialItems },
+            {
+              op: "system.update",
+              playerActorId,
+              initialItems,
+              ...(clockText.trim() === "" ? (project.system.clock ? { clock: null } : {}) : clockPeriods.length >= 2 && clockPeriods.length <= 12 ? { clock: { periods: clockPeriods } } : {}),
+            },
           ])
         }
       />

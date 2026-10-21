@@ -193,7 +193,7 @@
   - `conditions`：`switches`（最多 2 個，皆 ON）、`variable {id,min}`、`selfSwitch`、`itemId`、`quest {questId,status}`、`custom`（任意條件）
   - `graphic {assetId}`（沒有＝透明事件）、`trigger`（`action` 確定鍵／`touch` 接觸／`autorun` 自動執行）、`priority`（`below`／`same`／`above`）
   - `commands`：事件指令列
-- **事件指令**（`code`）：`text`、`choices`、`if`、`switch`、`selfSwitch`、`variable`、`item`、`quest`、`transfer`、`ending`、`chapter`、`common`、`erase`、`exit`、`label`、`jump`、`wait`、`music`、`comment`。
+- **事件指令**（`code`）：`text`、`choices`、`present`（出示物品）、`time`（時間經過）、`if`、`switch`、`selfSwitch`、`variable`、`item`、`quest`、`transfer`、`ending`、`chapter`、`common`、`erase`、`exit`、`label`、`jump`、`wait`、`music`、`comment`。
 
 完整格式用 `npm run game -- schema` 或 `<STUDIO_URL>/api/ops-schema` 取得；`npm run game -- inspect <id>` 會把專案印成 RPG Maker 式的事件清單（◆ 指令）。
 
@@ -206,7 +206,7 @@
 | `event.move`／`event.remove` | 移動、刪除事件 |
 | `actor.upsert`／`item.upsert`／`quest.upsert`／`ending.upsert`／`chapter.upsert`／`commonEvent.upsert` | 資料庫（對應的 `.remove` 刪除） |
 | `switch.upsert`／`variable.upsert` | 幫開關、變數取中文名稱（指令裡用到的 ID 會自動建立） |
-| `system.update` `{start,playerActorId,initialItems}` | 起點、主角、初始物品 |
+| `system.update` `{start,playerActorId,initialItems,clock}` | 起點、主角、初始物品；`clock: {periods: ["早上","中午","傍晚","晚上"]}` 開啟時段與日程（`null` 關閉） |
 | `project.update` `{title,description,intro,genre,cover}` | 遊戲資訊與封面 |
 
 ### RPG Maker 的常見寫法
@@ -221,8 +221,12 @@
 | 任務日誌 | `quest start` → `quest step {step}` → `quest complete`；步驟文字寫「找誰／去哪／做什麼」 |
 | 章節 | 劇情轉折處用 `chapter` 指令（顯示標題卡）；在資料庫為每章設定 `testStart`，可以直接從那一章開始測試 |
 | 結局 | 在條件分支或事件頁條件裡用 `ending` 指令；結局至少由 2 個條件或選擇決定，用 `epilogues` 回應其他選擇 |
+| 拿出證據、送禮、用鑰匙開門 | `text`（「你有什麼證據？」）後面接 `present` `{options: [{itemId, commands}], otherwise, cancel?}`：拿出指定物品走那一項，拿錯走 `otherwise`（一定要有一句反應），什麼都不拿走 `cancel`。比「選項裡列出答案」更像推理，玩家要自己判斷該拿什麼 |
+| 時間壓力、作息、取捨 | `system.update` 設定 `clock`；用 `time` `{advance: 1}` 讓做某件事花掉一個時段（或 `{day, period}` 直接設定）。內建變數 `day`（第幾天）、`period`（第幾個時段，0 起算）：事件頁條件 `variable: {id: "period", min: 2}`（傍晚以後），或條件分支 `{type: "variable", id: "day", op: ">=", value: 3}`（第 3 天起）。期限用 autorun 頁讀 `day` 觸發 |
 
 **新增時的順序**：先建立資料庫項目（角色、物品、任務、結局、章節），再放引用它們的事件。
+
+**讓玩法不只是對話**：寫提案與每一章時，至少想一個「玩家要自己判斷」的互動，例如拿出哪一樣證據（`present`）、今天的時段要花在哪裡（`time`）。只有「找人聊天、按繼續」的章節，故事再好也容易無聊。
 
 ## 7. 常見錯誤（審查最常退件的原因）
 

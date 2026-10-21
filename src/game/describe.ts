@@ -56,6 +56,13 @@ export function describeCommand(p: GameProject, c: EventCommand): string {
     }
     case "choices":
       return `顯示選項：${c.options.map((o) => o.text).join("／")}`;
+    case "present":
+      return `出示物品：${c.options.map((o) => nameOf(p.items, o.itemId)).join("／") || "（沒有指定物品）"}`;
+    case "time": {
+      const periods = p.system.clock?.periods ?? [];
+      const set = [c.day !== undefined ? `第 ${c.day} 天` : "", c.period !== undefined ? (periods[c.period] ?? `第 ${c.period + 1} 個時段`) : ""].filter(Boolean).join("・");
+      return `時間：${set ? `設定為${set}` : ""}${set && c.advance ? "，再" : ""}${c.advance ? `經過 ${c.advance} 個時段` : ""}`;
+    }
     case "if":
       return `條件分支：${describeCondition(p, c.condition)}`;
     case "switch":
@@ -115,6 +122,19 @@ export function describeCommandList(p: GameProject, list: EventCommand[], indent
         lines.push(`${indent}：選擇「${o.text}」時${o.condition ? `［條件：${describeCondition(p, o.condition)}］` : ""}`);
         lines.push(...describeCommandList(p, o.commands, `${indent}  `));
       });
+      lines.push(`${indent}：分支結束`);
+    }
+    if (c.code === "present") {
+      c.options.forEach((o) => {
+        lines.push(`${indent}：拿出［${nameOf(p.items, o.itemId)}］時`);
+        lines.push(...describeCommandList(p, o.commands, `${indent}  `));
+      });
+      lines.push(`${indent}：拿出其他物品時`);
+      lines.push(...describeCommandList(p, c.otherwise, `${indent}  `));
+      if (c.cancel?.length) {
+        lines.push(`${indent}：什麼都不拿時`);
+        lines.push(...describeCommandList(p, c.cancel, `${indent}  `));
+      }
       lines.push(`${indent}：分支結束`);
     }
   }

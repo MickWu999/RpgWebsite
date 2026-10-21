@@ -165,6 +165,16 @@ export function validateLogic(project: GameProject): ValidationReport {
         case "item":
           if (!items.has(cmd.itemId)) err(p, `物品「${cmd.itemId}」不存在`);
           break;
+        case "present":
+          cmd.options.forEach((o) => items.has(o.itemId) || err(p, `出示物品的「${o.itemId}」不存在`));
+          if (new Set(cmd.options.map((o) => o.itemId)).size < cmd.options.length) err(p, "出示物品裡有重複的物品");
+          break;
+        case "time": {
+          const periods = project.system.clock?.periods;
+          if (!periods) err(p, "時間指令需要先在系統設定時段（system.update 的 clock: {periods: [\"早上\", \"中午\", \"傍晚\", \"晚上\"]}）");
+          else if (cmd.period !== undefined && cmd.period >= periods.length) err(p, `時段只有 ${periods.length} 個（period 從 0 起算），沒有 period ${cmd.period}`);
+          break;
+        }
         case "quest": {
           usedQuests.add(cmd.questId);
           const q = quests.get(cmd.questId);
@@ -306,6 +316,7 @@ function checkObtainability(project: GameProject, err: (path: string, message: s
       if (a.type === "switch" && a.value) readSwitches.add(a.id);
     }),
   );
+  walkProject(project, (c) => c.code === "present" && c.options.forEach((o) => needed.add(o.itemId)));
   for (const id of needed) if (!gained.has(id)) warn("items", `條件需要物品「${project.items.find((i) => i.id === id)?.name ?? id}」，但遊戲中沒有任何取得方式`);
   for (const id of readSwitches) if (!turnedOn.has(id)) warn("switches", `開關「${project.switches.find((s) => s.id === id)?.name ?? id}」被當成條件，卻從來沒有被打開`);
 }

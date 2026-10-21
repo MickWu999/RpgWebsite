@@ -39,7 +39,7 @@ export function currentLocator(project: GameProject, state: PlayerState): string
   // 「台詞後面緊接著選項」會合成一個畫面，執行位置停在選項上；改成指回那句台詞
   const root = sourceRoot(project, frame.source);
   const list = root ? resolveList(root, frame.path) : null;
-  if (list?.[index]?.code === "choices" && list[index - 1]?.code === "text" && state.message?.kind === "text" && state.message.text) index--;
+  if ((list?.[index]?.code === "choices" || list?.[index]?.code === "present") && list[index - 1]?.code === "text" && state.message?.kind === "text" && state.message.text) index--;
   return locatorOf(frame.source, frame.path, index);
 }
 

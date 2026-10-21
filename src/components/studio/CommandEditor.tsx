@@ -53,6 +53,16 @@ function rowsOf(list: EventCommand[], path: CommandPath, depth: number, out: Row
         rowsOf(o.commands, [...path, index, i], depth + 1, out, p);
       });
       out.push({ kind: "label", key: `${base}/${index}/end`, depth, text: "：分支結束" });
+    } else if (cmd.code === "present") {
+      cmd.options.forEach((o, i) => {
+        out.push({ kind: "label", key: `${base}/${index}/o${i}`, depth, text: `：拿出［${p.items.find((it) => it.id === o.itemId)?.name ?? o.itemId}］時` });
+        rowsOf(o.commands, [...path, index, i], depth + 1, out, p);
+      });
+      out.push({ kind: "label", key: `${base}/${index}/otherwise`, depth, text: "：拿出其他物品時" });
+      rowsOf(cmd.otherwise, [...path, index, "otherwise"], depth + 1, out, p);
+      out.push({ kind: "label", key: `${base}/${index}/cancel`, depth, text: "：什麼都不拿時" });
+      rowsOf(cmd.cancel ?? [], [...path, index, "cancel"], depth + 1, out, p);
+      out.push({ kind: "label", key: `${base}/${index}/end`, depth, text: "：分支結束" });
     }
   });
   out.push({ kind: "insert", key: `${base}/+`, depth, path, index: list.length });
@@ -68,6 +78,11 @@ export function updateList(root: EventCommand[], path: CommandPath, fn: (list: E
     const next = updateList(sub, rest, fn);
     if (cmd.code === "if") return branch === "then" ? { ...cmd, then: next } : { ...cmd, else: next };
     if (cmd.code === "choices") return { ...cmd, options: cmd.options.map((o, j) => (j === branch ? { ...o, commands: next } : o)) };
+    if (cmd.code === "present") {
+      if (branch === "otherwise") return { ...cmd, otherwise: next };
+      if (branch === "cancel") return { ...cmd, cancel: next };
+      return { ...cmd, options: cmd.options.map((o, j) => (j === branch ? { ...o, commands: next } : o)) };
+    }
     return cmd;
   });
 }
@@ -75,6 +90,8 @@ export function updateList(root: EventCommand[], path: CommandPath, fn: (list: E
 const COLOR: Partial<Record<EventCommand["code"], string>> = {
   text: "cmd-text",
   choices: "cmd-flow",
+  present: "cmd-flow",
+  time: "cmd-state",
   if: "cmd-flow",
   label: "cmd-flow",
   jump: "cmd-flow",
@@ -204,6 +221,7 @@ const CATEGORIES: Array<{ title: string; items: Array<[EventCommand["code"], str
     items: [
       ["text", "顯示文字", "顯示對話或旁白；選角色會帶出名字、頭像與講話聲"],
       ["choices", "顯示選項", "讓玩家選擇；每個選項有自己的執行內容"],
+      ["present", "出示物品", "打開道具欄讓玩家拿出一樣東西：證據對質、送禮、用鑰匙開門"],
       ["comment", "註解", "不會執行，給自己和 AI 看的說明"],
     ],
   },
@@ -226,6 +244,7 @@ const CATEGORIES: Array<{ title: string; items: Array<[EventCommand["code"], str
       ["variable", "變數操作", "數值：好感度、次數、金錢…"],
       ["item", "增減物品", "給予或拿走物品"],
       ["quest", "任務", "開始、推進、完成任務日誌"],
+      ["time", "時間經過", "經過幾個時段，或設定成第幾天的哪個時段（要先在系統設定時段）"],
     ],
   },
   {
@@ -246,6 +265,10 @@ function defaultCommand(code: EventCommand["code"], p: GameProject): EventComman
       return { code, text: "", ...(p.actors[1] ? { actorId: p.actors[1].id } : {}) };
     case "choices":
       return { code, options: [{ text: "是", commands: [] }, { text: "否", commands: [] }] };
+    case "present":
+      return { code, options: p.items[0] ? [{ itemId: p.items[0].id, commands: [] }] : [], otherwise: [{ code: "text", text: "……這個不對。" }] };
+    case "time":
+      return { code, advance: 1 };
     case "if":
       return { code, condition: defaultCondition("switch", p), then: [] };
     case "switch":
@@ -385,6 +408,52 @@ function CommandForm({ project, cmd, onChange }: { project: GameProject; cmd: Ev
           </button>
         </>
       );
+    case "present":
+      return (
+        <>
+          <div className="small muted">打開道具欄讓玩家拿出一樣東西。緊接在「顯示文字」後面時，會和文字一起出現（例如「你有什麼證據？」）。每一項的反應在清單裡編輯；拿出沒列在這裡的物品，會執行「拿出其他物品時」。</div>
+          {cmd.options.map((o, i) => (
+            <div key={i} className="logic-row">
+              <span>物品 {i + 1}</span>
+              <ItemSelect project={project} value={o.itemId} onChange={(itemId) => onChange({ ...cmd, options: cmd.options.map((x, j) => (j === i ? { ...x, itemId } : x)) })} />
+              <button className="btn small" onClick={() => onChange({ ...cmd, options: cmd.options.filter((_, j) => j !== i) })}>
+                移除
+              </button>
+            </div>
+          ))}
+          <button className="btn small" disabled={cmd.options.length >= 12 || project.items.length === 0} onClick={() => onChange({ ...cmd, options: [...cmd.options, { itemId: project.items[0]?.id ?? "", commands: [] }] })}>
+            ＋ 物品
+          </button>
+        </>
+      );
+    case "time": {
+      const periods = project.system.clock?.periods;
+      if (!periods) return <div className="notice">要先在「資料庫 → 系統」設定時段（例如 早上、中午、傍晚、晚上），才能使用時間指令。</div>;
+      return (
+        <>
+          <label className="field">
+            經過幾個時段（過了「{periods[periods.length - 1]}」就到下一天）
+            <input type="number" min={0} max={50} value={cmd.advance ?? 0} onChange={(e) => onChange({ ...cmd, advance: Number(e.target.value) || undefined })} />
+          </label>
+          <div className="small muted">或直接設定成：</div>
+          <div className="logic-row">
+            <label className="small">
+              第
+              <input type="number" min={1} style={{ width: 64 }} value={cmd.day ?? ""} placeholder="不變" onChange={(e) => onChange({ ...cmd, day: e.target.value ? Math.max(1, Number(e.target.value)) : undefined })} />
+              天
+            </label>
+            <select value={cmd.period ?? ""} onChange={(e) => onChange({ ...cmd, period: e.target.value === "" ? undefined : Number(e.target.value) })}>
+              <option value="">時段不變</option>
+              {periods.map((name, i) => (
+                <option key={i} value={i}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      );
+    }
     case "if":
       return (
         <>
