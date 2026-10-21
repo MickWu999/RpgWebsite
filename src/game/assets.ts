@@ -397,12 +397,14 @@ export const FOOTSTEP_SURFACE: Record<string, { rate: number; volume: number }> 
 export const MUSIC_MOODS = ["peaceful", "lively", "adventure", "mysterious", "tense", "melancholy"] as const;
 export type MusicMood = (typeof MUSIC_MOODS)[number];
 const MUSIC_DIR = "/assets/music/jrpg-junkala";
+/** 音樂檔更新時加一，避免玩家裝置上的快取（service worker 與瀏覽器快取 7 天）繼續播放舊檔 */
+const MUSIC_VERSION = "?v=3";
 export const MUSIC: Record<MusicMood, { src: string; title: string }> = {
-  peaceful: { src: `${MUSIC_DIR}/peaceful_home_town.mp3`, title: "Town1 - Home Town" },
-  lively: { src: `${MUSIC_DIR}/lively_bazaar.mp3`, title: "Town4 - Bazaar" },
-  adventure: { src: `${MUSIC_DIR}/adventure_grasslands.mp3`, title: "Exploration1 - Grasslands" },
-  mysterious: { src: `${MUSIC_DIR}/mysterious_whispers.mp3`, title: "Evil5 - Whispers From Beyond" },
-  tense: { src: `${MUSIC_DIR}/tense_ancient_evil.mp3`, title: "Evil1 - Ancient Evil Awakens" },
-  melancholy: { src: `${MUSIC_DIR}/melancholy_place_i_call_home.mp3`, title: "Calm1 - A Place I Call Home" },
+  peaceful: { src: `${MUSIC_DIR}/peaceful_home_town.mp3${MUSIC_VERSION}`, title: "Town1 - Home Town" },
+  lively: { src: `${MUSIC_DIR}/lively_bazaar.mp3${MUSIC_VERSION}`, title: "Town4 - Bazaar" },
+  adventure: { src: `${MUSIC_DIR}/adventure_grasslands.mp3${MUSIC_VERSION}`, title: "Exploration1 - Grasslands" },
+  mysterious: { src: `${MUSIC_DIR}/mysterious_whispers.mp3${MUSIC_VERSION}`, title: "Evil5 - Whispers From Beyond" },
+  tense: { src: `${MUSIC_DIR}/tense_ancient_evil.mp3${MUSIC_VERSION}`, title: "Evil1 - Ancient Evil Awakens" },
+  melancholy: { src: `${MUSIC_DIR}/melancholy_place_i_call_home.mp3${MUSIC_VERSION}`, title: "Calm1 - A Place I Call Home" },
 };
 export const DEFAULT_MUSIC: MusicMood = "adventure";

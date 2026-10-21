@@ -26,7 +26,7 @@ export const CHAR_INTERVAL_MS = { slow: 55, normal: 35, fast: 22 };
 
 class AudioManager {
   private ctx: AudioContext | null = null;
-  /** 總輸出：主音量 → 限幅器 → 喇叭。避免音樂、講話聲、音效同時播放時音量疊加而破音 */
+  /** 總輸出：主音量 → 喇叭（各音源的音量都留有餘裕，相加也不會超過上限） */
   private out: AudioNode | null = null;
   private buffers = new Map<string, Promise<AudioBuffer | null>>();
   private stepIndex = 0;
@@ -55,16 +55,13 @@ class AudioManager {
     if (typeof window === "undefined") return;
     if (!this.ctx) {
       try {
-        this.ctx = new AudioContext();
+        // 手機戴耳機會聽到底噪的原因與對策：
+        // 1. 預設的「低延遲」模式緩衝很小，手機忙著畫畫面時來不及送出音訊，會有細微的爆音／沙沙聲 → 改用 playback 模式（較大的緩衝）
+        // 2. 原本的限幅器（DynamicsCompressor）會自動補償增益，把安靜段落一起拉高 → 移除，改由各音源的音量留餘裕
+        this.ctx = new AudioContext({ latencyHint: "playback" });
         const master = this.ctx.createGain();
-        master.gain.value = 0.85;
-        const limiter = this.ctx.createDynamicsCompressor();
-        limiter.threshold.value = -6;
-        limiter.knee.value = 4;
-        limiter.ratio.value = 12;
-        limiter.attack.value = 0.003;
-        limiter.release.value = 0.15;
-        master.connect(limiter).connect(this.ctx.destination);
+        master.gain.value = 0.9;
+        master.connect(this.ctx.destination);
         this.out = master;
       } catch {
         return;
@@ -76,7 +73,8 @@ class AudioManager {
   }
 
   /** 播放循環背景音樂（同一首不重新開始）；null 表示停止。切換時淡入淡出。 */
-  playMusic(src: string | null, volume = 0.3) {
+  /** 背景音樂的音量：太小聲會讓玩家把手機音量開大，連耳機本身的底噪一起放大 */
+  playMusic(src: string | null, volume = 0.5) {
     this.wantedMusic = src;
     if (!this.ctx || this.music?.src === src) return;
     const ctx = this.ctx;

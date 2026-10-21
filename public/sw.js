@@ -5,7 +5,7 @@
  * - /games/：網路優先，離線時用快取 → 玩過的遊戲離線也能玩
  * 只處理同網域 GET；本機 AI bridge（127.0.0.1:8787）等跨網域請求不經過快取。
  */
-const CACHE = "rpg-cache-v1";
+const CACHE = "rpg-cache-v2";
 const PRECACHE = ["/", "/play/", "/manifest.webmanifest", "/icons/icon-192.png", "/games/index.json"];
 
 self.addEventListener("install", (event) => {
