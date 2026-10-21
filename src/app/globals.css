@@ -702,3 +702,9 @@ details.card > summary { cursor: pointer; }
 .rm-clock { position: absolute; top: 10px; right: 10px; z-index: 6; padding: 4px 12px; font-size: 15px; pointer-events: none; }
 /* 有時鐘的遊戲：右上角的提示往下移，不要蓋住時鐘 */
 .rm-screen:has(.rm-clock) .rm-toasts { top: 64px; }
+/* 遊戲選單：回報問題 */
+.rm-report { display: flex; flex-direction: column; gap: 8px; }
+.rm-report-line { font-size: 14px; }
+.rm-report-input { width: 100%; font: inherit; font-size: 16px; padding: 8px; border-radius: 6px; border: 1px solid #5a6a9a; background: #0e1430; color: #fff; resize: none; -webkit-user-select: text; user-select: text; pointer-events: auto; }
+.rm-report-error { color: #ffb4b4; font-size: 14px; }
+.rm-screen.pad-only .rm-report { pointer-events: auto; }

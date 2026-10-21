@@ -80,6 +80,22 @@ export function analyticsEnabled() {
   }
 }
 
+/** 匿名玩家代號（問題回報也用它限制次數） */
+export function visitorId() {
+  return visitor();
+}
+
+/** 遊戲選單的「回報問題」：寫進這款遊戲的修改清單，附上位置代碼與當下狀態 */
+export async function sendReport(report: Record<string, unknown>): Promise<string | null> {
+  try {
+    const res = await fetch("/api/report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...report, visitor: visitor(), nickname: getNickname() }) });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    return data.ok ? null : (data.error ?? "送出失敗，請稍後再試");
+  } catch {
+    return "沒有網路，送不出去";
+  }
+}
+
 function visitor() {
   try {
     const key = "rpg:visitor";

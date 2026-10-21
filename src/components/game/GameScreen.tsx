@@ -58,7 +58,7 @@ import CoverArt from "./CoverArt";
 import DebugPanel from "./DebugPanel";
 import FeedbackDialog, { feedbackAsked } from "./FeedbackDialog";
 import TouchPad from "./TouchPad";
-import { flushPlayEvents, trackErrors, trackPlay } from "@/lib/analytics";
+import { flushPlayEvents, sendReport, trackErrors, trackPlay } from "@/lib/analytics";
 import { canVibrate, vibrate, vibrateForEvents } from "@/lib/haptics";
 import { disablePush, enablePush, fetchLatestNotice, getPushStatus, NOTICE_ICON, PUSH_STATUS_LABEL, type Notice, type PushStatus } from "@/lib/push";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
@@ -83,7 +83,7 @@ const MOVE_INTERVAL_MS = 140;
 type Mode = "loading" | "splash" | "cover" | "title" | "map" | "menu" | "ending";
 export type TestStart = { chapterId?: string; at?: { mapId: string; x: number; y: number } };
 export type GameSource = { kind: "pack" | "studio"; id: string; test?: TestStart };
-type MenuPage = "root" | "items" | "quests" | "status" | "save" | "load" | "options" | "title";
+type MenuPage = "root" | "items" | "quests" | "status" | "save" | "load" | "options" | "report" | "title";
 type Toast = { id: number; text: string };
 type UI = {
   mode: Mode;
@@ -123,6 +123,7 @@ const MENU_COMMANDS: Array<[MenuPage, string]> = [
   ["save", "存檔"],
   ["load", "讀檔"],
   ["options", "設定"],
+  ["report", "回報問題"],
   ["title", "回到標題"],
 ];
 const SAVE_LABEL: Record<SaveSlot, string> = { auto: "自動存檔", "1": "存檔 1", "2": "存檔 2", "3": "存檔 3" };
@@ -628,6 +629,37 @@ export default function GameScreen({ source }: { source: GameSource }) {
     [flash, update, source.kind],
   );
 
+  // ---------- 回報問題：記住畫面上最後一句台詞與它的位置代碼（打開選單回報時附上） ----------
+  const lastLineRef = useRef<{ locator: string | null; excerpt: string; mapId: string; x: number; y: number; chapterId: string | null } | null>(null);
+  const lastLineGame = ui?.game;
+  useEffect(() => {
+    const g = lastLineGame;
+    const m = g?.message?.kind === "text" ? g.message : null;
+    if (!g || !m || !project) return;
+    const excerpt = [m.text, ...(m.choices ?? []).map((c) => `▸ ${c.text}`)].filter(Boolean).join("\n");
+    lastLineRef.current = { locator: currentLocator(project, g), excerpt, mapId: g.mapId, x: g.x, y: g.y, chapterId: g.chapterId };
+  }, [lastLineGame, project]);
+  const getLastLine = useCallback(() => lastLineRef.current?.excerpt ?? "", []);
+  const submitReport = useCallback(
+    async (body: string) => {
+      const p = projectRef.current;
+      const g = uiRef.current?.game;
+      if (!p || !g) return "遊戲還沒載入";
+      const last = lastLineRef.current;
+      const state = {
+        switches: Object.keys(g.switches).filter((k) => g.switches[k]),
+        variables: g.variables,
+        items: g.items,
+        quests: Object.fromEntries(Object.entries(g.quests).map(([k, v]) => [k, v.status])),
+        device: `${window.innerWidth}×${window.innerHeight}${window.matchMedia("(pointer: coarse)").matches ? "・觸控" : ""}`,
+      };
+      const note = { body, locator: last?.locator ?? null, mapId: last?.mapId ?? g.mapId, x: last?.x ?? g.x, y: last?.y ?? g.y, chapterId: last?.chapterId ?? g.chapterId, excerpt: last?.excerpt ?? "", state };
+      if (source.kind === "studio") return studioApi.addNote(p.id, note).then(() => null, () => "加入修改清單失敗，請確認登入狀態");
+      return sendReport({ gameId: p.id, ...note });
+    },
+    [source.kind],
+  );
+
   // ---------- 分支的存檔點：章節標題卡出現時記住這一章的開頭；出現選項時記住這個抉擇（不佔玩家的存檔欄位） ----------
   const checkpointGame = ui?.game;
   useEffect(() => {
@@ -786,7 +818,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         update({ ...u, menuPage: "root" });
         return;
       }
-      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 9, title: 2 }[u.menuPage];
+      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 9, report: 0, title: 2 }[u.menuPage];
       if (vertical) {
         update({ ...u, subCursor: wrap(u.subCursor + delta, count) });
         return;
@@ -1357,6 +1389,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                       <span>◀ {value} ▶</span>
                     </button>
                   ))}
+                {ui.menuPage === "report" && <ReportForm getLastLine={getLastLine} onSubmit={submitReport} onDone={() => update((u) => ({ ...u, menuPage: "root" }))} />}
                 {ui.menuPage === "title" && (
                   <>
                     <div style={{ marginBottom: 8 }}>要回到標題畫面嗎？（進度已自動存檔）</div>
@@ -1549,6 +1582,44 @@ export default function GameScreen({ source }: { source: GameSource }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 遊戲選單的「回報問題」：一句話＋自動附上的最後一句台詞與位置 */
+function ReportForm({ getLastLine, onSubmit, onDone }: { getLastLine: () => string; onSubmit: (body: string) => Promise<string | null>; onDone: () => void }) {
+  const [lastLine] = useState(getLastLine);
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState<{ kind: "sending" | "done" | "error"; message?: string } | null>(null);
+  if (status?.kind === "done") {
+    return (
+      <div className="rm-report" data-testid="report-done">
+        <div className="rm-heading">謝謝你的回報！</div>
+        <p className="rm-dim">已經送到製作團隊的修改清單，會一筆一筆處理。</p>
+        <button className="rm-item selected" onClick={onDone}>
+          回到選單
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="rm-report" data-testid="report-form">
+      <div className="rm-heading">📮 回報問題</div>
+      {lastLine && <div className="rm-dim rm-report-line">會一起附上剛才的畫面：「{lastLine.slice(0, 60)}{lastLine.length > 60 ? "…" : ""}」</div>}
+      <textarea className="rm-report-input" rows={3} maxLength={500} value={text} placeholder="例如：這裡卡住了、這句台詞怪怪的、按了沒反應……" onChange={(e) => setText(e.target.value)} data-testid="report-input" />
+      {status?.kind === "error" && <div className="rm-report-error">{status.message}</div>}
+      <button
+        className="rm-item selected"
+        disabled={!text.trim() || status?.kind === "sending"}
+        onClick={async () => {
+          setStatus({ kind: "sending" });
+          const err = await onSubmit(text.trim());
+          setStatus(err ? { kind: "error", message: err } : { kind: "done" });
+        }}
+        data-testid="report-send"
+      >
+        {status?.kind === "sending" ? "送出中…" : "送出"}
+      </button>
     </div>
   );
 }

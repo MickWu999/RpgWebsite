@@ -8,7 +8,8 @@ import { sha256hex, type Env } from "./lib";
  * - POST /api/events：匿名遊玩紀錄（每個操作：對話、選擇、換地圖、物品、任務、選單、設定、錯誤…；一次最多 100 筆），並更新匿名玩家與遊玩階段
  * - POST /api/push/subscribe、/api/push/unsubscribe：推播訂閱（只存推播服務的網址與瀏覽器產生的公鑰，不保存 IP）
  * - GET /api/notices/latest、/api/notices：公告（推播不帶內容，service worker 收到後來這裡讀最新一則）
- * 除了回饋、遊玩數據與推播訂閱之外，前台不提供任何寫入或後台功能。
+ * - POST /api/report：玩家在遊戲選單「回報問題」：寫進該遊戲的修改清單（project_notes），附位置代碼與當下狀態；每位玩家一天最多 10 筆
+ * 除了回饋、遊玩數據、推播訂閱與問題回報之外，前台不提供任何寫入或後台功能。
  */
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -81,6 +82,28 @@ export default {
         await env.DB.batch(stmts);
       }
       return new Response(JSON.stringify({ ok: true, saved: events.length }), { headers });
+    }
+
+    if (url.pathname === "/api/report" && req.method === "POST") {
+      const b = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+      const id = /^[\w-]{1,64}$/;
+      const str = (v: unknown, n: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
+      const text = str(b?.body, 500);
+      if (!b || typeof b.gameId !== "string" || !id.test(b.gameId) || typeof b.visitor !== "string" || !id.test(b.visitor) || !text) {
+        return new Response(JSON.stringify({ ok: false, error: "格式錯誤" }), { status: 400, headers });
+      }
+      const game = await env.DB.prepare("SELECT project_id FROM published_games WHERE id = ?").bind(b.gameId).first<{ project_id: string }>();
+      if (!game) return new Response(JSON.stringify({ ok: false, error: "找不到這款遊戲" }), { status: 404, headers });
+      const author = `玩家 #${b.visitor.slice(0, 6)}${str(b.nickname, 20) ? `（${str(b.nickname, 20)}）` : ""}`;
+      const since = new Date(Date.now() - 864e5).toISOString();
+      const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM project_notes WHERE author LIKE ? AND created_at > ?").bind(`玩家 #${b.visitor.slice(0, 6)}%`, since).first<{ n: number }>();
+      if ((recent?.n ?? 0) >= 10) return new Response(JSON.stringify({ ok: false, error: "今天已經回報很多次了，謝謝你！明天再來" }), { status: 429, headers });
+      const noteId = `note_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
+      const int = (v: unknown) => (Number.isInteger(v) ? (v as number) : null);
+      await env.DB.prepare("INSERT INTO project_notes (id, project_id, locator, map_id, x, y, chapter_id, excerpt, state, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(noteId, game.project_id, str(b.locator, 200), str(b.mapId, 64), int(b.x), int(b.y), str(b.chapterId, 64), str(b.excerpt, 500), b.state ? JSON.stringify(b.state).slice(0, 20_000) : null, text, author, new Date().toISOString())
+        .run();
+      return new Response(JSON.stringify({ ok: true }), { headers });
     }
 
     if (url.pathname === "/api/push/subscribe" && req.method === "POST") {
