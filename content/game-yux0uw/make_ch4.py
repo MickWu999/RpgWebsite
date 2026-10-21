@@ -74,7 +74,7 @@ C4 = {"switches": ["c4_start"]}
 BLANK = lambda cond: page([], cond=cond, priority="below")
 PUBLIC = s("research_public")
 
-# 港口上和來放燈籠的人說話（第一次）：說過三個人之後，小翔會帶著鯨魚出現
+# 港口上和來放燈籠的人說話（第一次）：跟美雪、周防說過話，而且至少說過三個人之後，小翔會帶著鯨魚出現
 TALKED = lambda: [VAR("c4_talked"), SELF("A")]
 
 # ---------- 資料庫 ----------
@@ -99,7 +99,9 @@ db = [
             "items": {"photo": 1, "letters": 1, "score_book": 1, "order_book": 1, "obit_book": 1},
             "quests": {"q_itsuki": {"status": "completed", "step": 2}, "q_hikari": {"status": "completed", "step": 2}, "q_night": {"status": "completed", "step": 3}}}}},
 ]
-switches = [("c4_want_return", "跟美雪說想把悲傷還回去"), ("c4_proof", "跟周防說悲傷是證據"), ("c4_burn", "讓魚店大叔燒了分數本"),
+switches = [("c4_met_miyuki", "在港口跟美雪說過話"), ("c4_met_suou", "在港口跟周防說過話"), ("c4_met_fukuda", "在港口跟福田社長說過話"), ("c4_met_mikan", "在港口跟美柑說過話"),
+            ("c4_fukuda_write", "勸福田社長在燈籠上寫小光的名字"), ("c4_sellable", "跟美柑說悲傷可以賣（只要回到主人手上）"),
+            ("c4_want_return", "跟美雪說想把悲傷還回去"), ("c4_proof", "跟周防說悲傷是證據"), ("c4_burn", "讓魚店大叔燒了分數本"),
             ("lantern_sayo", "燈籠上寫了小夜"), ("lantern_itsuki", "燈籠上寫了阿樹"), ("c4_start", "第 4 章開場結束"), ("c4_umbrella", "修好了小夜的傘"), ("c4_whale", "鯨魚回到了海裡"), ("sho_confessed", "小翔在燈籠流水的夜晚向美雪坦白")]
 db += [{"op": "switch.upsert", "switch": {"id": i, "name": n}} for i, n in switches]
 db += [{"op": "variable.upsert", "variable": {"id": "c4_talked", "name": "在港口說過話的人數"}},
@@ -266,7 +268,7 @@ add("harbor", ev("miyuki_h", "森下美雪", 5, 5, [
             OPT("想。", [T("……想。", HARUO), T("是嗎。那您一定也有一樣東西，一直沒拿回來吧。", MIYUKI), SW("c4_want_return")]),
             OPT("我還不知道。", [T("……我還不知道。", HARUO), T("嗯。不知道也沒關係。我也花了三個月，才敢聽天氣預報。", MIYUKI)]),
         ),
-        *TALKED(),
+        SW("c4_met_miyuki"), *TALKED(),
     ], cond=C4, graphic="char_modern_woman"),
     page([T("（美雪蹲在堤岸邊，用手指在燈籠上寫字。）")], cond={"switches": ["c4_start"], "selfSwitch": "A"}, graphic="char_modern_woman"),
 ]))
@@ -286,7 +288,12 @@ add("harbor", ev("fukuda_h", "福田社長", 8, 5, [
             T("我什麼都不知道。可是你的臉，跟十年前我站在會場最後面的臉，很像。", FUKUDA),
             T("一個人扛的東西，別人看不出重量。……我是說，業務上，要找人分攤。", FUKUDA),
         ]),
-        *TALKED(),
+        T("……你覺得，我該在燈籠上寫小光的名字嗎？寫了，她是不是就真的走了？", FUKUDA),
+        CH(
+            OPT("寫吧。讓她回家。", [T("……好。（社長拿出筆，寫得很慢，像在填一張很重要的表。）", FUKUDA), SW("c4_fukuda_write")]),
+            OPT("等你準備好再寫。", [T("……那我先抱著。業務上，不急。", FUKUDA)]),
+        ),
+        SW("c4_met_fukuda"), *TALKED(),
     ], cond=C4, graphic="char_modern_man"),
     page([T("號碼牌……不對，燈籠要從哪裡放下去來著？", FUKUDA)], cond={"switches": ["c4_start"], "selfSwitch": "A"}, graphic="char_modern_man"),
 ]))
@@ -303,7 +310,12 @@ add("harbor", ev("mikan_h", "美柑", 16, 5, [
         ], [
             T("本店今晚賣燈籠！一個三百圓！……您不用，您的燈籠是阿梅婆婆的手工限定款。", MIKAN),
         ])]),
-        *TALKED(),
+        T("晴生先生，本店想問您一件事。……您覺得，悲傷可以賣嗎？", MIKAN),
+        CH(
+            OPT("可以，只要它回到主人手上。", [T("……那本店以後，只賣「回家的悲傷」！", MIKAN), SW("c4_sellable")]),
+            OPT("不行。", [T("……嗯。本店其實早就知道了。", MIKAN)]),
+        ),
+        SW("c4_met_mikan"), *TALKED(),
     ], cond=C4, graphic="char_modern_girl"),
     page([T("集點卡最後一點，本店替您蓋了。……今晚的份。", MIKAN)], cond={"switches": ["c4_start"], "selfSwitch": "A"}, graphic="char_modern_girl"),
 ]))
@@ -323,7 +335,7 @@ add("harbor", ev("suou_h", "周防博士", 20, 5, [
             OPT("負擔。", [T("……負擔。所以才有人願意替別人扛。", HARUO), T("嗯。扛得動的人，也會累。", SUOU)]),
             OPT("證據。", [T("……證據。愛過一個人的證據。", HARUO), T("那這十年，你手上有好多別人的證據。", SUOU), SW("c4_proof")]),
         ),
-        *TALKED(),
+        SW("c4_met_suou"), *TALKED(),
     ], cond=C4, graphic="char_long_hair"),
     page([T("你決定吧。我只負責記住。", SUOU)], cond={"switches": ["c4_start"], "selfSwitch": "A"}, graphic="char_long_hair"),
 ]))
@@ -370,11 +382,18 @@ whale = [
     SW("c4_whale"), QUEST("q_lantern", "step", 3), SELF("A"),
 ]
 add("harbor", ev("sho_whale", "小翔", 13, 7, [
-    page(whale, trigger="autorun", cond={"switches": ["c4_start"], "variable": {"id": "c4_talked", "min": 3}}, graphic="char_modern_boy"),
+    page(whale, trigger="autorun", cond={"switches": ["c4_met_miyuki", "c4_met_suou"], "variable": {"id": "c4_talked", "min": 3}}, graphic="char_modern_boy"),
     page([T("呃、那個……鯨魚游走了。牠游得很好。", SHO)], cond={"selfSwitch": "A"}, graphic="char_modern_boy"),
 ], note="第 4 章的轉：鯨魚回到海裡"))
 
 # --- 合：最後的決定 ---
+AFTER = [
+    IF(s("c4_burn"), [T("（堤岸的另一頭，魚店大叔的分數本在火裡燒著。十年份的一百分。）")]),
+    IF(s("c4_fukuda_write"), [T("（寫著「光」的燈籠，漂在最前面。福田社長站在堤岸上，一直沒有走。）")],
+       [IF(s("c4_met_fukuda"), [T("（福田社長抱著還沒寫名字的燈籠，站在堤岸上。）")])]),
+    IF(s("c4_sellable"), [T("（美柑在堤岸邊收攤。招牌翻了面：「回家的悲傷，本店代送」。）")],
+       [IF(s("c4_met_mikan"), [T("（美柑把最後一瓶淚水打開，倒進了海裡。）")])]),
+]
 choose_carry = [
     T("我來扛。", HARUO),
     T("大家已經習慣不痛了。這十年，有人因為不痛活了下來。我不能替他們決定要不要痛。", HARUO),
@@ -382,6 +401,7 @@ choose_carry = [
     IF(s("lantern_sayo"), [T("（寫著「小夜」的燈籠，慢慢漂遠了。）")], [IF(s("lantern_itsuki"), [T("（寫著「阿樹」的燈籠，漂向阿樹找鯨魚的那片海。）")], [T("（沒有寫名字的燈籠，慢慢漂遠了。它會替誰回家，他也不知道。）")])]),
     T("（他在哭。這些眼淚還是大家的。可是現在，他知道每一滴是誰的。）"),
     T("我會記得。每一滴是誰的，我都會記下來。", HARUO),
+    *AFTER,
     WAIT(800), QUEST("q_lantern", "complete"),
     END("end_carry"),
 ]
@@ -402,6 +422,7 @@ choose_return = [
     T("……小夜。", HARUO),
     T("（他把燈籠放進海裡。）"),
     IF(s("lantern_sayo"), [T("（寫著「小夜」的燈籠，慢慢漂遠了。）")], [IF(s("lantern_itsuki"), [T("（寫著「阿樹」的燈籠，漂向阿樹找鯨魚的那片海。）")], [T("（沒有寫名字的燈籠，慢慢漂遠了。它會替誰回家，他也不知道。）")])]),
+    *AFTER,
     WAIT(800), QUEST("q_lantern", "complete"),
     END("end_return"),
 ]
@@ -420,6 +441,7 @@ choose_together = [
     T("……小夜。", HARUO),
     IF(s("lantern_sayo"), [T("（寫著「小夜」的燈籠，慢慢漂遠了。）")], [IF(s("lantern_itsuki"), [T("（寫著「阿樹」的燈籠，漂向阿樹找鯨魚的那片海。）")], [T("（沒有寫名字的燈籠，慢慢漂遠了。它會替誰回家，他也不知道。）")])]),
     T("（燈籠旁邊，大家的燈籠一盞一盞跟了上去。）"),
+    *AFTER,
     WAIT(800), QUEST("q_lantern", "complete"),
     END("end_together"),
 ]
@@ -428,10 +450,10 @@ final = [
     IF(PUBLIC, [T("（身後排著長長的人龍。他們都知道，自己的悲傷就在這裡。）")],
        [T("（身後只有幾個人。他們不知道，自己的悲傷就站在這裡。）")]),
     T("（他手上有兩樣東西：阿梅婆婆的燈籠，和小夜的傘。）"),
-    IF(s("c4_burn"), [T("（堤岸的另一頭，魚店大叔的分數本在火裡燒著。十年份的一百分。）")]),
-    IF(s("c4_want_return"), [T("（美雪問他想不想還。他說了「想」。）")], [T("（美雪問他想不想還。他說還不知道。現在，也還是。）")]),
-    IF(s("c4_proof"), [T("（悲傷是愛過的證據，他跟周防博士這樣說。那他自己的證據，在哪裡？）")],
-       [T("（悲傷是負擔，他跟周防博士這樣說。那他扛的，有多少是他自己的？）")]),
+    IF(ALL(s("c4_met_miyuki"), s("c4_met_suou")), [
+        IF(s("c4_want_return"), [IF(s("c4_proof"), [T("（他跟美雪說想還，跟周防博士說悲傷是證據。）")], [T("（他跟美雪說想還，跟周防博士說悲傷是負擔。）")])],
+           [IF(s("c4_proof"), [T("（他跟美雪說還不知道，跟周防博士說悲傷是證據。）")], [T("（他跟美雪說還不知道，跟周防博士說悲傷是負擔。）")])]),
+    ]),
     T("（燈籠上還沒有名字。）"),
     CH(
         OPT("寫「小夜」。", [T("（他寫下她的名字。筆畫很慢。）"), SW("lantern_sayo")]),
@@ -456,7 +478,12 @@ final = [
     ),
 ]
 add("harbor", ev("lantern_point", "堤岸的最前面", 12, 4, [
-    page([T("（堤岸的最前面。還不是時候……先和來放燈籠的人說說話吧。）")], cond=C4),
+    page([
+        T("（堤岸的最前面。還不是時候。）"),
+        IF(s("c4_met_miyuki", False), [T("（美雪蹲在堤岸邊，在燈籠上寫字。）")]),
+        IF(s("c4_met_suou", False), [T("（周防博士站在人群外面，看著海。）")]),
+        IF(ALL(s("c4_met_miyuki"), s("c4_met_suou")), [T("（還有人在等他說話。）")], [T("（先去跟她們說說話吧。）")]),
+    ], cond=C4),
     page(final, cond={"switches": ["c4_whale"]}),
 ], note="第 4 章的合：最後的決定"))
 

@@ -1221,6 +1221,30 @@
     {
       "id": "lantern_itsuki",
       "name": "燈籠上寫了阿樹"
+    },
+    {
+      "id": "c4_met_miyuki",
+      "name": "在港口跟美雪說過話"
+    },
+    {
+      "id": "c4_met_suou",
+      "name": "在港口跟周防說過話"
+    },
+    {
+      "id": "c4_met_fukuda",
+      "name": "在港口跟福田社長說過話"
+    },
+    {
+      "id": "c4_met_mikan",
+      "name": "在港口跟美柑說過話"
+    },
+    {
+      "id": "c4_fukuda_write",
+      "name": "勸福田社長在燈籠上寫小光的名字"
+    },
+    {
+      "id": "c4_sellable",
+      "name": "跟美柑說悲傷可以賣（只要回到主人手上）"
     }
   ],
   "variables": [
@@ -11974,6 +11998,13 @@
                   ]
                 },
                 {
+                  "code": "switch",
+                  "ids": [
+                    "c4_met_miyuki"
+                  ],
+                  "value": true
+                },
+                {
                   "code": "variable",
                   "id": "c4_talked",
                   "op": "add",
@@ -12095,6 +12126,50 @@
                   ]
                 },
                 {
+                  "code": "text",
+                  "text": "……你覺得，我該在燈籠上寫小光的名字嗎？寫了，她是不是就真的走了？",
+                  "actorId": "fukuda"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "寫吧。讓她回家。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……好。（社長拿出筆，寫得很慢，像在填一張很重要的表。）",
+                          "actorId": "fukuda"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "c4_fukuda_write"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    },
+                    {
+                      "text": "等你準備好再寫。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……那我先抱著。業務上，不急。",
+                          "actorId": "fukuda"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "c4_met_fukuda"
+                  ],
+                  "value": true
+                },
+                {
                   "code": "variable",
                   "id": "c4_talked",
                   "op": "add",
@@ -12199,6 +12274,50 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "code": "text",
+                  "text": "晴生先生，本店想問您一件事。……您覺得，悲傷可以賣嗎？",
+                  "actorId": "mikan"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "可以，只要它回到主人手上。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……那本店以後，只賣「回家的悲傷」！",
+                          "actorId": "mikan"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "c4_sellable"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    },
+                    {
+                      "text": "不行。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……嗯。本店其實早就知道了。",
+                          "actorId": "mikan"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "c4_met_mikan"
+                  ],
+                  "value": true
                 },
                 {
                   "code": "variable",
@@ -12335,6 +12454,13 @@
                       ]
                     }
                   ]
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "c4_met_suou"
+                  ],
+                  "value": true
                 },
                 {
                   "code": "variable",
@@ -12476,7 +12602,8 @@
             {
               "conditions": {
                 "switches": [
-                  "c4_start"
+                  "c4_met_miyuki",
+                  "c4_met_suou"
                 ],
                 "variable": {
                   "id": "c4_talked",
@@ -12677,7 +12804,65 @@
               "commands": [
                 {
                   "code": "text",
-                  "text": "（堤岸的最前面。還不是時候……先和來放燈籠的人說說話吧。）"
+                  "text": "（堤岸的最前面。還不是時候。）"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "c4_met_miyuki",
+                    "value": false
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "（美雪蹲在堤岸邊，在燈籠上寫字。）"
+                    }
+                  ]
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "c4_met_suou",
+                    "value": false
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "（周防博士站在人群外面，看著海。）"
+                    }
+                  ]
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "all",
+                    "conditions": [
+                      {
+                        "type": "switch",
+                        "id": "c4_met_miyuki",
+                        "value": true
+                      },
+                      {
+                        "type": "switch",
+                        "id": "c4_met_suou",
+                        "value": true
+                      }
+                    ]
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "（還有人在等他說話。）"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "text",
+                      "text": "（先去跟她們說說話吧。）"
+                    }
+                  ]
                 }
               ]
             },
@@ -12721,54 +12906,72 @@
                 {
                   "code": "if",
                   "condition": {
-                    "type": "switch",
-                    "id": "c4_burn",
-                    "value": true
+                    "type": "all",
+                    "conditions": [
+                      {
+                        "type": "switch",
+                        "id": "c4_met_miyuki",
+                        "value": true
+                      },
+                      {
+                        "type": "switch",
+                        "id": "c4_met_suou",
+                        "value": true
+                      }
+                    ]
                   },
                   "then": [
                     {
-                      "code": "text",
-                      "text": "（堤岸的另一頭，魚店大叔的分數本在火裡燒著。十年份的一百分。）"
-                    }
-                  ]
-                },
-                {
-                  "code": "if",
-                  "condition": {
-                    "type": "switch",
-                    "id": "c4_want_return",
-                    "value": true
-                  },
-                  "then": [
-                    {
-                      "code": "text",
-                      "text": "（美雪問他想不想還。他說了「想」。）"
-                    }
-                  ],
-                  "else": [
-                    {
-                      "code": "text",
-                      "text": "（美雪問他想不想還。他說還不知道。現在，也還是。）"
-                    }
-                  ]
-                },
-                {
-                  "code": "if",
-                  "condition": {
-                    "type": "switch",
-                    "id": "c4_proof",
-                    "value": true
-                  },
-                  "then": [
-                    {
-                      "code": "text",
-                      "text": "（悲傷是愛過的證據，他跟周防博士這樣說。那他自己的證據，在哪裡？）"
-                    }
-                  ],
-                  "else": [
-                    {
-                      "code": "text",
-                      "text": "（悲傷是負擔，他跟周防博士這樣說。那他扛的，有多少是他自己的？）"
+                      "code": "if",
+                      "condition": {
+                        "type": "switch",
+                        "id": "c4_want_return",
+                        "value": true
+                      },
+                      "then": [
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_proof",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（他跟美雪說想還，跟周防博士說悲傷是證據。）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "text",
+                              "text": "（他跟美雪說想還，跟周防博士說悲傷是負擔。）"
+                            }
+                          ]
+                        }
+                      ],
+                      "else": [
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_proof",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（他跟美雪說還不知道，跟周防博士說悲傷是證據。）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "text",
+                              "text": "（他跟美雪說還不知道，跟周防博士說悲傷是負擔。）"
+                            }
+                          ]
+                        }
+                      ]
                     }
                   ]
                 },
@@ -12986,6 +13189,80 @@
                           "actorId": "player"
                         },
                         {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_burn",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（堤岸的另一頭，魚店大叔的分數本在火裡燒著。十年份的一百分。）"
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_fukuda_write",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（寫著「光」的燈籠，漂在最前面。福田社長站在堤岸上，一直沒有走。）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "switch",
+                                "id": "c4_met_fukuda",
+                                "value": true
+                              },
+                              "then": [
+                                {
+                                  "code": "text",
+                                  "text": "（福田社長抱著還沒寫名字的燈籠，站在堤岸上。）"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_sellable",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（美柑在堤岸邊收攤。招牌翻了面：「回家的悲傷，本店代送」。）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "switch",
+                                "id": "c4_met_mikan",
+                                "value": true
+                              },
+                              "then": [
+                                {
+                                  "code": "text",
+                                  "text": "（美柑把最後一瓶淚水打開，倒進了海裡。）"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
                           "code": "wait",
                           "ms": 800
                         },
@@ -13097,6 +13374,80 @@
                                 {
                                   "code": "text",
                                   "text": "（沒有寫名字的燈籠，慢慢漂遠了。它會替誰回家，他也不知道。）"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_burn",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（堤岸的另一頭，魚店大叔的分數本在火裡燒著。十年份的一百分。）"
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_fukuda_write",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（寫著「光」的燈籠，漂在最前面。福田社長站在堤岸上，一直沒有走。）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "switch",
+                                "id": "c4_met_fukuda",
+                                "value": true
+                              },
+                              "then": [
+                                {
+                                  "code": "text",
+                                  "text": "（福田社長抱著還沒寫名字的燈籠，站在堤岸上。）"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_sellable",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（美柑在堤岸邊收攤。招牌翻了面：「回家的悲傷，本店代送」。）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "switch",
+                                "id": "c4_met_mikan",
+                                "value": true
+                              },
+                              "then": [
+                                {
+                                  "code": "text",
+                                  "text": "（美柑把最後一瓶淚水打開，倒進了海裡。）"
                                 }
                               ]
                             }
@@ -13253,6 +13604,80 @@
                         {
                           "code": "text",
                           "text": "（燈籠旁邊，大家的燈籠一盞一盞跟了上去。）"
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_burn",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（堤岸的另一頭，魚店大叔的分數本在火裡燒著。十年份的一百分。）"
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_fukuda_write",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（寫著「光」的燈籠，漂在最前面。福田社長站在堤岸上，一直沒有走。）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "switch",
+                                "id": "c4_met_fukuda",
+                                "value": true
+                              },
+                              "then": [
+                                {
+                                  "code": "text",
+                                  "text": "（福田社長抱著還沒寫名字的燈籠，站在堤岸上。）"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "switch",
+                            "id": "c4_sellable",
+                            "value": true
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（美柑在堤岸邊收攤。招牌翻了面：「回家的悲傷，本店代送」。）"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "switch",
+                                "id": "c4_met_mikan",
+                                "value": true
+                              },
+                              "then": [
+                                {
+                                  "code": "text",
+                                  "text": "（美柑把最後一瓶淚水打開，倒進了海裡。）"
+                                }
+                              ]
+                            }
+                          ]
                         },
                         {
                           "code": "wait",
