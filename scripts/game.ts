@@ -9,10 +9,9 @@ import { CLICHES } from "@/ai/designGuide";
 import { drawSeeds } from "@/ai/seeds";
 import { ASSET_CATALOG, MUSIC, TERRAIN } from "@/game/assets";
 import { MAX_REVIEW_ROUNDS, projectDigest, reviewProject, reviewTreatment, SPOILER_LINE, type ReviewResult } from "@/ai/review";
-import { chapterPlaytest, checkChapters } from "@/game/chapters";
+import { chapterPlaytest, checkChapters, fullPlaytest } from "@/game/chapters";
 import { projectRevision } from "@/game/engine";
 import { applyAction, settle } from "@/game/playtest";
-import { runPlaytest } from "@/game/playtest";
 import { lintDesign } from "@/game/lint";
 import { assessQuality } from "@/game/quality";
 import { commandAt, findRefs } from "@/game/refs";
@@ -179,7 +178,7 @@ async function doReview(gameId: string, project: GameProject): Promise<ReviewRes
   if (!validation.isValid) fail("專案尚未通過驗證，請先讓 check 的驗證錯誤清空再審查");
   const story = readText(gameId, "story.md") ?? project.description;
   const treatment = readText(gameId, "treatment.md") ?? undefined;
-  const playtest = runPlaytest(project);
+  const playtest = fullPlaytest(project);
   const chapters = checkChapters(project);
   const quality = assessQuality(project, playtest, { checkDuration: !values.demo, chapters });
   let chapter: Parameters<typeof reviewProject>[1]["chapter"];
@@ -225,7 +224,7 @@ const reviewOut = (r: ReviewResult, extra: Record<string, unknown> = {}) => out(
 
 function inspect(project: GameProject) {
   const valid = validateProject(project);
-  console.log(projectDigest(project, valid.project ? runPlaytest(project) : null));
+  console.log(projectDigest(project, valid.project ? fullPlaytest(project) : null));
   if (!valid.isValid) console.log(`\n## 目前的驗證錯誤\n${valid.errors.map((e) => `- ${e.path}：${e.message}`).join("\n")}`);
 }
 

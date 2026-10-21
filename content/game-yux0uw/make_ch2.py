@@ -7,7 +7,8 @@ import copy, json, os, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = sys.argv[1] if len(sys.argv) > 1 else HERE
-PROJECT = json.load(open(os.path.join(HERE, "project.json")))
+# 加頁的基底是第 1 章上線時的版本（重跑時才不會重複加頁）：環境變數 BASE 指定，預設用目前的 project.json
+PROJECT = json.load(open(os.environ.get("BASE", os.path.join(HERE, "project.json"))))
 
 # ---------- 小工具（與 make_ch1.py 相同） ----------
 def T(text, actor=None, speaker=None):
@@ -16,6 +17,7 @@ def T(text, actor=None, speaker=None):
     if speaker: c["speaker"] = speaker
     return c
 def SW(*ids, on=True): return {"code": "switch", "ids": list(ids), "value": on}
+def NOTE(text): return {"code": "comment", "text": text}
 def SELF(key="A", on=True): return {"code": "selfSwitch", "key": key, "value": on}
 def VAR(i, v=1, op="add"): return {"code": "variable", "id": i, "op": op, "value": v}
 def ITEM(i, d=1): return {"code": "item", "itemId": i, "delta": d}
@@ -87,7 +89,7 @@ db = [
         "profile": "福壽堂做了四十年的接待員，從福田社長的父親那一代就在。說話慢，句尾常加「是吧」。想要：社長有一天能好好休息。知道：小光小時候在接待桌上蓋自己的印章、對著開走的靈車說「路上小心」；小光的告別式上沒有人哭，社長在會場最後面一直數人數。不知道：美柑留著小光的紙鶴。"}},
     {"op": "item.upsert", "item": {"id": "tai", "name": "鯛魚", "description": "魚店大叔說好的「一百分的獎品」。一整尾，用報紙包著，比晴生的手臂還長。", "iconAssetId": "icon_coin"}},
     {"op": "item.upsert", "item": {"id": "crane", "name": "褪色的紙鶴", "description": "小光摺的紙鶴，美柑留了十年。翅膀上有一個用蠟筆寫的「光」。", "iconAssetId": "icon_letter"}},
-    {"op": "quest.upsert", "quest": {"id": "q_hikari", "title": "認識小光", "description": "福田社長請晴生在一場「十年忌」的法事上哭。故人叫光，六歲。除此之外，社長什麼都不肯說。", "steps": [
+    {"op": "quest.upsert", "quest": {"id": "q_hikari", "title": "認識小光", "description": "福田社長請晴生在一場法事上哭。故人叫光，六歲。除此之外，社長什麼都不肯說。", "steps": [
         {"text": "打聽「小光」的事：福壽堂的事務所（商店街東邊）、美柑的店面（魚店旁邊，鐵捲門拉一半那間）。小光的告別式也是在福壽堂辦的"},
         {"text": "認識小光一點了。準備好了，就到福壽堂事務所找福田社長"},
         {"text": "讓「客戶」好好地告別"},
@@ -108,6 +110,8 @@ db = [
             {"condition": s("mikan_partner"), "text": "東京的第一批貨出了。美柑在集點卡背面寫了一行小字：「去東京的車票，還差三十二點。」"},
             {"condition": s("mikan_stopped"), "text": "美柑的店面拉下了鐵捲門，上面貼著一張紙：「本店公休。理由：在哭。」"},
             {"condition": s("c2_miyuki"), "text": "美雪說，她開始敢聽天氣預報了。只是音量會關得小小的。"},
+            {"condition": s("crane_return"), "text": "那隻紙鶴要還給美柑。晴生把它夾在修傘的工具箱最上層，怕壓壞了。"},
+            {"condition": s("crane_fukuda"), "text": "那隻褪色的紙鶴，現在放在福壽堂角落那個小小的櫃子裡，小光的照片前面。"},
             {"condition": s("c2_sample"), "text": "周防博士的試管裡，裝著晴生的一滴眼淚。她在標籤上寫了一個問號。"},
         ]}},
 ]
@@ -116,11 +120,12 @@ switches = [
     ("c2_sheet", "看到第 1 號業績表"), ("c2_reviews", "看過美柑客人的評語"), ("mikan_partner", "答應和美柑合夥"), ("mikan_stopped", "勸美柑收手"),
     ("c2_miyuki", "聽美雪說了最後一通電話"), ("c2_sample", "給了周防博士一滴眼淚"), ("c2_tai", "在法事上供了鯛魚"),
     ("c2_used_matsu", "法事上說了蓋印章的事"), ("c2_used_crane", "法事上拿出紙鶴"), ("c2_used_sheet", "法事上說了第 1 號業績表"),
-    ("fukuda_cried", "福田社長哭了"), ("c2_memorial_done", "小光的法事結束"),
+    ("fukuda_cried", "福田社長哭了"), ("crane_return", "紙鶴要還給美柑"), ("crane_fukuda", "紙鶴留給了福田社長"), ("c2_memorial_done", "小光的法事結束"),
 ]
 db += [{"op": "switch.upsert", "switch": {"id": i, "name": n}} for i, n in switches]
 db += [{"op": "variable.upsert", "variable": {"id": "c2_clues", "name": "蒐集到的小光的事"}},
-       {"op": "variable.upsert", "variable": {"id": "c2_told", "name": "法事上說了幾件小光的事"}}]
+       {"op": "variable.upsert", "variable": {"id": "c2_told", "name": "法事上說了幾件小光的事"}},
+       {"op": "variable.upsert", "variable": {"id": "c2_last", "name": "法事上晴生剛說的那件事（社長的擋話回應用）"}}]
 
 # ---------- 地圖 ----------
 maps = {
@@ -185,10 +190,14 @@ suou_end = page([
     T("下次見面，帶著你自己的答案來。（她把溫度計收進口袋，走進夜裡。）", SUOU),
     {"code": "ending", "endingId": "end_ch2"},
 ], trigger="autorun", graphic="char_long_hair", cond={"switches": ["c2_memorial_done"]})
-evops.append(extend("shotengai", "suou", page([], cond=C2, priority="below"), suou_end))
+suou_base = existing("shotengai", "suou")
+suou_base["pages"][0].setdefault("conditions", {})["custom"] = s("c2_start", False)  # 第 1 章章末：第 2 章開始後不再觸發
+suou_base["pages"] += [page([], cond=C2, priority="below"), suou_end]
+evops.append({"op": "event.upsert", "mapId": "shotengai", "event": suou_base})
 
 # --- 開場：三坪的傘店，擠進三個想要他眼淚的人 ---
 opening2 = [
+    NOTE("章節標題卡：玩家在第 1 章章末（end_ch1，nextChapterId＝ch2）按「繼續」時，系統會切換到第 2 章、自動顯示標題卡，並把玩家放在這一章的起點（傘店）。這裡不再放「章節」指令，避免標題卡出現兩次"),
     T("（阿樹的告別式過了三天。早上的雨宮傘店。）"),
     T("（收音機：「……今天的潮見町，晴時多雲，午後偶爾有短暫陣雨。」）"),
     IF(s("miyuki_cried"), [
@@ -221,20 +230,18 @@ opening2 = [
     T("（三坪大的傘店，擠了三個想要他眼淚的人。）"),
     T("……我的店，只有三坪。", HARUO),
     T("先說正事！這個禮拜六有一場「試營運」，專業哭喪方案的第一場。", FUKUDA),
-    T("客戶是……一位老客戶。十年忌。", FUKUDA),
+    T("客戶是……一位老客戶。一場法事。", FUKUDA),
     T("故人的資料呢？", HARUO),
     T("名字叫「光」。六歲。就這樣。客戶說，你上次不是自己去問的嗎？", FUKUDA),
-    T("（福田社長說這句話的時候，一直盯著預約簿，沒有看晴生。）"),
     CH(
         OPT("……好。我先認識她。", [
             T("……好。光，六歲。我先去認識她。", HARUO),
-            T("拜託了。……我是說，業務上拜託了！", FUKUDA),
+            T("業務上拜託了！滿意度要九成以上！", FUKUDA),
         ]),
         OPT("我不是專業的哭喪人。", [
             T("社長，我不是專業的哭喪人。上次哭的是森下太太，不是我。", HARUO),
-            T("……那就當作幫我一個忙。", FUKUDA),
+            T("試營運的客戶指定要你。這是業務。", FUKUDA),
             T("（福田社長把預約簿闔起來，深深地鞠了一個躬。晴生第一次看到他不談業績。）"),
-            T("……不，是幫「客戶」一個忙。拜託了。", FUKUDA),
             T("……我先去認識她。哭不哭得出來，我不知道。", HARUO),
         ]),
     ),
@@ -258,7 +265,7 @@ evops.append(extend("kasaya", "radio", page([
 evops.append(extend("shotengai", "fukuda", page([
     T("（福田社長在福壽堂門口講電話：「是，是，下個月的檔期……」他看到晴生，摀住話筒。）"),
     IF(v("c2_clues", ">=", 1), [
-        T("資料蒐集好了？晚上我在事務所等你。……我是說，客戶在等你。", FUKUDA),
+        T("資料蒐集好了？晚上事務所見。客戶很守時。", FUKUDA),
     ], [
         T("試營運的資料，蒐集得如何？……什麼都別問我。客戶說了，你自己去問。", FUKUDA),
     ]),
@@ -348,27 +355,37 @@ add("fukujudo_office",
 
 # 福田社長（晚上，事務所）：法事
 def use_matsu():
-    return [SW("c2_used_matsu"), VAR("c2_told"),
+    return [SW("c2_used_matsu"), VAR("c2_told"), VAR("c2_last", 1, "set"),
         T("她會坐在接待桌上，在訪客簿蓋自己的印章，一個圓圓的「光」。", HARUO),
         T("靈車開走的時候，她會跑到門口揮手，說「路上小心」。", HARUO),
         T("……阿松這個大嘴巴。", FUKUDA),
         T("（社長的聲音，在「嘴巴」那兩個字上破了。）")]
 def use_crane():
-    return [SW("c2_used_crane"), VAR("c2_told"),
+    return [SW("c2_used_crane"), VAR("c2_told"), VAR("c2_last", 2, "set"),
         T("（晴生從口袋拿出那隻褪色的紙鶴，放進福田社長的手心。）"),
         T("美柑的媽媽離家那天，小光塞了這隻紙鶴給她。她說：「哭的時候，手上要有東西拿。」", HARUO),
         T("翅膀上的這個字，是她寫的。", HARUO),
         T("（福田社長的手指，停在那個歪歪的「光」上面。）")]
 def use_sheet():
-    return [SW("c2_used_sheet"), VAR("c2_told"),
+    return [SW("c2_used_sheet"), VAR("c2_told"), VAR("c2_last", 3, "set"),
         T("講台的抽屜裡，有第 1 號業績表。參加人數 31，哭泣人數 0。滿意度那一欄，是空白的。", HARUO),
         T("背面是一張蠟筆畫。一個光頭的大人，旁邊寫著「爸爸的工作　加油」。", HARUO),
         T("……那一張，我填不下去。", FUKUDA),
         T("所以我做了一千兩百張別的。每一張都填得滿滿的。", FUKUDA)]
-def rebut(fukuda_line):
+# 社長的擋話會回應晴生上一句說了什麼（c2_last：1＝印章、2＝紙鶴、3＝業績表、0＝沒說）
+RETORT = {
+    1: "……印章是公司的財產。業務上的事，不用提。",
+    2: "紙鶴……我們這行不收紙鶴。供品要先登記。",
+    3: "那一張是作廢的。作廢的業績表，不算數。",
+}
+def rebut(fukuda_line, first=False):
     """社長擋一句，晴生可以拿出一件還沒說的小事（每件只能用一次）"""
+    line = [T(fukuda_line, FUKUDA)] if first else [
+        IF(v("c2_last", "==", 1), [T(RETORT[1], FUKUDA)], [IF(v("c2_last", "==", 2), [T(RETORT[2], FUKUDA)], [IF(v("c2_last", "==", 3), [T(RETORT[3], FUKUDA)], [T(fukuda_line, FUKUDA)])])]),
+    ]
     return [
-        T(fukuda_line, FUKUDA),
+        *line,
+        VAR("c2_last", 0, "set"),
         CH(
             OPT("說她蓋印章、揮手的事", use_matsu(), ALL(s("c2_matsu"), s("c2_used_matsu", False))),
             OPT("拿出紙鶴", use_crane(), ALL(s("c2_crane"), has("crane"), s("c2_used_crane", False))),
@@ -387,16 +404,17 @@ memorial = [
         T("……那孩子，最愛吃魚了。尤其是眼睛。很怪吧。", FUKUDA),
         ITEM("tai", -1), SW("c2_tai"),
     ]),
-    *rebut("先說好，滿意度要九成以上。這是業務。"),
+    *rebut("先說好，滿意度要九成以上。這是業務。", first=True),
     *rebut("故人的資料，我們這行不需要。哭就好。"),
-    *rebut("……時間差不多了。結束吧。"),
+    T("……時間差不多了。", FUKUDA),
+    *rebut("結束吧。"),
     IF(v("c2_told", ">=", 2), [
         T("（福田社長沒有說話。辦公桌上的業績表，多了一個小小的圓點。）"),
         T("……欸？", FUKUDA),
         T("（又一個。他低頭看著自己的手背，像是第一次看到雨。）"),
         T("十年了。我辦了一千兩百場告別式，每一場都在數，有沒有人哭。", FUKUDA),
         T("原來我一直在等的……是這個啊。", FUKUDA),
-        T("（社長站起來，打開角落那個小小的櫃子。裡面是一張照片：一個缺了門牙的女孩，舉著一個印章。）"),
+        T("（社長站起來，打開角落那個小小的櫃子。裡面是一張照片：綁著歪掉的雙馬尾的女孩，額頭上蓋了一個紅紅的「光」。）"),
         T("小光。爸爸……爸爸今天，哭了。", FUKUDA),
         SW("fukuda_cried"),
         T("（晴生的眼睛是乾的。他看著社長，胸口某個地方，又輕了一點。）"),
@@ -411,6 +429,22 @@ memorial = [
         T("……對不起。", HARUO),
         T("不，是我的錯。我連她的一件事都沒有告訴你。我自己，也快想不起來了。", FUKUDA),
     ])]),
+    IF(has("crane"), [
+        T("（紙鶴還在社長的手心裡。美柑說過，要還的。）"),
+        CH(
+            OPT("拿回來，還給美柑。", [
+                T("……這隻紙鶴，是美柑借我的。我得還給她。", HARUO),
+                T("（社長把紙鶴放回晴生手上，動作很慢，像在交接一份很重要的文件。）"),
+                T("替我跟那孩子說聲謝謝。……十年了，原來還有人留著。", FUKUDA),
+                SW("crane_return"),
+            ]),
+            OPT("留給社長。", [
+                T("留著吧。美柑那邊，我去跟她說。", HARUO),
+                T("（社長把紙鶴放在小光的照片前面。）……哭的時候，手上要有東西拿，是吧。", FUKUDA),
+                ITEM("crane", -1), SW("crane_fukuda"),
+            ]),
+        ),
+    ]),
     WAIT(600),
     QUEST("q_hikari", "complete"),
     SW("c2_memorial_done"),
@@ -453,14 +487,19 @@ mikan_tells = [
     T("（她把紙鶴放在晴生手上。）借您。社長的……法事要用的話。要還喔！", MIKAN),
     ITEM("crane"), SW("c2_crane"), *CLUE(),
 ]
-mikan_deal = [
-    T("好！那來談正事！（她把筆電轉過來。）這是本店的客人評價，五顆星喔！", MIKAN),
+mikan_reviews = [
+    T("對了對了，給您看本店的客人評價，五顆星喔！（她把筆電轉過來。）", MIKAN),
     T("（螢幕上一排評價：「喝了之後，想起我爸在醫院握著我的手。」「想起了十年前死掉的狗，小黑。」）"),
     T("（「想起了自己的婚禮。不知道為什麼，很想跟前妻說對不起。」）"),
     T("……他們想起的，都是自己的事。", HARUO),
     T("對呀！所以評價才這麼好！", MIKAN),
     T("（沒有一個人想起晴生的事。一件都沒有。那這些眼淚裡裝的，到底是誰的悲傷？）"),
     SW("c2_reviews"),
+    T("合夥的事，下次再談！本店先去進貨！……進面紙。", MIKAN),
+    SELF("A"),
+]
+mikan_deal = [
+    T("您來了！那來談正事！", MIKAN),
     T("東京有一家公司，想跟本店簽約，每個月一千瓶。只要您每天固定哭三次，本店負責收面紙，分您七成！", MIKAN),
     T("……妳為什麼這麼想賺錢？", HARUO),
     T("本店要去東京展店！……騙你的。", MIKAN),
@@ -497,8 +536,9 @@ add("mikan_base",
             IF(s("refused_mikan"), [T("雖然您拒絕過本店，本店還是很有禮貌的！", MIKAN)]),
             T("我在找一個叫「光」的孩子的事。六歲，十年前過世的。", HARUO),
             *mikan_tells,
-            *mikan_deal,
+            *mikan_reviews,
         ], graphic="char_modern_girl"),
+        page(mikan_deal, cond={"selfSwitch": "A"}, graphic="char_modern_girl"),
         page([
             IF(s("mikan_stopped"), [
                 T("……本店公休中。（她的眼睛腫腫的，抱著那個空了的鐵盒。）", MIKAN),

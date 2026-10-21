@@ -178,7 +178,7 @@
     {
       "id": "q_hikari",
       "title": "認識小光",
-      "description": "福田社長請晴生在一場「十年忌」的法事上哭。故人叫光，六歲。除此之外，社長什麼都不肯說。",
+      "description": "福田社長請晴生在一場法事上哭。故人叫光，六歲。除此之外，社長什麼都不肯說。",
       "steps": [
         {
           "text": "打聽「小光」的事：福壽堂的事務所（商店街東邊）、美柑的店面（魚店旁邊，鐵捲門拉一半那間）。小光的告別式也是在福壽堂辦的"
@@ -323,6 +323,22 @@
             "value": true
           },
           "text": "美雪說，她開始敢聽天氣預報了。只是音量會關得小小的。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "crane_return",
+            "value": true
+          },
+          "text": "那隻紙鶴要還給美柑。晴生把它夾在修傘的工具箱最上層，怕壓壞了。"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "crane_fukuda",
+            "value": true
+          },
+          "text": "那隻褪色的紙鶴，現在放在福壽堂角落那個小小的櫃子裡，小光的照片前面。"
         },
         {
           "condition": {
@@ -525,6 +541,14 @@
     {
       "id": "c2_memorial_done",
       "name": "小光的法事結束"
+    },
+    {
+      "id": "crane_return",
+      "name": "紙鶴要還給美柑"
+    },
+    {
+      "id": "crane_fukuda",
+      "name": "紙鶴留給了福田社長"
     }
   ],
   "variables": [
@@ -543,6 +567,10 @@
     {
       "id": "c2_clues",
       "name": "蒐集到的小光的事"
+    },
+    {
+      "id": "c2_last",
+      "name": "法事上晴生剛說的那件事（社長的擋話回應用）"
     }
   ],
   "commonEvents": [],
@@ -1220,7 +1248,7 @@
                   "then": [
                     {
                       "code": "text",
-                      "text": "資料蒐集好了？晚上我在事務所等你。……我是說，客戶在等你。",
+                      "text": "資料蒐集好了？晚上事務所見。客戶很守時。",
                       "actorId": "fukuda"
                     }
                   ],
@@ -1668,7 +1696,12 @@
               "conditions": {
                 "switches": [
                   "funeral_done"
-                ]
+                ],
+                "custom": {
+                  "type": "switch",
+                  "id": "c2_start",
+                  "value": false
+                }
               },
               "graphic": {
                 "assetId": "char_long_hair"
@@ -2265,6 +2298,10 @@
               "priority": "below",
               "commands": [
                 {
+                  "code": "comment",
+                  "text": "章節標題卡：玩家在第 1 章章末（end_ch1，nextChapterId＝ch2）按「繼續」時，系統會切換到第 2 章、自動顯示標題卡，並把玩家放在這一章的起點（傘店）。這裡不再放「章節」指令，避免標題卡出現兩次"
+                },
+                {
                   "code": "text",
                   "text": "（阿樹的告別式過了三天。早上的雨宮傘店。）"
                 },
@@ -2430,7 +2467,7 @@
                 },
                 {
                   "code": "text",
-                  "text": "客戶是……一位老客戶。十年忌。",
+                  "text": "客戶是……一位老客戶。一場法事。",
                   "actorId": "fukuda"
                 },
                 {
@@ -2442,10 +2479,6 @@
                   "code": "text",
                   "text": "名字叫「光」。六歲。就這樣。客戶說，你上次不是自己去問的嗎？",
                   "actorId": "fukuda"
-                },
-                {
-                  "code": "text",
-                  "text": "（福田社長說這句話的時候，一直盯著預約簿，沒有看晴生。）"
                 },
                 {
                   "code": "choices",
@@ -2460,7 +2493,7 @@
                         },
                         {
                           "code": "text",
-                          "text": "拜託了。……我是說，業務上拜託了！",
+                          "text": "業務上拜託了！滿意度要九成以上！",
                           "actorId": "fukuda"
                         }
                       ]
@@ -2475,17 +2508,12 @@
                         },
                         {
                           "code": "text",
-                          "text": "……那就當作幫我一個忙。",
+                          "text": "試營運的客戶指定要你。這是業務。",
                           "actorId": "fukuda"
                         },
                         {
                           "code": "text",
                           "text": "（福田社長把預約簿闔起來，深深地鞠了一個躬。晴生第一次看到他不談業績。）"
-                        },
-                        {
-                          "code": "text",
-                          "text": "……不，是幫「客戶」一個忙。拜託了。",
-                          "actorId": "fukuda"
                         },
                         {
                           "code": "text",
@@ -6171,6 +6199,12 @@
                           "actorId": "fukuda"
                         },
                         {
+                          "code": "variable",
+                          "id": "c2_last",
+                          "op": "set",
+                          "value": 0
+                        },
+                        {
                           "code": "choices",
                           "options": [
                             {
@@ -6202,6 +6236,12 @@
                                   "code": "variable",
                                   "id": "c2_told",
                                   "op": "add",
+                                  "value": 1
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
                                   "value": 1
                                 },
                                 {
@@ -6261,6 +6301,12 @@
                                   "value": 1
                                 },
                                 {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
+                                  "value": 2
+                                },
+                                {
                                   "code": "text",
                                   "text": "（晴生從口袋拿出那隻褪色的紙鶴，放進福田社長的手心。）"
                                 },
@@ -6310,6 +6356,270 @@
                                   "id": "c2_told",
                                   "op": "add",
                                   "value": 1
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
+                                  "value": 3
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "講台的抽屜裡，有第 1 號業績表。參加人數 31，哭泣人數 0。滿意度那一欄，是空白的。",
+                                  "actorId": "player"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "背面是一張蠟筆畫。一個光頭的大人，旁邊寫著「爸爸的工作　加油」。",
+                                  "actorId": "player"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "……那一張，我填不下去。",
+                                  "actorId": "fukuda"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "所以我做了一千兩百張別的。每一張都填得滿滿的。",
+                                  "actorId": "fukuda"
+                                }
+                              ]
+                            },
+                            {
+                              "text": "……",
+                              "commands": [
+                                {
+                                  "code": "text",
+                                  "text": "……",
+                                  "actorId": "player"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "variable",
+                            "id": "c2_last",
+                            "op": "==",
+                            "value": 1
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "……印章是公司的財產。業務上的事，不用提。",
+                              "actorId": "fukuda"
+                            }
+                          ],
+                          "else": [
+                            {
+                              "code": "if",
+                              "condition": {
+                                "type": "variable",
+                                "id": "c2_last",
+                                "op": "==",
+                                "value": 2
+                              },
+                              "then": [
+                                {
+                                  "code": "text",
+                                  "text": "紙鶴……我們這行不收紙鶴。供品要先登記。",
+                                  "actorId": "fukuda"
+                                }
+                              ],
+                              "else": [
+                                {
+                                  "code": "if",
+                                  "condition": {
+                                    "type": "variable",
+                                    "id": "c2_last",
+                                    "op": "==",
+                                    "value": 3
+                                  },
+                                  "then": [
+                                    {
+                                      "code": "text",
+                                      "text": "那一張是作廢的。作廢的業績表，不算數。",
+                                      "actorId": "fukuda"
+                                    }
+                                  ],
+                                  "else": [
+                                    {
+                                      "code": "text",
+                                      "text": "故人的資料，我們這行不需要。哭就好。",
+                                      "actorId": "fukuda"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "code": "variable",
+                          "id": "c2_last",
+                          "op": "set",
+                          "value": 0
+                        },
+                        {
+                          "code": "choices",
+                          "options": [
+                            {
+                              "text": "說她蓋印章、揮手的事",
+                              "condition": {
+                                "type": "all",
+                                "conditions": [
+                                  {
+                                    "type": "switch",
+                                    "id": "c2_matsu",
+                                    "value": true
+                                  },
+                                  {
+                                    "type": "switch",
+                                    "id": "c2_used_matsu",
+                                    "value": false
+                                  }
+                                ]
+                              },
+                              "commands": [
+                                {
+                                  "code": "switch",
+                                  "ids": [
+                                    "c2_used_matsu"
+                                  ],
+                                  "value": true
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_told",
+                                  "op": "add",
+                                  "value": 1
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
+                                  "value": 1
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "她會坐在接待桌上，在訪客簿蓋自己的印章，一個圓圓的「光」。",
+                                  "actorId": "player"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "靈車開走的時候，她會跑到門口揮手，說「路上小心」。",
+                                  "actorId": "player"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "……阿松這個大嘴巴。",
+                                  "actorId": "fukuda"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "（社長的聲音，在「嘴巴」那兩個字上破了。）"
+                                }
+                              ]
+                            },
+                            {
+                              "text": "拿出紙鶴",
+                              "condition": {
+                                "type": "all",
+                                "conditions": [
+                                  {
+                                    "type": "switch",
+                                    "id": "c2_crane",
+                                    "value": true
+                                  },
+                                  {
+                                    "type": "item",
+                                    "itemId": "crane"
+                                  },
+                                  {
+                                    "type": "switch",
+                                    "id": "c2_used_crane",
+                                    "value": false
+                                  }
+                                ]
+                              },
+                              "commands": [
+                                {
+                                  "code": "switch",
+                                  "ids": [
+                                    "c2_used_crane"
+                                  ],
+                                  "value": true
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_told",
+                                  "op": "add",
+                                  "value": 1
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
+                                  "value": 2
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "（晴生從口袋拿出那隻褪色的紙鶴，放進福田社長的手心。）"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "美柑的媽媽離家那天，小光塞了這隻紙鶴給她。她說：「哭的時候，手上要有東西拿。」",
+                                  "actorId": "player"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "翅膀上的這個字，是她寫的。",
+                                  "actorId": "player"
+                                },
+                                {
+                                  "code": "text",
+                                  "text": "（福田社長的手指，停在那個歪歪的「光」上面。）"
+                                }
+                              ]
+                            },
+                            {
+                              "text": "說第 1 號業績表",
+                              "condition": {
+                                "type": "all",
+                                "conditions": [
+                                  {
+                                    "type": "switch",
+                                    "id": "c2_sheet",
+                                    "value": true
+                                  },
+                                  {
+                                    "type": "switch",
+                                    "id": "c2_used_sheet",
+                                    "value": false
+                                  }
+                                ]
+                              },
+                              "commands": [
+                                {
+                                  "code": "switch",
+                                  "ids": [
+                                    "c2_used_sheet"
+                                  ],
+                                  "value": true
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_told",
+                                  "op": "add",
+                                  "value": 1
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
+                                  "value": 3
                                 },
                                 {
                                   "code": "text",
@@ -6347,188 +6657,73 @@
                         },
                         {
                           "code": "text",
-                          "text": "故人的資料，我們這行不需要。哭就好。",
+                          "text": "……時間差不多了。",
                           "actorId": "fukuda"
                         },
                         {
-                          "code": "choices",
-                          "options": [
+                          "code": "if",
+                          "condition": {
+                            "type": "variable",
+                            "id": "c2_last",
+                            "op": "==",
+                            "value": 1
+                          },
+                          "then": [
                             {
-                              "text": "說她蓋印章、揮手的事",
-                              "condition": {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "switch",
-                                    "id": "c2_matsu",
-                                    "value": true
-                                  },
-                                  {
-                                    "type": "switch",
-                                    "id": "c2_used_matsu",
-                                    "value": false
-                                  }
-                                ]
-                              },
-                              "commands": [
-                                {
-                                  "code": "switch",
-                                  "ids": [
-                                    "c2_used_matsu"
-                                  ],
-                                  "value": true
-                                },
-                                {
-                                  "code": "variable",
-                                  "id": "c2_told",
-                                  "op": "add",
-                                  "value": 1
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "她會坐在接待桌上，在訪客簿蓋自己的印章，一個圓圓的「光」。",
-                                  "actorId": "player"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "靈車開走的時候，她會跑到門口揮手，說「路上小心」。",
-                                  "actorId": "player"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "……阿松這個大嘴巴。",
-                                  "actorId": "fukuda"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "（社長的聲音，在「嘴巴」那兩個字上破了。）"
-                                }
-                              ]
-                            },
+                              "code": "text",
+                              "text": "……印章是公司的財產。業務上的事，不用提。",
+                              "actorId": "fukuda"
+                            }
+                          ],
+                          "else": [
                             {
-                              "text": "拿出紙鶴",
+                              "code": "if",
                               "condition": {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "switch",
-                                    "id": "c2_crane",
-                                    "value": true
-                                  },
-                                  {
-                                    "type": "item",
-                                    "itemId": "crane"
-                                  },
-                                  {
-                                    "type": "switch",
-                                    "id": "c2_used_crane",
-                                    "value": false
-                                  }
-                                ]
+                                "type": "variable",
+                                "id": "c2_last",
+                                "op": "==",
+                                "value": 2
                               },
-                              "commands": [
-                                {
-                                  "code": "switch",
-                                  "ids": [
-                                    "c2_used_crane"
-                                  ],
-                                  "value": true
-                                },
-                                {
-                                  "code": "variable",
-                                  "id": "c2_told",
-                                  "op": "add",
-                                  "value": 1
-                                },
+                              "then": [
                                 {
                                   "code": "text",
-                                  "text": "（晴生從口袋拿出那隻褪色的紙鶴，放進福田社長的手心。）"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "美柑的媽媽離家那天，小光塞了這隻紙鶴給她。她說：「哭的時候，手上要有東西拿。」",
-                                  "actorId": "player"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "翅膀上的這個字，是她寫的。",
-                                  "actorId": "player"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "（福田社長的手指，停在那個歪歪的「光」上面。）"
-                                }
-                              ]
-                            },
-                            {
-                              "text": "說第 1 號業績表",
-                              "condition": {
-                                "type": "all",
-                                "conditions": [
-                                  {
-                                    "type": "switch",
-                                    "id": "c2_sheet",
-                                    "value": true
-                                  },
-                                  {
-                                    "type": "switch",
-                                    "id": "c2_used_sheet",
-                                    "value": false
-                                  }
-                                ]
-                              },
-                              "commands": [
-                                {
-                                  "code": "switch",
-                                  "ids": [
-                                    "c2_used_sheet"
-                                  ],
-                                  "value": true
-                                },
-                                {
-                                  "code": "variable",
-                                  "id": "c2_told",
-                                  "op": "add",
-                                  "value": 1
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "講台的抽屜裡，有第 1 號業績表。參加人數 31，哭泣人數 0。滿意度那一欄，是空白的。",
-                                  "actorId": "player"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "背面是一張蠟筆畫。一個光頭的大人，旁邊寫著「爸爸的工作　加油」。",
-                                  "actorId": "player"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "……那一張，我填不下去。",
-                                  "actorId": "fukuda"
-                                },
-                                {
-                                  "code": "text",
-                                  "text": "所以我做了一千兩百張別的。每一張都填得滿滿的。",
+                                  "text": "紙鶴……我們這行不收紙鶴。供品要先登記。",
                                   "actorId": "fukuda"
                                 }
-                              ]
-                            },
-                            {
-                              "text": "……",
-                              "commands": [
+                              ],
+                              "else": [
                                 {
-                                  "code": "text",
-                                  "text": "……",
-                                  "actorId": "player"
+                                  "code": "if",
+                                  "condition": {
+                                    "type": "variable",
+                                    "id": "c2_last",
+                                    "op": "==",
+                                    "value": 3
+                                  },
+                                  "then": [
+                                    {
+                                      "code": "text",
+                                      "text": "那一張是作廢的。作廢的業績表，不算數。",
+                                      "actorId": "fukuda"
+                                    }
+                                  ],
+                                  "else": [
+                                    {
+                                      "code": "text",
+                                      "text": "結束吧。",
+                                      "actorId": "fukuda"
+                                    }
+                                  ]
                                 }
                               ]
                             }
                           ]
                         },
                         {
-                          "code": "text",
-                          "text": "……時間差不多了。結束吧。",
-                          "actorId": "fukuda"
+                          "code": "variable",
+                          "id": "c2_last",
+                          "op": "set",
+                          "value": 0
                         },
                         {
                           "code": "choices",
@@ -6562,6 +6757,12 @@
                                   "code": "variable",
                                   "id": "c2_told",
                                   "op": "add",
+                                  "value": 1
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
                                   "value": 1
                                 },
                                 {
@@ -6621,6 +6822,12 @@
                                   "value": 1
                                 },
                                 {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
+                                  "value": 2
+                                },
+                                {
                                   "code": "text",
                                   "text": "（晴生從口袋拿出那隻褪色的紙鶴，放進福田社長的手心。）"
                                 },
@@ -6670,6 +6877,12 @@
                                   "id": "c2_told",
                                   "op": "add",
                                   "value": 1
+                                },
+                                {
+                                  "code": "variable",
+                                  "id": "c2_last",
+                                  "op": "set",
+                                  "value": 3
                                 },
                                 {
                                   "code": "text",
@@ -6739,7 +6952,7 @@
                             },
                             {
                               "code": "text",
-                              "text": "（社長站起來，打開角落那個小小的櫃子。裡面是一張照片：一個缺了門牙的女孩，舉著一個印章。）"
+                              "text": "（社長站起來，打開角落那個小小的櫃子。裡面是一張照片：綁著歪掉的雙馬尾的女孩，額頭上蓋了一個紅紅的「光」。）"
                             },
                             {
                               "code": "text",
@@ -6807,6 +7020,77 @@
                                   "code": "text",
                                   "text": "不，是我的錯。我連她的一件事都沒有告訴你。我自己，也快想不起來了。",
                                   "actorId": "fukuda"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "code": "if",
+                          "condition": {
+                            "type": "item",
+                            "itemId": "crane"
+                          },
+                          "then": [
+                            {
+                              "code": "text",
+                              "text": "（紙鶴還在社長的手心裡。美柑說過，要還的。）"
+                            },
+                            {
+                              "code": "choices",
+                              "options": [
+                                {
+                                  "text": "拿回來，還給美柑。",
+                                  "commands": [
+                                    {
+                                      "code": "text",
+                                      "text": "……這隻紙鶴，是美柑借我的。我得還給她。",
+                                      "actorId": "player"
+                                    },
+                                    {
+                                      "code": "text",
+                                      "text": "（社長把紙鶴放回晴生手上，動作很慢，像在交接一份很重要的文件。）"
+                                    },
+                                    {
+                                      "code": "text",
+                                      "text": "替我跟那孩子說聲謝謝。……十年了，原來還有人留著。",
+                                      "actorId": "fukuda"
+                                    },
+                                    {
+                                      "code": "switch",
+                                      "ids": [
+                                        "crane_return"
+                                      ],
+                                      "value": true
+                                    }
+                                  ]
+                                },
+                                {
+                                  "text": "留給社長。",
+                                  "commands": [
+                                    {
+                                      "code": "text",
+                                      "text": "留著吧。美柑那邊，我去跟她說。",
+                                      "actorId": "player"
+                                    },
+                                    {
+                                      "code": "text",
+                                      "text": "（社長把紙鶴放在小光的照片前面。）……哭的時候，手上要有東西拿，是吧。",
+                                      "actorId": "fukuda"
+                                    },
+                                    {
+                                      "code": "item",
+                                      "itemId": "crane",
+                                      "delta": -1
+                                    },
+                                    {
+                                      "code": "switch",
+                                      "ids": [
+                                        "crane_fukuda"
+                                      ],
+                                      "value": true
+                                    }
+                                  ]
                                 }
                               ]
                             }
@@ -7114,7 +7398,7 @@
                 },
                 {
                   "code": "text",
-                  "text": "好！那來談正事！（她把筆電轉過來。）這是本店的客人評價，五顆星喔！",
+                  "text": "對了對了，給您看本店的客人評價，五顆星喔！（她把筆電轉過來。）",
                   "actorId": "mikan"
                 },
                 {
@@ -7145,6 +7429,33 @@
                     "c2_reviews"
                   ],
                   "value": true
+                },
+                {
+                  "code": "text",
+                  "text": "合夥的事，下次再談！本店先去進貨！……進面紙。",
+                  "actorId": "mikan"
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "graphic": {
+                "assetId": "char_modern_girl"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "您來了！那來談正事！",
+                  "actorId": "mikan"
                 },
                 {
                   "code": "text",
