@@ -53,6 +53,9 @@ export type PlayAnalytics = {
   visitors: number;
   sessions: number;
   minutes: number | null;
+  loads: number;
+  starters: number;
+  finishers: number;
   chapters: Array<{ chapter_id: string; entered: number; done: number; minutes: number | null }>;
   endings: Array<{ ref: string; players: number }>;
   quits: Array<{ chapter_id: string | null; ref: string | null; players: number }>;
@@ -76,7 +79,7 @@ export type AdminOverview = {
   sessions: number;
   avgMinutes: number | null;
   groups: Array<{ k: "device" | "os" | "browser" | "country"; v: string | null; n: number }>;
-  games: Array<{ game_id: string; visitors: number; sessions: number }>;
+  games: Array<{ game_id: string; visitors: number; sessions: number; avgMinutes: number | null; starters: number; finishers: number }>;
   daily: Array<{ day: string; visitors: number }>;
   recentErrors: Array<{ detail: string; game_id: string; n: number }>;
 };
@@ -170,6 +173,7 @@ export const studioApi = {
   insights: (id: string) => call<{ insights: GameInsights }>("GET", `/api/projects/${id}/insights`),
   adminOverview: () => call<{ overview: AdminOverview }>("GET", "/api/admin/overview"),
   adminPlayers: (limit = 50, offset = 0) => call<{ total: number; players: AdminPlayerRow[] }>("GET", `/api/admin/players?limit=${limit}&offset=${offset}`),
+  adminFeedback: () => call<{ feedback: Array<FeedbackEntry & { game_id: string }> }>("GET", "/api/admin/feedback"),
   adminPlayer: (visitor: string) => call<AdminPlayerDetail>("GET", `/api/admin/players/${visitor}`),
   notes: (id: string) => call<{ notes: NoteEntry[] }>("GET", `/api/projects/${id}/notes`),
   addNote: (id: string, note: { body: string; locator: string | null; mapId: string; x: number; y: number; chapterId: string | null; excerpt: string; state: unknown }) =>

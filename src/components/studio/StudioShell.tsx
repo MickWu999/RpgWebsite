@@ -38,11 +38,19 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
         { href: `/studio/edit/?id=${projectId}`, icon: "🗺", label: "地圖與事件", hint: "繪製地圖、放置 NPC 與調查點" },
         { href: `/studio/edit/?id=${projectId}&db=actors`, icon: "📚", label: "資料庫", hint: "角色、物品、任務、結局、章節、開關、系統" },
         { href: `/studio/play/?id=${projectId}`, icon: "▶", label: "測試遊玩", hint: "在新分頁從頭玩一次", external: true },
+        { href: `/studio/stats/?id=${projectId}`, icon: "📈", label: "遊戲數據", hint: "玩家實際怎麼玩：漏斗、每章時間、選擇比例、卡關、沒人發現的事件" },
         { href: `/studio/versions/?id=${projectId}`, icon: "🕘", label: "版本紀錄", hint: "每次儲存與 AI 操作的紀錄，可還原" },
         { href: `/studio/publish/?id=${projectId}`, icon: "🚀", label: "發布", hint: "檢查通過後發布到玩家網站" },
       ]
     : [];
-  const bottomNav: NavItem[] = [{ href: "/studio/ai/", icon: "🤖", label: "AI 協作", hint: "讓 VS Code 的 Claude Code 製作遊戲；使用說明" }];
+  // 一般後台的分區：製作、營運、系統管理（個人的密碼、操作者、登出放在左下角的帳號選單）
+  const makeNav: NavItem[] = [{ href: "/studio/ai/", icon: "🤖", label: "AI 協作", hint: "讓 VS Code 的 Claude Code 製作遊戲；API Token、使用說明、審查規則" }];
+  const opsNav: NavItem[] = [
+    { href: "/studio/dashboard/", icon: "📊", label: "儀表板", hint: "全站的玩家與遊玩情況、每款遊戲的通關率" },
+    { href: "/studio/players/", icon: "👥", label: "玩家", hint: "誰在玩、玩到哪裡；邀請連結" },
+    { href: "/studio/feedback/", icon: "💬", label: "玩家回饋", hint: "所有遊戲的星等、標籤與留言" },
+  ];
+  const systemNav: NavItem[] = [{ href: "/studio/logins/", icon: "🔐", label: "登入紀錄", hint: "Studio 的登入紀錄（含 IP），發現陌生人登入" }];
   const [menu, setMenu] = useState(false);
   const isActive = (href: string) => {
     const [p, q] = href.split("?");
@@ -76,23 +84,24 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
           </span>
         </Link>
         <nav className="shell-nav">
+          <div className="shell-section shell-label">製作</div>
           <Link href="/studio/" className={`shell-nav-item${pathname.replace(/\/$/, "") === "/studio" ? " active" : ""}`} title="所有專案" data-testid="nav-專案">
             <span className="shell-icon">📁</span>
             <span className="shell-label">專案</span>
           </Link>
-          <Link href="/studio/players/" className={`shell-nav-item${pathname.startsWith("/studio/players") ? " active" : ""}`} title="玩家與營運數據" data-testid="nav-營運">
-            <span className="shell-icon">📊</span>
-            <span className="shell-label">營運</span>
-          </Link>
           {projectNav.length > 0 && (
-            <>
+            <div className="shell-subnav">
               <div className="shell-section shell-label">{title ?? "目前專案"}</div>
               {projectNav.map(link)}
-            </>
+            </div>
           )}
+          {makeNav.map(link)}
+          <div className="shell-section shell-label">營運</div>
+          {opsNav.map(link)}
+          <div className="shell-section shell-label">系統管理</div>
+          {systemNav.map(link)}
         </nav>
         <nav className="shell-nav shell-bottom">
-          {bottomNav.map(link)}
           <div className="shell-user-wrap">
             <button className={`shell-user${menu ? " open" : ""}`} onClick={() => setMenu((v) => !v)} data-testid="user-menu">
               <span className="shell-icon">👤</span>

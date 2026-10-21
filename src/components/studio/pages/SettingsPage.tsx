@@ -1,20 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useState } from "react";
 import { studioApi } from "@/lib/studioApi";
 import StudioShell, { PageHeader } from "../StudioShell";
 
-type LoginRow = Awaited<ReturnType<typeof studioApi.logins>>["logins"][number];
-
-/** 設定：修改密碼、後台登入紀錄 */
+/** 設定：修改密碼（登入紀錄在「系統管理 → 登入紀錄」） */
 export default function SettingsPage() {
-  const [logins, setLogins] = useState<LoginRow[] | null>(null);
-  useEffect(() => {
-    studioApi
-      .logins()
-      .then((r) => setLogins(r.logins))
-      .catch(() => setLogins([]));
-  }, []);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -57,44 +49,12 @@ export default function SettingsPage() {
           </button>
           <p className="small muted">更新後，所有裝置都需要重新登入。API Token 不受影響（如有疑慮請到「AI 協作」撤銷）。</p>
         </form>
-        <section className="card stack" data-testid="login-log">
+        <section className="card stack" style={{ maxWidth: 480 }}>
           <h2>登入紀錄</h2>
-          <div className="small muted">最近 100 次登入 Studio 的紀錄（保留 90 天）。看到不認識的 IP、地區，或失敗次數異常，請立刻修改密碼。</div>
-          {!logins ? (
-            <div className="small muted">載入中…</div>
-          ) : logins.length === 0 ? (
-            <div className="small muted">還沒有紀錄。</div>
-          ) : (
-            <table className="version-table">
-              <thead>
-                <tr>
-                  <th>時間</th>
-                  <th>帳號（操作者）</th>
-                  <th>IP</th>
-                  <th>地區</th>
-                  <th>裝置</th>
-                  <th>結果</th>
-                </tr>
-              </thead>
-              <tbody>
-                {logins.map((l, i) => (
-                  <tr key={i}>
-                    <td className="small">{new Date(l.created_at).toLocaleString("zh-TW", { hour12: false })}</td>
-                    <td className="small">
-                      {l.username}
-                      {l.operator ? `（${l.operator}）` : ""}
-                    </td>
-                    <td className="small">
-                      <code>{l.ip}</code>
-                    </td>
-                    <td className="small">{l.country ?? "-"}</td>
-                    <td className="small">{l.device}</td>
-                    <td className="small">{l.success ? <span className="badge ok">成功</span> : <span className="badge err">失敗</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <div className="small muted">每次登入 Studio 的時間、IP、地區與裝置，在「系統管理 → 登入紀錄」。</div>
+          <Link className="btn small" href="/studio/logins/">
+            查看登入紀錄
+          </Link>
         </section>
       </div>
     </StudioShell>

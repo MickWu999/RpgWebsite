@@ -368,65 +368,38 @@ export default function ProjectOverview() {
             </section>
 
             <section className="card" data-testid="analytics-board">
-              <h2>遊玩數據</h2>
+              <h2>
+                遊玩數據{" "}
+                <Link className="btn small" href={`/studio/stats/?id=${id}`}>
+                  查看完整遊戲數據 →
+                </Link>
+              </h2>
               {!loaded.analytics ? (
                 <div className="small muted">載入中…</div>
               ) : !analytics?.visitors ? (
-                <div className="small muted">還沒有遊玩數據。玩家在玩家網站遊玩時，會匿名記錄開始、章節進度、結局與離開的位置（不保存 IP；沒有網路時不記錄，也不影響遊玩）。</div>
+                <div className="small muted">還沒有人玩過。發布後，玩家在玩家網站的每個操作都會匿名記錄（不保存 IP，玩家可以關閉），整理成漏斗、選擇比例、卡關的地方，也會放進 AI 案例庫。</div>
               ) : (
                 <>
-                  <div className="small">
-                    👤 {analytics.visitors} 位玩家・{analytics.sessions} 次遊玩
-                    {analytics.minutes ? `・累計約 ${Math.round(analytics.minutes)} 分鐘` : ""}
-                    {analytics.daily.length > 0 && <span className="muted">・近 14 天：{analytics.daily.map((d) => `${d.day.slice(5)} ${d.visitors}人`).join("、")}</span>}
-                  </div>
-                  <table className="version-table">
-                    <tbody>
-                      {p.chapters.map((c, i) => {
-                        const row = analytics.chapters.find((x) => x.chapter_id === c.id);
-                        return (
-                          <tr key={c.id}>
-                            <td className="small">
-                              第 {i + 1} 章 {c.title}
-                            </td>
-                            <td className="small">{row ? `完成 ${row.done} / 進入 ${row.entered}（${row.entered ? Math.round((row.done / row.entered) * 100) : 0}%）` : "—"}</td>
-                            <td className="small muted">{row?.minutes ? `平均 ${row.minutes.toFixed(0)} 分鐘` : ""}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {analytics.endings.length > 0 && (
-                    <div className="small" style={{ marginTop: 8 }}>
-                      🏁 結局：{analytics.endings.map((e) => `${p.endings.find((x) => x.id === e.ref)?.title ?? e.ref} ${e.players} 人`).join("、")}
+                  <div className="metrics">
+                    <div className="metric">
+                      <div className="metric-label">玩家</div>
+                      <div className="metric-value">{analytics.visitors}</div>
+                      <div className="metric-hint">玩過這款遊戲的不同裝置</div>
                     </div>
-                  )}
+                    <div className="metric">
+                      <div className="metric-label">通關率</div>
+                      <div className="metric-value">{analytics.starters ? `${Math.round((analytics.finishers / analytics.starters) * 100)}%` : "-"}</div>
+                      <div className="metric-hint">開始的玩家裡，抵達任何結局（含章末）的比例</div>
+                    </div>
+                    <div className="metric">
+                      <div className="metric-label">平均每位玩家</div>
+                      <div className="metric-value">{analytics.minutes ? `${(analytics.minutes / analytics.visitors).toFixed(1)} 分` : "-"}</div>
+                      <div className="metric-hint">遊玩時間加總除以玩家數</div>
+                    </div>
+                  </div>
                   {insights && (insights.choices.some((c) => c.lopsided) || insights.unseen.length > 0 || insights.stuck.length > 0) && (
                     <div className="small" style={{ marginTop: 8 }} data-testid="insights">
-                      <b>給 AI 的線索</b>（也會放進案例庫）
-                      {insights.choices
-                        .filter((c) => c.lopsided)
-                        .slice(0, 4)
-                        .map((c) => (
-                          <div key={c.locator}>
-                            ⚖ 選項幾乎一面倒（{c.locator}）：{c.options.map((o) => `「${o.text ?? o.value}」${o.pct}%`).join("、")}
-                          </div>
-                        ))}
-                      {insights.unseen.length > 0 && <div>👀 從來沒人觸發：{insights.unseen.slice(0, 6).map((u) => `${u.map}／${u.name}`).join("、")}</div>}
-                      {insights.stuck.slice(0, 3).map((x) => (
-                        <div key={x.place}>
-                          ⏳ 卡關：{x.place}，{x.sessions} 次遊玩停了超過 2 分鐘（平均 {x.avgMinutes} 分鐘）
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {analytics.quits.length > 0 && (
-                    <div className="small muted" style={{ marginTop: 4 }}>
-                      🚪 最常離開的地方（還沒破關）：
-                      {analytics.quits
-                        .slice(0, 5)
-                        .map((q) => `${p.chapters.find((c) => c.id === q.chapter_id)?.title ?? q.chapter_id ?? "?"}・${p.maps.find((m) => m.id === q.ref)?.name ?? q.ref ?? "?"} ${q.players} 人`)
-                        .join("、")}
+                      ⚠ 有 {insights.choices.filter((c) => c.lopsided).length} 個一面倒的選擇、{insights.unseen.length} 個沒人觸發的事件、{insights.stuck.length} 個卡關的地方，詳見遊戲數據。
                     </div>
                   )}
                 </>

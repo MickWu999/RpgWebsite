@@ -638,7 +638,28 @@ details.card > summary { cursor: pointer; }
 .stats-row { display: flex; flex-wrap: wrap; gap: 18px; }
 .stat-value { font-size: 22px; font-weight: 600; }
 .bars { display: flex; align-items: flex-end; gap: 3px; height: 120px; overflow-x: auto; }
-.bar { flex: 1 0 18px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.bar { flex: 1 1 0; max-width: 40px; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
 .bar-fill { width: 100%; min-height: 2px; background: #6c8cff; border-radius: 3px 3px 0 0; }
 .bar-label { font-size: 10px; opacity: 0.6; margin-top: 2px; }
 .timeline { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; max-height: 420px; overflow-y: auto; }
+
+/* 一般後台：指標卡、橫向長條、表格 */
+.shell-subnav { margin: 2px 0 4px 8px; padding-left: 4px; border-left: 1px solid var(--border); }
+.metrics { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.metric { background: var(--panel, #1a1e2e); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.metric-label { font-size: 12px; color: var(--muted); }
+.metric-value { font-size: 26px; font-weight: 600; margin: 2px 0; }
+.metric-hint { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.hbar { display: grid; grid-template-columns: minmax(120px, 220px) 1fr minmax(60px, auto); align-items: center; gap: 10px; font-size: 13px; margin: 3px 0; }
+.hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar-track { height: 12px; background: #23283c; border-radius: 6px; overflow: hidden; }
+.hbar-fill { height: 100%; background: linear-gradient(90deg, #6c8cff, #9a7bff); border-radius: 6px; }
+.hbar-value { white-space: nowrap; }
+.bar-value { font-size: 10px; opacity: 0.8; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.choice-block { padding: 8px 0; border-top: 1px solid var(--border); }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; padding: 8px 10px; border-bottom: 1px solid var(--border); background: #191d2c; position: sticky; top: 0; }
+.admin-table td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.admin-table tbody tr:hover { background: #1c2133; }
+@media (max-width: 640px) { .hbar { grid-template-columns: 90px 1fr auto; } }

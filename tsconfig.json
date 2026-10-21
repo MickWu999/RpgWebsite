@@ -40,6 +40,5 @@
     ".next",
     "test-results",
     "playwright-report",
-    "worker"
-  ]
+    "worker", "out"]
 }

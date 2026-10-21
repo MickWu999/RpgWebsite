@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
-import PlayersPage from "@/components/studio/pages/PlayersPage";
+import { PlayersPage } from "@/components/studio/pages/OpsPages";
 
 export default function Page() {
   return (

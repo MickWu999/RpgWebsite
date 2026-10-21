@@ -128,6 +128,10 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
     if (path === "/api/admin/overview" && method === "GET") return json({ ok: true, overview: await adminOverview(env) });
     const u = new URL(req.url);
     if (path === "/api/admin/players" && method === "GET") return json({ ok: true, ...(await adminPlayers(env, Math.min(Number(u.searchParams.get("limit")) || 50, 200), Number(u.searchParams.get("offset")) || 0)) });
+    if (path === "/api/admin/feedback" && method === "GET") {
+      const { results } = await env.DB.prepare("SELECT game_id, chapter_id, rating, tags, comment, created_at FROM player_feedback ORDER BY created_at DESC LIMIT 300").all<{ game_id: string; chapter_id: string; rating: number; tags: string; comment: string; created_at: string }>();
+      return json({ ok: true, feedback: results.map((r) => ({ ...r, tags: JSON.parse(r.tags) as string[] })) });
+    }
     const pm = path.match(/^\/api\/admin\/players\/([\w-]{1,64})$/);
     if (pm && method === "GET") return json({ ok: true, ...(await adminPlayer(env, pm[1])) });
     return error(404, "找不到這個營運 API");
@@ -572,8 +576,8 @@ async function lessons(env: Env, actor: Actor, gameId: string | null) {
 async function playAnalytics(env: Env, gameId: string) {
   const all = async <T>(sql: string) => (await env.DB.prepare(sql).bind(gameId).all<T>()).results;
   const [totals, chapters, endings, quits, daily] = await Promise.all([
-    all<{ visitors: number; sessions: number; minutes: number | null }>(
-      "SELECT COUNT(DISTINCT visitor) AS visitors, COUNT(DISTINCT session) AS sessions, (SELECT SUM(m) FROM (SELECT MAX(value) AS m FROM play_events WHERE game_id = ?1 AND type = 'leave' GROUP BY session)) AS minutes FROM play_events WHERE game_id = ?1",
+    all<{ visitors: number; sessions: number; minutes: number | null; loads: number; starters: number; finishers: number }>(
+      "SELECT COUNT(DISTINCT visitor) AS visitors, COUNT(DISTINCT session) AS sessions, (SELECT SUM(m) FROM (SELECT MAX(value) AS m FROM play_events WHERE game_id = ?1 AND type = 'leave' GROUP BY session)) AS minutes, COUNT(DISTINCT CASE WHEN type = 'load' THEN visitor END) AS loads, COUNT(DISTINCT CASE WHEN type = 'start' THEN visitor END) AS starters, COUNT(DISTINCT CASE WHEN type = 'ending' THEN visitor END) AS finishers FROM play_events WHERE game_id = ?1",
     ),
     all<{ chapter_id: string; entered: number; done: number; minutes: number | null }>(
       "SELECT chapter_id, COUNT(DISTINCT CASE WHEN type = 'chapter' THEN visitor END) AS entered, COUNT(DISTINCT CASE WHEN type = 'chapter_done' THEN visitor END) AS done, AVG(CASE WHEN type = 'chapter_done' THEN value END) AS minutes FROM play_events WHERE game_id = ?1 AND chapter_id IS NOT NULL AND type IN ('chapter', 'chapter_done') GROUP BY chapter_id",
@@ -696,7 +700,9 @@ async function adminOverview(env: Env) {
     all<{ k: string; v: string | null; n: number }>(
       "SELECT 'device' AS k, device AS v, COUNT(*) AS n FROM play_visitors GROUP BY device UNION ALL SELECT 'os', os, COUNT(*) FROM play_visitors GROUP BY os UNION ALL SELECT 'browser', browser, COUNT(*) FROM play_visitors GROUP BY browser UNION ALL SELECT 'country', country, COUNT(*) FROM play_visitors GROUP BY country",
     ),
-    all<{ game_id: string; visitors: number; sessions: number }>("SELECT game_id, COUNT(DISTINCT visitor) AS visitors, COUNT(*) AS sessions FROM play_sessions GROUP BY game_id ORDER BY visitors DESC"),
+    all<{ game_id: string; visitors: number; sessions: number; avgMinutes: number | null; starters: number; finishers: number }>(
+      "SELECT s.game_id, COUNT(DISTINCT s.visitor) AS visitors, COUNT(*) AS sessions, AVG((julianday(s.last_at) - julianday(s.started_at)) * 1440) AS avgMinutes, (SELECT COUNT(DISTINCT visitor) FROM play_events e WHERE e.game_id = s.game_id AND e.type = 'start') AS starters, (SELECT COUNT(DISTINCT visitor) FROM play_events e WHERE e.game_id = s.game_id AND e.type = 'ending') AS finishers FROM play_sessions s GROUP BY s.game_id ORDER BY visitors DESC",
+    ),
     all<{ day: string; visitors: number }>("SELECT substr(started_at, 1, 10) AS day, COUNT(DISTINCT visitor) AS visitors FROM play_sessions WHERE started_at >= date('now', '-29 days') GROUP BY day ORDER BY day"),
     all<{ detail: string; game_id: string; n: number }>("SELECT detail, game_id, COUNT(*) AS n FROM play_events WHERE type = 'error' AND created_at >= date('now', '-6 days') GROUP BY detail, game_id ORDER BY n DESC LIMIT 10"),
   ]);

@@ -63,13 +63,17 @@ export default {
         const d = body.device ?? {};
         const country = text((req as Request & { cf?: { country?: string } }).cf?.country ?? req.headers.get("CF-IPCountry"), 8);
         const gameId = events[0].gameId as string;
+        // 遊玩階段的開始與最後時間用事件本身的時間（同一批送出的事件也能算出正確的遊玩時間）
+        const times = events.map(at).sort();
+        const first = times[0];
+        const last = times[times.length - 1];
         stmts.push(
           env.DB.prepare(
             "INSERT INTO play_visitors (visitor, first_seen, last_seen, device, os, browser, lang, country, sessions, invite, nickname) VALUES (?1, ?2, ?2, ?3, ?4, ?5, ?6, ?7, 0, ?8, ?9) ON CONFLICT(visitor) DO UPDATE SET last_seen = ?2, device = COALESCE(?3, device), os = COALESCE(?4, os), browser = COALESCE(?5, browser), lang = COALESCE(?6, lang), country = COALESCE(?7, country), invite = COALESCE(invite, ?8), nickname = ?9",
           ).bind(body.visitor, now, text(d.device, 16), text(d.os, 16), text(d.browser, 16), text(d.lang, 10), country, text(body.invite, 20), text(body.nickname, 20)),
           env.DB.prepare(
-            "INSERT INTO play_sessions (session, visitor, game_id, started_at, last_at, events, screen, touch_mode) VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, ?7) ON CONFLICT(session) DO UPDATE SET last_at = ?4, events = events + ?5, screen = COALESCE(?6, screen), touch_mode = COALESCE(?7, touch_mode)",
-          ).bind(body.session, body.visitor, gameId, now, events.length, text(d.screen, 16), text(d.touchMode, 8)),
+            "INSERT INTO play_sessions (session, visitor, game_id, started_at, last_at, events, screen, touch_mode) VALUES (?1, ?2, ?3, ?4, ?8, ?5, ?6, ?7) ON CONFLICT(session) DO UPDATE SET started_at = MIN(started_at, ?4), last_at = MAX(last_at, ?8), events = events + ?5, screen = COALESCE(?6, screen), touch_mode = COALESCE(?7, touch_mode)",
+          ).bind(body.session, body.visitor, gameId, first, events.length, text(d.screen, 16), text(d.touchMode, 8), last),
           env.DB.prepare("UPDATE play_visitors SET sessions = (SELECT COUNT(*) FROM play_sessions WHERE visitor = ?1) WHERE visitor = ?1").bind(body.visitor),
         );
         await env.DB.batch(stmts);
