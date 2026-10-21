@@ -824,7 +824,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
       document.body.classList.remove("rm-hide-cursor");
       window.clearInterval(timer);
     };
-  }, [act, update, flash, newGame, enterMap, loadSlot, saveToSlot, router, isStudio, source.id]);
+  }, [act, update, flash, newGame, enterMap, loadSlot, saveToSlot, router, isStudio, source.id, source.kind]);
 
   /** Android 等支援的瀏覽器：切換全螢幕（進入時鎖定橫向，再按一次離開）；iPhone Safari 不支援，按鈕不顯示 */
   const [isFullscreen, setIsFullscreen] = useState(false);
