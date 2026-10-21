@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isAutomated } from "@/lib/analytics";
 
 /**
  * 玩完一章時的玩家回饋（星等＋快速標籤＋一句話）。
@@ -73,11 +74,13 @@ export default function FeedbackDialog({ gameId, chapterId, title, onDone }: { g
                 disabled={rating === 0}
                 data-testid="feedback-send"
                 onClick={async () => {
-                  await fetch("/api/feedback", {
+                  // 自動化測試不送出，避免假回饋進入 AI 案例庫
+                  if (!isAutomated())
+                    await fetch("/api/feedback", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ gameId, chapterId, rating, tags, comment }),
-                  }).catch(() => null);
+                      body: JSON.stringify({ gameId, chapterId, rating, tags, comment }),
+                    }).catch(() => null);
                   setSent(true);
                 }}
               >

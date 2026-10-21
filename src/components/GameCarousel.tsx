@@ -127,7 +127,7 @@ export default function GameLibrary({ games }: { games: CatalogEntry[] }) {
           ) : game.chapters ? (
             <span>📖 {game.chapters} 章</span>
           ) : null}
-          <span>🏁 {game.endings} 種結局</span>
+          {game.release !== "ongoing" && <span>🏁 {game.endings} 種結局</span>}
           <span>🎭 {GENRE_LABELS[game.genre]}</span>
           {game.status === "demo" && <span>教學短篇</span>}
         </div>

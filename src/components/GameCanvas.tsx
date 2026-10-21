@@ -30,6 +30,8 @@ function createWorldScene(
     private layer!: PhaserNS.GameObjects.Container;
     private player!: PhaserNS.GameObjects.Image | PhaserNS.GameObjects.Arc;
     private marker: PhaserNS.GameObjects.Text | null = null;
+    /** 人物名牌：玩家走近（2 格內）才顯示，避免滿地名字像 MMO */
+    private nameLabels: Array<{ label: PhaserNS.GameObjects.Text; x: number; y: number }> = [];
     /** 目前畫面上的地圖與事件外觀；改變時重畫 */
     private signature: string | null = null;
     private currentSceneId: string | null = null;
@@ -107,6 +109,7 @@ function createWorldScene(
       const scene = getMap(project, state.mapId);
       const ts = scene.tileSize;
       this.layer.removeAll(true);
+      this.nameLabels = [];
 
       for (let y = 0; y < scene.height; y++) {
         for (let x = 0; x < scene.width; x++) {
@@ -145,7 +148,11 @@ function createWorldScene(
         if (page.priority === "below" && !isCharacter) this.tweens.add({ targets: obj, y: cy - 4, yoyo: true, repeat: -1, duration: 600, ease: "Sine.easeInOut" });
         if (page.graphic.direction === "left" && "setFlipX" in obj) obj.setFlipX(true);
         this.layer.add(obj);
-        if (isCharacter) this.layer.add(this.label(cx, cy - ts * 0.72, event.name, "#ffffff"));
+        if (isCharacter) {
+          const label = this.label(cx, cy - ts * 0.72, event.name, "#ffffff");
+          this.nameLabels.push({ label, x: event.x, y: event.y });
+          this.layer.add(label);
+        }
       }
 
       const px = state.x * ts + ts / 2;
@@ -163,6 +170,7 @@ function createWorldScene(
       cam.setBounds(0, 0, Math.max(scene.width * ts, this.scale.width), Math.max(scene.height * ts, this.scale.height));
       cam.startFollow(this.player, true, 0.2, 0.2);
       cam.centerOn(px, py);
+      for (const n of this.nameLabels) n.label.setVisible(Math.abs(n.x - state.x) + Math.abs(n.y - state.y) <= 2);
       this.currentSceneId = scene.id;
       this.signature = this.signatureOf(state);
       this.last = { x: state.x, y: state.y };
@@ -199,6 +207,7 @@ function createWorldScene(
         else this.player.setPosition(tx, ty);
       }
       this.last = { x: state.x, y: state.y };
+      for (const n of this.nameLabels) n.label.setVisible(Math.abs(n.x - state.x) + Math.abs(n.y - state.y) <= 2);
       if ("setFlipX" in this.player) {
         if (state.facing === "left") this.player.setFlipX(true);
         if (state.facing === "right") this.player.setFlipX(false);

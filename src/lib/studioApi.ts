@@ -96,8 +96,13 @@ export type ReviewEntry = {
       issues: Array<{ severity: string; area: string; problem: string; suggestion: string }>;
       followUp?: Array<{ problem: string; resolved: boolean; note: string }>;
       players?: Array<{ persona: "veteran" | "casual" | "story"; wouldContinue: boolean; reason: string }>;
+      keep?: string[];
+      topFixes?: string[];
     };
     prediction?: { guesses: Array<{ about: string; guess: string }>; feelsLike: string[] } | null;
+    players?: Array<{ persona: "veteran" | "casual" | "story"; wouldContinue: boolean; reason: string }>;
+    humanAccepted?: { by: string; note: string; at: string };
+    round?: number;
   };
 };
 export type VersionEntry = { version: number; label: string; actor: string; created_at: string };
@@ -116,6 +121,7 @@ export const studioApi = {
   saveDoc: (id: string, kind: "story" | "treatment", content: string) => call("PUT", `/api/projects/${id}/docs/${kind}`, { content }),
   reviews: (id: string) => call<{ reviews: ReviewEntry[] }>("GET", `/api/projects/${id}/reviews`),
   feedback: (id: string) => call<{ feedback: FeedbackEntry[] }>("GET", `/api/projects/${id}/feedback`),
+  acceptReview: (id: string, target: string, note: string) => call<{ ok: true }>("POST", `/api/projects/${id}/reviews/accept`, { target, note }),
   notes: (id: string) => call<{ notes: NoteEntry[] }>("GET", `/api/projects/${id}/notes`),
   addNote: (id: string, note: { body: string; locator: string | null; mapId: string; x: number; y: number; chapterId: string | null; excerpt: string; state: unknown }) =>
     call<{ id: string }>("POST", `/api/projects/${id}/notes`, note),

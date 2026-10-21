@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -7,7 +8,7 @@ import { providerFromEnv } from "@/ai/claudeCodeProvider";
 import { CLICHES } from "@/ai/designGuide";
 import { drawSeeds } from "@/ai/seeds";
 import { ASSET_CATALOG, MUSIC, TERRAIN } from "@/game/assets";
-import { projectDigest, reviewProject, reviewTreatment, type ReviewResult } from "@/ai/review";
+import { MAX_REVIEW_ROUNDS, projectDigest, reviewProject, reviewTreatment, SPOILER_LINE, type ReviewResult } from "@/ai/review";
 import { chapterPlaytest, checkChapters } from "@/game/chapters";
 import { projectRevision } from "@/game/engine";
 import { applyAction, settle } from "@/game/playtest";
@@ -47,7 +48,7 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- remote inspect <id>            下載並以事件清單形式輸出
  *   npm run game -- remote apply <id> <ops.json>   送出操作（自動帶目前版本號，避免覆蓋人的修改）
  *   npm run game -- remote check <id>
- *   npm run game -- remote lessons                 AI 案例庫（玩家回饋＋審查常見問題）→ content/lessons.md，製作前必讀
+ *   npm run game -- remote lessons [id]            AI 案例庫（通用的規則統計＋這款遊戲的紀錄）→ content/lessons.md，製作前必讀；審查前會自動更新
  *   npm run game -- remote story <id>              讀取人在 Studio 寫的故事 → content/<id>/story.md
  *   npm run game -- remote push-docs <id>          上傳 story.md、treatment.md 到 Studio（給人看）
  *   npm run game -- remote review-treatment <id>   （審查結果自動上傳到 Studio）
@@ -130,13 +131,44 @@ const readLessons = () => (existsSync(LESSONS_FILE) ? readFileSync(LESSONS_FILE,
 
 const readText = (gameId: string, file: string) => (existsSync(path.join(dir(gameId), file)) ? readFileSync(path.join(dir(gameId), file), "utf8") : null);
 
+/** 改編合約（scope.md）：使用者確認過的範圍與取捨，審查不能拿合約寫明的事扣分 */
+function readScope(gameId: string) {
+  const scope = readText(gameId, "scope.md");
+  return { scope, userStory: Boolean(scope && /來源[：:][^\n]*使用者/.test(scope)) };
+}
+
+/**
+ * 送審前的關卡（不花審查費用）：內容沒改不能重送；同一關最多 MAX_REVIEW_ROUNDS 輪，超過就交給使用者。
+ * 回傳這一輪的輪數。
+ */
+function roundGate(gameId: string, target: string, revision: string): number {
+  const prev = readReview(gameId, target);
+  if (prev && !prev.passed && prev.revision === revision) fail(`內容和上一輪審查完全一樣，不能重送。請依上一輪的 topFixes 修改後再審（content/${gameId}/reviews/${target}.json）`);
+  const round = prev && !prev.passed ? (prev.round ?? 1) + 1 : 1;
+  if (round > MAX_REVIEW_ROUNDS)
+    fail(`「${target}」已經審查 ${MAX_REVIEW_ROUNDS} 輪沒通過。請停下來回報使用者，附上最後一輪的意見；使用者可以在 Studio 的審查紀錄按「👤 人工接受」，或和你一起調整改編合約（scope.md）後重來`);
+  return round;
+}
+
 async function doReviewTreatment(gameId: string): Promise<ReviewResult> {
   const treatment = readText(gameId, "treatment.md");
   if (!treatment || treatment.length < 400) fail(`找不到 ${path.join(dir(gameId), "treatment.md")}，或內容太短；請依規範第 5 節的格式撰寫劇本大綱`);
+  const { scope, userStory } = readScope(gameId);
+  // 規範要求的東西由程式檢查，缺了就不送審（不花審查費用）
+  const missing = [
+    ...(scope ? [] : [`改編合約 content/${gameId}/scope.md（先和使用者確認範圍，格式見規範第 5 節）`]),
+    ...(treatment!.includes(SPOILER_LINE) ? [] : [`劇透線 ${SPOILER_LINE}`]),
+    ...(/^#+\s*招牌場景/m.test(treatment!) ? [] : ["「## 招牌場景」段落"]),
+    ...(/自我檢查表/.test(treatment!) ? [] : ["最後的「自我檢查表」"]),
+  ];
+  if (missing.length) fail(`送審前還缺：${missing.join("、")}`);
+  const revision = createHash("sha256").update(`${scope}\n${treatment}`).digest("hex").slice(0, 16);
+  const round = roundGate(gameId, "treatment", revision);
   const story = readText(gameId, "story.md") ?? "";
-  const r = await reviewTreatment(await provider(), story, treatment!, { previous: readReview(gameId, "treatment"), lessons: readLessons() });
-  writeReview(gameId, r);
-  return r;
+  const r = await reviewTreatment(await provider(), story, treatment!, { previous: readReview(gameId, "treatment"), lessons: readLessons(), scope, userStory });
+  const result = { ...r, revision, round };
+  writeReview(gameId, result);
+  return result;
 }
 
 async function doReview(gameId: string, project: GameProject): Promise<ReviewResult> {
@@ -166,19 +198,24 @@ async function doReview(gameId: string, project: GameProject): Promise<ReviewRes
     const blocking = quality.blocking.length + (playtest.ok ? 0 : 1);
     if (blocking > 0) return out({ ok: false, stage: "check", message: "整體審查前，check 必須全部通過", blocking: quality.blocking, playtest: playtest.issues }, 2) as never;
   }
+  const target = values.chapter ?? "full";
+  const revision = projectRevision(project);
+  const round = roundGate(gameId, target, revision);
   const r = await reviewProject(await provider(), {
     story,
     treatment,
     project,
     playtest,
     quality,
-    revision: projectRevision(project),
+    revision,
     chapter,
-    previous: readReview(gameId, values.chapter ?? "full"),
+    previous: readReview(gameId, target),
     lessons: readLessons(),
+    ...readScope(gameId),
   });
-  writeReview(gameId, r);
-  return r;
+  const result = { ...r, round };
+  writeReview(gameId, result);
+  return result;
 }
 
 const reviewOut = (r: ReviewResult, extra: Record<string, unknown> = {}) => out({ ok: r.passed, ...extra, ...r }, r.passed ? 0 : 2);
@@ -217,12 +254,20 @@ async function remote(sub: string | undefined, target: string | undefined, file:
     }
   };
   const pushDocs = async (gameId: string) => {
-    for (const kind of ["story", "treatment"] as const) {
+    for (const kind of ["story", "treatment", "scope"] as const) {
       const text = readText(gameId, `${kind}.md`);
       if (text) await api("PUT", `/api/projects/${gameId}/docs/${kind}`, { content: text });
     }
   };
   const need = (usage: string) => target || fail(`用法：npm run game -- remote ${usage}`, 1);
+  /** 審查前自動更新案例庫，只帶入這款遊戲自己的紀錄 */
+  const refreshLessons = async (gameId?: string) => {
+    const res = await fetch(`${base}/api/lessons${gameId ? `?game=${encodeURIComponent(gameId)}` : ""}`, { headers: { Authorization: `Bearer ${token}` } }).catch(() => null);
+    if (!res?.ok) return false;
+    mkdirSync(CONTENT, { recursive: true });
+    writeFileSync(LESSONS_FILE, await res.text());
+    return true;
+  };
   switch (sub) {
     case "list":
       return done(await api("GET", "/api/projects"));
@@ -284,12 +329,9 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       return out({ ok: true, written, story: r.data.docs.story?.content ?? null }, 0);
     }
     case "lessons": {
-      // AI 案例庫：玩家回饋＋歷次審查最常退件的問題 → content/lessons.md（製作與審查都會讀）
-      const res = await fetch(`${base}/api/lessons`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) return out({ ok: false, error: `HTTP ${res.status}` }, 2);
-      mkdirSync(CONTENT, { recursive: true });
-      writeFileSync(LESSONS_FILE, await res.text());
-      return out({ ok: true, written: LESSONS_FILE }, 0);
+      // AI 案例庫：通用的規則統計＋（指定遊戲時）這款遊戲自己的紀錄 → content/lessons.md（製作與審查都會讀）
+      if (!(await refreshLessons(target))) return out({ ok: false, error: "讀取案例庫失敗" }, 2);
+      return out({ ok: true, written: LESSONS_FILE, game: target ?? null }, 0);
     }
     case "push-docs":
       need("push-docs <id>");
@@ -297,7 +339,10 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       return out({ ok: true, pushed: ["story.md", "treatment.md"].filter((f) => readText(target!, f)) }, 0);
     case "review-treatment": {
       need("review-treatment <id>");
+      // 以後台的審查紀錄為準（包含使用者的人工接受），再判斷輪數與內容是否改過
+      await syncReviews(target!);
       await pushDocs(target!);
+      await refreshLessons(target);
       const r = await doReviewTreatment(target!);
       await api("POST", `/api/projects/${target}/reviews`, r);
       return reviewOut(r, { uploaded: true });
@@ -312,6 +357,7 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       await syncReviews(target!);
       if (sub === "status") return out({ ok: true, version: r.data.version, ...gateStatus(target!, r.data.project) }, 0);
       await pushDocs(target!);
+      await refreshLessons(target);
       const rev = await doReview(target!, r.data.project);
       await api("POST", `/api/projects/${target}/reviews`, rev);
       return reviewOut(rev, { uploaded: true });

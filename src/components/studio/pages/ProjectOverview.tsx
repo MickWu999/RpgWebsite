@@ -225,23 +225,64 @@ export default function ProjectOverview() {
             <section className="card" data-testid="review-board">
               <h2>審查紀錄</h2>
               {reviews.length === 0 && <div className="small muted">還沒有審查紀錄。AI 每次審查（大綱、章節、整體）的分數與意見都會出現在這裡。</div>}
-              {reviews.slice(0, 12).map((r) => {
+              {reviews.slice(0, 12).map((r, idx) => {
                 const chapter = p.chapters.find((c) => c.id === r.target);
+                // 每個目標只有最新一筆、而且沒通過時，可以人工接受
+                const latestOfTarget = reviews.findIndex((x) => x.target === r.target) === idx;
+                const accepted = r.data.humanAccepted;
                 return (
                   <details key={r.id} className="review-item">
                     <summary>
-                      <span className={`badge ${r.passed ? "ok" : "err"}`}>{r.passed ? "通過" : "退回"}</span> <b>{KIND_LABEL[r.kind]}</b>
-                      {chapter ? `：${chapter.title}` : ""}・{r.overall ?? "-"} 分 <span className="small muted">{time(r.created_at)}</span>
+                      <span className={`badge ${r.passed ? "ok" : "err"}`}>{accepted ? "👤 人工接受" : r.passed ? "通過" : "退回"}</span> <b>{KIND_LABEL[r.kind]}</b>
+                      {chapter ? `：${chapter.title}` : ""}・{r.overall ?? "-"} 分{r.data.round ? `・第 ${r.data.round} 輪` : ""} <span className="small muted">{time(r.created_at)}</span>
+                      {!r.passed && r.data.reasons && r.data.reasons.length > 0 && <div className="small muted">沒過的原因：{r.data.reasons.slice(0, 3).join("；")}</div>}
                     </summary>
+                    {accepted && (
+                      <div className="small">
+                        👤 {accepted.by} 人工接受{accepted.note ? `：${accepted.note}` : ""}
+                      </div>
+                    )}
+                    {latestOfTarget && !r.passed && (
+                      <button
+                        className="btn small"
+                        data-testid="accept-review"
+                        onClick={async () => {
+                          const note = window.prompt("人工接受這份審查結果，讓 AI 往下做。要留給 AI 的話（選填，例如「結局數量照合約，其他意見可以之後再改」）：");
+                          if (note === null) return;
+                          await studioApi.acceptReview(id, r.target, note).catch((e: Error) => window.alert(e.message));
+                          studioApi.reviews(id).then((x) => setReviews(x.reviews)).catch(() => {});
+                        }}
+                      >
+                        👤 人工接受
+                      </button>
+                    )}
                     <p className="small">{r.data.review.summary}</p>
+                    {r.data.review.keep && r.data.review.keep.length > 0 && (
+                      <div className="small">
+                        <b>這部最好的地方（修改時不要動）</b>
+                        {r.data.review.keep.map((x, i) => (
+                          <div key={i}>✔ {x}</div>
+                        ))}
+                      </div>
+                    )}
+                    {r.data.review.topFixes && r.data.review.topFixes.length > 0 && (
+                      <div className="small">
+                        <b>最重要的修改</b>
+                        {r.data.review.topFixes.map((x, i) => (
+                          <div key={i}>
+                            {i + 1}. {x}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     {r.data.review.followUp && r.data.review.followUp.length > 0 && (
                       <div className="small muted">
                         上一輪的問題：已解決 {r.data.review.followUp.filter((f) => f.resolved).length} / {r.data.review.followUp.length}
                       </div>
                     )}
-                    {r.data.review.players && (
+                    {(r.data.players ?? r.data.review.players) && (
                       <div className="small">
-                        {r.data.review.players.map((x) => (
+                        {(r.data.players ?? r.data.review.players)!.map((x) => (
                           <div key={x.persona}>
                             {x.wouldContinue ? "👍" : "👎"} {PERSONA_LABEL[x.persona]}：{x.reason}
                           </div>

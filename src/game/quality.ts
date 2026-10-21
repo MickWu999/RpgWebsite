@@ -179,6 +179,12 @@ export function assessQuality(project: GameProject, playtest: PlaytestReport, op
     });
   project.endings.forEach((e) => PLACEHOLDER.test(e.text) && blocking.push({ path: "endings", message: `結局「${e.title}」含有佔位文字` }));
 
+  // 簡介與開場文字：玩家在遊戲選單與開始遊戲時要知道大概的情境（連載的第 1 章上線時就需要）
+  const desc = project.description.trim();
+  need(desc.length >= 30 && !PLACEHOLDER.test(desc), "description", "遊戲簡介（遊戲選單上顯示）還沒寫好：用 2～4 句說明主角、處境與想要什麼，至少 30 字，不要劇透翻轉");
+  const intro = (project.intro ?? "").trim();
+  need(intro.length >= 20 && !PLACEHOLDER.test(intro), "intro", "開場文字（開始新遊戲時顯示）還沒寫好：用 1～3 段交代世界的情境，至少 20 字");
+
   // 死開關：被打開卻從來沒有被讀取（選擇沒有後果）
   const read = new Set<string>();
   const readVars = new Set<string>();

@@ -1,8 +1,25 @@
 "use client";
 
-import { CLICHES, DESIGN_GUIDE, REVIEW_RUBRIC, TREATMENT_RUBRIC } from "@/ai/designGuide";
-import { REVIEW_PASS_RULE } from "@/ai/review";
+import { CLICHES, DESIGN_GUIDE, GENRE_EXPECTATIONS, REVIEW_RUBRIC, TREATMENT_RUBRIC } from "@/ai/designGuide";
+import { MAX_REVIEW_ROUNDS, REVIEW_PASS_RULE } from "@/ai/review";
 import { QUALITY_THRESHOLDS as Q } from "@/game/quality";
+
+/** 準則原文是給 AI 讀的 Markdown：「## 」「### 」開頭的行顯示成標題，其他行照原樣 */
+function GuideText({ text }: { text: string }) {
+  return (
+    <div className="doc-text small">
+      {text.split("\n").map((line, i) =>
+        line.startsWith("### ") ? (
+          <h3 key={i}>{line.slice(4)}</h3>
+        ) : line.startsWith("## ") ? (
+          <h2 key={i}>{line.slice(3)}</h2>
+        ) : (
+          <div key={i}>{line}</div>
+        ),
+      )}
+    </div>
+  );
+}
 
 /** 審查規則：AI 製作與審查依據的準則、評分標準與門檻（與程式實際使用的同一份） */
 export default function RulesContent() {
@@ -53,10 +70,16 @@ export default function RulesContent() {
           </tbody>
         </table>
         <div className="small">
-          <b>通過門檻</b>：總分 ≥ {REVIEW_PASS_RULE.minOverall}；故事面向（前提、不好猜、靈魂、角色、選擇、弧線、結局、好玩程度等）≥ {REVIEW_PASS_RULE.minEachScore}；技術面向（結構、任務、回饋、節奏、玩法變化、時長預算）≥ {REVIEW_PASS_RULE.minCraftScore}；沒有 critical；major 最多 {REVIEW_PASS_RULE.maxMajorIssues} 個；玩家評審團至少 {REVIEW_PASS_RULE.minPlayersContinue} 人想繼續玩。
+          <b>通過門檻</b>：總分 ≥ {REVIEW_PASS_RULE.minOverall}；核心面向 ≥ {REVIEW_PASS_RULE.minCoreScore}（大綱看「前提」，章節與整體看「故事靈魂」，使用者提供故事時再加「忠於原作」）；其他面向 ≥ {REVIEW_PASS_RULE.minOtherScore}（只是安全網）；沒有 critical；major 最多 {REVIEW_PASS_RULE.maxMajorIssues} 個；玩家評審團至少 {REVIEW_PASS_RULE.minPlayersContinue} 人想繼續玩。
+        </div>
+        <div className="small">
+          <b>審查像資深編輯</b>：每次審查都會列出「這部最好的地方（修改時不准動）」與「最重要的 3 個修改」。critical 只用在不能玩、邏輯矛盾、違反改編合約；單純違反準則不算 critical。改編合約（scope.md）寫明的取捨不能拿來扣分。盲猜測試只是參考，被猜中不代表失敗。
+        </div>
+        <div className="small">
+          <b>最多 {MAX_REVIEW_ROUNDS} 輪</b>：內容沒改就不能重送；同一關 {MAX_REVIEW_ROUNDS} 輪沒過，AI 會停下來交給你。你可以在總覽的審查紀錄按「👤 人工接受」讓 AI 往下做，或調整改編合約後重來。
         </div>
         <div className="small muted">
-          審查會收斂：重審時審查員會拿到上一輪的意見，先逐條判定是否已解決；新問題只有在屬於 critical 或會讓某個面向低於 6 分時才能提出。審查員也會參考 AI 案例庫（玩家回饋與過去最常退件的問題）。
+          審查會收斂：重審時審查員會拿到上一輪的意見，先逐條判定是否已解決；第二輪起只能補充新的 critical，不能再提新的 major 或 minor。玩家評審團另開一次呼叫，只看故事、不看規則。審查員也會參考 AI 案例庫（玩家回饋與過去最常退件的規則）。
         </div>
       </section>
       <section className="card stack">
@@ -87,7 +110,7 @@ export default function RulesContent() {
             </tr>
             <tr>
               <td className="small">敘事</td>
-              <td className="small">沒有死開關；結局由 2 個以上的條件或選擇決定；不同結局的路線要有不同的選擇；不得有佔位文字</td>
+              <td className="small">沒有死開關；結局由 2 個以上的條件或選擇決定；不同結局的路線要有不同的選擇；不得有佔位文字；遊戲簡介（至少 30 字）與開場文字（至少 20 字）都要寫好</td>
             </tr>
           </tbody>
         </table>
@@ -96,25 +119,25 @@ export default function RulesContent() {
         <summary>
           <b>敘事設計準則（P 故事的靈魂、A～H 輔助、X 常見盲點）</b>
         </summary>
-        <div className="doc-text small">{DESIGN_GUIDE}</div>
+        <GuideText text={DESIGN_GUIDE} />
       </details>
       <details className="card">
         <summary>
           <b>老套清單（AI 最容易寫出來的套路，以及怎麼反過來用）</b>
         </summary>
-        <div className="doc-text small">{CLICHES}</div>
+        <GuideText text={CLICHES} />
       </details>
       <details className="card">
         <summary>
           <b>章節與整體審查的評分標準</b>
         </summary>
-        <div className="doc-text small">{REVIEW_RUBRIC}</div>
+        <GuideText text={REVIEW_RUBRIC} />
       </details>
       <details className="card">
         <summary>
           <b>劇本大綱審查的評分標準</b>
         </summary>
-        <div className="doc-text small">{TREATMENT_RUBRIC}</div>
+        <GuideText text={`${TREATMENT_RUBRIC}\n\n${GENRE_EXPECTATIONS}`} />
       </details>
     </div>
   );

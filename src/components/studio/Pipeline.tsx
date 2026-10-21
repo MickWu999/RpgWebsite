@@ -37,13 +37,14 @@ export function stagesOf(p: PipelineInput): { stages: Stage[]; next: string } {
   let next = "已發布到玩家網站";
   if (!p.hasStory) next = "寫下故事或題材，交給 AI";
   else if (!p.hasTreatment) next = "等待 AI 撰寫劇本大綱";
-  else if (!p.treatmentPassed) next = p.treatmentPassed === false ? "大綱審查沒通過：AI 依意見修改中" : "等待大綱審查";
+  else if (!p.treatmentPassed && p.published) next = "已用人工確認發布；大綱審查還沒通過，可以在審查紀錄按「👤 人工接受」";
+  else if (!p.treatmentPassed) next = p.treatmentPassed === false ? "大綱審查沒通過：AI 依意見修改，或由你人工接受" : "等待大綱審查";
   else if (total === 0) next = "AI 開始製作第 1 章";
   else if (passed < total) {
     const i = p.chapters.findIndex((c) => !c.reviewPassed);
     const c = p.chapters[i];
-    next = c.reviewPassed === false ? `第 ${i + 1} 章審查沒通過：AI 依意見修改中` : `製作第 ${i + 1} 章「${c.title}」`;
-  } else if (!p.fullPassed || p.fullStale) next = p.fullStale ? "內容改過，需要重新整體審查" : p.fullPassed === false ? "整體審查沒通過：AI 依意見修改中" : "等待整體審查";
+    next = c.reviewPassed === false ? `第 ${i + 1} 章審查沒通過：AI 依意見修改，或由你人工接受` : `製作第 ${i + 1} 章「${c.title}」`;
+  } else if (!p.fullPassed || p.fullStale) next = p.fullStale ? "內容改過，需要重新整體審查" : p.fullPassed === false ? "整體審查沒通過：AI 依意見修改，或由你人工接受" : "等待整體審查";
   else if (!p.published) next = "可以發布";
   return { stages, next };
 }

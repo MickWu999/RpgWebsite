@@ -3,6 +3,7 @@ import { coverDataOf } from "../src/game/cover";
 import { projectRevision } from "../src/game/engine";
 import { gameProjectSchema, type GameProject } from "../src/game/schema";
 import { applyOps, blankProject, opSchema } from "../src/studio/ops";
+import { DESIGN_GUIDE } from "../src/ai/designGuide";
 import { z } from "zod";
 import { error, getCookie, hashPassword, HttpError, json, nowIso, randomId, randomToken, readJson, safeEqual, sha256hex, type Env } from "./lib";
 
@@ -116,7 +117,7 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
     return json({ ok: true, projects: results });
   }
   if (path === "/api/projects" && method === "POST") return createProject(req, env, actor);
-  if (path === "/api/lessons" && method === "GET") return lessons(env, actor);
+  if (path === "/api/lessons" && method === "GET") return lessons(env, actor, new URL(req.url).searchParams.get("game"));
 
   const m = path.match(/^\/api\/projects\/([\w-]+)(?:\/(.+))?$/);
   if (m) {
@@ -197,7 +198,7 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
       const { results } = await env.DB.prepare("SELECT kind, content, updated_at, updated_by FROM project_docs WHERE project_id = ?").bind(row.id).all();
       return json({ ok: true, docs: Object.fromEntries(results.map((d) => [d.kind, d])) });
     }
-    const dm = sub?.match(/^docs\/(story|treatment)$/);
+    const dm = sub?.match(/^docs\/(story|treatment|scope)$/);
     if (dm && method === "PUT") {
       const body = await readJson<{ content?: string }>(req);
       const content = String(body.content ?? "");
@@ -209,6 +210,19 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
     if (sub === "reviews" && method === "GET") {
       const { results } = await env.DB.prepare("SELECT id, kind, target, revision, passed, overall, data, actor, created_at FROM project_reviews WHERE project_id = ? ORDER BY created_at DESC LIMIT 200").bind(row.id).all();
       return json({ ok: true, reviews: results.map((r) => ({ ...r, passed: r.passed === 1, data: JSON.parse(String(r.data)) })) });
+    }
+    // 人工接受：審查沒過，但使用者決定可以往下做（只限瀏覽器登入的人，API Token 不能自己接受）
+    if (sub === "reviews/accept" && method === "POST") {
+      if (actor.kind !== "user") return error(403, "人工接受只能由使用者在 Studio 操作，API Token 不能自己接受");
+      const body = await readJson<{ target?: string; note?: string }>(req);
+      const target = String(body.target ?? "").slice(0, 64);
+      const latest = await env.DB.prepare("SELECT kind, revision, data FROM project_reviews WHERE project_id = ? AND target = ? ORDER BY created_at DESC LIMIT 1").bind(row.id, target).first<{ kind: string; revision: string | null; data: string }>();
+      if (!latest) return error(404, "這個目標還沒有審查紀錄");
+      const data: Record<string, unknown> = { ...(JSON.parse(latest.data) as Record<string, unknown>), passed: true, round: 0, humanAccepted: { by: actor.label, note: String(body.note ?? "").slice(0, 1000), at: nowIso() } };
+      await env.DB.prepare("INSERT INTO project_reviews (id, project_id, kind, target, revision, passed, overall, data, actor, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)")
+        .bind(randomId("rev"), row.id, latest.kind, target, latest.revision, Number((data.review as { overall?: number } | undefined)?.overall ?? 0) || null, JSON.stringify(data), actor.label, nowIso())
+        .run();
+      return json({ ok: true });
     }
     if (sub === "reviews" && method === "POST") {
       const body = await readJson<{ kind?: string; target?: string; revision?: string; passed?: boolean; review?: { overall?: number } }>(req);
@@ -455,56 +469,63 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
 }
 
 /**
- * AI 案例庫：彙整玩家回饋與歷次審查最常出現的問題，產生給 AI 閱讀的 Markdown。
- * AI 寫大綱與每一章之前讀它（npm run game -- remote lessons），審查員也會拿到同一份，用來檢查問題是否重演。
+ * AI 案例庫：AI 寫大綱與每一章之前讀它（npm run game -- remote lessons <id>），審查員也會拿到同一份。
+ * 分成兩部分（RPG 大師審查後調整，避免單一遊戲的例句塞進每一款遊戲的審查）：
+ * - 通用：所有遊戲最常被玩家選的標籤、審查最常指出的規則（依規則編號統計，附規則原文）
+ * - 這款遊戲：?game=<id> 時才附上這款遊戲的玩家留言、遊玩數據與審查意見
  */
-async function lessons(env: Env, actor: Actor) {
+async function lessons(env: Env, actor: Actor, gameId: string | null) {
   const projects = await env.DB.prepare("SELECT id, title FROM projects WHERE owner_id = ?").bind(actor.userId).all<{ id: string; title: string }>();
   const titles = new Map(projects.results.map((p) => [p.id, p.title]));
   const ids = [...titles.keys()];
-  const lines = [`# AI 案例庫（自動彙整，${nowIso().slice(0, 10)}）`, "", "製作與審查時請參考：玩家實際喜歡什麼、在哪裡卡住，以及審查最常退件的原因。不要重蹈覆轍。", ""];
-  if (ids.length === 0) return new Response(lines.join("\n"), { headers: { "Content-Type": "text/markdown; charset=utf-8" } });
+  const md = (lines: string[]) => new Response(lines.join("\n"), { headers: { "Content-Type": "text/markdown; charset=utf-8" } });
+  const lines = [`# AI 案例庫（自動彙整，${nowIso().slice(0, 10)}）`, "", "製作與審查時參考：玩家實際的反應，以及審查最常指出的規則。這是提醒，不是新的規則。", ""];
+  if (ids.length === 0) return md(lines);
   const q = ids.map(() => "?").join(",");
   const fb = await env.DB.prepare(`SELECT game_id, chapter_id, rating, tags, comment FROM player_feedback WHERE game_id IN (${q}) ORDER BY created_at DESC LIMIT 2000`).bind(...ids).all<{ game_id: string; chapter_id: string; rating: number; tags: string; comment: string }>();
-  lines.push("## 玩家回饋");
-  if (fb.results.length === 0) lines.push("（還沒有玩家回饋）");
+  const rv = await env.DB.prepare(`SELECT project_id, data FROM project_reviews WHERE project_id IN (${q}) ORDER BY created_at DESC LIMIT 300`).bind(...ids).all<{ project_id: string; data: string }>();
+  const issuesOf = (data: string) => ((JSON.parse(data) as { review?: { issues?: Array<{ severity: string; area: string; problem: string }> } }).review?.issues ?? []).filter((i) => i.severity !== "minor");
+
+  // ---------- 通用 ----------
+  lines.push("## 通用：玩家最常選的標籤");
   const tagCount = new Map<string, number>();
-  const byChapter = new Map<string, { sum: number; n: number }>();
-  for (const f of fb.results) {
-    for (const t of JSON.parse(f.tags) as string[]) tagCount.set(t, (tagCount.get(t) ?? 0) + 1);
-    const k = `${titles.get(f.game_id) ?? f.game_id}／${f.chapter_id}`;
-    const c = byChapter.get(k) ?? { sum: 0, n: 0 };
-    byChapter.set(k, { sum: c.sum + f.rating, n: c.n + 1 });
-  }
-  if (tagCount.size) lines.push(`- 最常被選的標籤：${[...tagCount].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t, n]) => `${t}（${n}）`).join("、")}`);
-  for (const [k, c] of byChapter) lines.push(`- ${k}：平均 ${(c.sum / c.n).toFixed(1)} 顆星（${c.n} 則）`);
-  const low = fb.results.filter((f) => f.rating <= 2 && f.comment.trim()).slice(0, 15);
-  if (low.length) lines.push("", "### 低分留言（2 顆星以下）", ...low.map((f) => `- 「${f.comment.trim().slice(0, 120)}」（${titles.get(f.game_id) ?? f.game_id}／${f.chapter_id}）`));
-  const high = fb.results.filter((f) => f.rating >= 5 && f.comment.trim()).slice(0, 8);
-  if (high.length) lines.push("", "### 玩家最喜歡的地方（5 顆星）", ...high.map((f) => `- 「${f.comment.trim().slice(0, 120)}」（${titles.get(f.game_id) ?? f.game_id}）`));
-  // 遊玩數據：完成率偏低的章節與玩家最常放棄的地方，比單一留言更能說明哪裡出了問題
-  const stats = await Promise.all(ids.map(async (gid) => ({ gid, a: await playAnalytics(env, gid) })));
-  const playLines: string[] = [];
-  for (const { gid, a } of stats) {
-    if (!a.visitors) continue;
-    const ch = a.chapters.map((c) => `${c.chapter_id} 完成 ${c.done}/${c.entered}${c.minutes ? `、平均 ${c.minutes.toFixed(0)} 分鐘` : ""}`).join("；");
-    const quit = a.quits.slice(0, 3).map((q) => `${q.chapter_id ?? "?"}／${q.ref ?? "?"}（${q.players} 人）`).join("、");
-    playLines.push(`- ${titles.get(gid) ?? gid}：${a.visitors} 位玩家。${ch}${quit ? `。最常放棄的地方：${quit}` : ""}`);
-  }
-  lines.push("", "## 遊玩數據", ...(playLines.length ? playLines : ["（還沒有遊玩數據）"]), "");
-  const rv = await env.DB.prepare(`SELECT data FROM project_reviews WHERE project_id IN (${q}) ORDER BY created_at DESC LIMIT 300`).bind(...ids).all<{ data: string }>();
-  const areas = new Map<string, { n: number; example: string }>();
-  for (const r of rv.results) {
-    const issues = ((JSON.parse(r.data) as { review?: { issues?: Array<{ severity: string; area: string; problem: string }> } }).review?.issues ?? []).filter((i) => i.severity !== "minor");
-    for (const i of issues) {
-      const a = areas.get(i.area) ?? { n: 0, example: i.problem };
-      areas.set(i.area, { n: a.n + 1, example: a.example });
+  for (const f of fb.results) for (const t of JSON.parse(f.tags) as string[]) tagCount.set(t, (tagCount.get(t) ?? 0) + 1);
+  lines.push(tagCount.size ? `- ${[...tagCount].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([t, n]) => `${t}（${n}）`).join("、")}` : "（還沒有玩家回饋）");
+  // 依規則編號統計 critical／major（例如 H6、F1、X5），附上規則原文
+  const ruleText = new Map(DESIGN_GUIDE.split("\n").map((l) => [l.match(/^([A-Z]\d{1,2}) /)?.[1], l] as const).filter((x): x is [string, string] => Boolean(x[0])));
+  const codes = new Map<string, number>();
+  for (const r of rv.results) for (const i of issuesOf(r.data)) for (const c of new Set(`${i.area} ${i.problem}`.match(/\b[A-HPX]\d{1,2}\b/g) ?? [])) if (ruleText.has(c)) codes.set(c, (codes.get(c) ?? 0) + 1);
+  lines.push("", "## 通用：審查最常指出的規則（critical／major）");
+  if (codes.size === 0) lines.push("（還沒有審查紀錄）");
+  for (const [c, n] of [...codes].sort((a, b) => b[1] - a[1]).slice(0, 10)) lines.push(`- ${c}（${n} 次）：${ruleText.get(c)!.slice(c.length + 1, c.length + 120)}`);
+
+  // ---------- 這款遊戲 ----------
+  if (gameId && titles.has(gameId)) {
+    lines.push("", `## 這款遊戲：${titles.get(gameId)}`);
+    const mine = fb.results.filter((f) => f.game_id === gameId);
+    const byChapter = new Map<string, { sum: number; n: number }>();
+    for (const f of mine) {
+      const c = byChapter.get(f.chapter_id) ?? { sum: 0, n: 0 };
+      byChapter.set(f.chapter_id, { sum: c.sum + f.rating, n: c.n + 1 });
     }
+    for (const [k, c] of byChapter) lines.push(`- ${k}：平均 ${(c.sum / c.n).toFixed(1)} 顆星（${c.n} 則）`);
+    for (const f of mine.filter((x) => x.comment.trim()).slice(0, 12)) lines.push(`- ${"★".repeat(f.rating)}「${f.comment.trim().slice(0, 120)}」（${f.chapter_id}）`);
+    const a = await playAnalytics(env, gameId);
+    if (a.visitors) {
+      const ch = a.chapters.map((c) => `${c.chapter_id} 完成 ${c.done}/${c.entered}${c.minutes ? `、平均 ${c.minutes.toFixed(0)} 分鐘` : ""}`).join("；");
+      const quit = a.quits.slice(0, 3).map((x) => `${x.chapter_id ?? "?"}／${x.ref ?? "?"}（${x.players} 人）`).join("、");
+      lines.push(`- 遊玩數據：${a.visitors} 位玩家。${ch}${quit ? `。最常放棄的地方：${quit}` : ""}`);
+    }
+    const issues = rv.results.filter((r) => r.project_id === gameId).flatMap((r) => issuesOf(r.data));
+    const seen = new Set<string>();
+    for (const i of issues) {
+      if (seen.has(i.area) || seen.size >= 10) continue;
+      seen.add(i.area);
+      lines.push(`- 審查意見（${i.area}）：${i.problem.slice(0, 140)}`);
+    }
+    if (!mine.length && !a.visitors && !issues.length) lines.push("（這款遊戲還沒有紀錄）");
   }
-  lines.push("", "## 審查最常退件的問題（critical／major）");
-  if (areas.size === 0) lines.push("（還沒有審查紀錄）");
-  for (const [area, a] of [...areas].sort((x, y) => y[1].n - x[1].n).slice(0, 12)) lines.push(`- ${area}（${a.n} 次）：例如「${a.example.slice(0, 140)}」`);
-  return new Response(lines.join("\n"), { headers: { "Content-Type": "text/markdown; charset=utf-8" } });
+  return md(lines);
 }
 
 /** 遊玩數據統計：玩家數、每章進入與完成人數、平均花費時間、結局分布、玩家最常離開的地方、近 14 天每日玩家數 */
@@ -567,11 +588,12 @@ const API_DOCS = `# AI RPG Studio API
 | GET /api/projects/:id/docs、PUT .../docs/story\|treatment \`{content}\` | 故事原文與劇本大綱 |
 | GET /api/projects/:id/reviews、POST .../reviews \`{kind,target,revision,passed,review}\` | 審查紀錄（由 \`npm run game -- remote review…\` 自動上傳） |
 | GET /api/projects/:id/feedback | 玩家回饋（玩完一章時的星等、標籤、留言） |
+| POST /api/projects/:id/reviews/accept \`{target, note}\` | 人工接受某個目標（treatment、章節 ID、full）的最新審查（只限瀏覽器登入的使用者） |
 | GET /api/projects/:id/notes | 修改清單（人在測試遊玩時按 📌 標記的意見，含位置代碼與當下狀態） |
 | POST /api/projects/:id/notes \`{body, locator?, mapId?, x?, y?, chapterId?, excerpt?, state?}\` | 新增一筆修改意見 |
 | PATCH /api/projects/:id/notes/:noteId \`{status: "resolved"\|"wontfix"\|"open", resolution}\` | 標成已處理（寫明怎麼改的）或不處理 |
 | GET /api/projects/:id/analytics | 遊玩數據（玩家數、每章完成率與時間、結局分布、最常離開的地方） |
-| GET /api/lessons | AI 案例庫（Markdown）：玩家回饋與審查最常退件的問題，製作前必讀 |
+| GET /api/lessons?game=<id> | AI 案例庫（Markdown）：玩家回饋與審查最常退件的問題，製作前必讀 |
 | POST /api/projects/:id/publish \`{check}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標與審查關卡。建議用 \`npm run game -- remote publish <id>\` |
 
 資料模型是 RPG Maker 式（資料庫、地圖、多頁事件、事件指令），說明見 docs/ai-development-spec.md 第 6 節。
