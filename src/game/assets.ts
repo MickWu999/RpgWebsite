@@ -208,6 +208,17 @@ export const TERRAIN: Record<string, TerrainDef> = {
   // 港口與海邊：海水（可以平鋪）與堤岸（下緣是石砌岸邊：放在海水的最後一列，下方接陸地）
   "~": urban("海水", 198, false, { examine: "海水很平靜，看不出底下有多深。" }),
   _: urban("堤岸", 225, false, { examine: "港口的堤岸，往下就是海。" }),
+  // 便利商店：白色地磚、冷藏櫃、商品貨架、自動門（RPG Urban）；收銀台、咖啡機（Roguelike Indoors）
+  s: urban("超商地磚", 117, true),
+  i: urban("冷藏櫃", 256, false, { overlay: true, under: "s", examine: "冷藏櫃裡排滿了飲料，玻璃門上起了一層霧。" }),
+  g: urban("貨架（零食）", 301, false, { overlay: true, under: "s", examine: "貨架上是洋芋片和泡麵，排得很整齊。" }),
+  z: urban("貨架（飲料）", 302, false, { overlay: true, under: "s", examine: "貨架上是一罐一罐的茶飲和咖啡。" }),
+  A: urban("貨架（雜貨）", 304, false, { overlay: true, under: "s", examine: "雨傘、電池、口罩，什麼都有一點。" }),
+  N: urban("自動門", 285, false, { examine: "玻璃自動門。外面的雨聲很大。" }),
+  J: indoor("櫃台", 329, false, { overlay: true, under: "s", examine: "櫃台上擺著口香糖和暖暖包。" }),
+  K: indoor("收銀機", 331, false, { overlay: true, under: "s", examine: "收銀機。發票機偶爾會自己吐出一張紙。" }),
+  Q: indoor("咖啡機", 268, false, { overlay: true, under: "s", examine: "咖啡機在低聲運轉。" }),
+  V: indoor("椅子（超商）", 55, false, { overlay: true, under: "s", examine: "靠窗的高腳椅。" }),
   // ---------- 室內（Roguelike Indoors）：家、寢室、辦公室 ----------
   o: indoor("木地板", 51, true),
   c: indoor("綠地毯", 159, true),

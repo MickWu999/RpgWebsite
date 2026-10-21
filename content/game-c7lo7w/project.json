@@ -100,10 +100,10 @@
       "description": "店長交代：收銀機下面那封信，明天早上有人會來拿，誰都不准碰。",
       "steps": [
         {
-          "text": "顧好收銀機下面的信，撐到十二點"
+          "text": "找出十二點前拿走信的人。「仔細問」會花掉一個時段（十點 → 十一點 → 十二點），先想好要問誰"
         },
         {
-          "text": "信在十二點前不見了，時間又回到十點。「仔細問」會花掉一個時段，想清楚先問誰"
+          "text": "夜晚又重來了。上一輪問到的事都在筆記裡（選單的「物品」），這一輪先問還沒問的人"
         },
         {
           "text": "有人說了謊。找到證據，跟那個人對質"
@@ -224,14 +224,14 @@
       "tilesetId": "tileset_tiny_town",
       "terrain": [
         "bbbbbbbbbbbbbb",
-        "byyyyyooyyyyyb",
-        "boooooooooooob",
-        "boyyoyyooooojb",
-        "booooooooooojb",
-        "boyyoyyoooooob",
-        "booooooooooohb",
-        "bpooooooooooob",
-        "bbbbbbdbbbbbbb"
+        "biiiiiiiQssssb",
+        "bssssssssssssb",
+        "bsgzAssgzAsssb",
+        "bssssssssssssb",
+        "bsAzgssAgzJJKb",
+        "bssssssssssssb",
+        "bVVsssssssssib",
+        "bwwwwNNwwwwwwb"
       ],
       "walkable": [
         [
@@ -257,8 +257,72 @@
           false,
           false,
           false,
+          false,
+          false,
+          false,
           true,
           true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          false,
           false,
           false,
           false,
@@ -284,69 +348,6 @@
         ],
         [
           false,
-          true,
-          false,
-          false,
-          true,
-          false,
-          false,
-          true,
-          true,
-          true,
-          true,
-          true,
-          false,
-          false
-        ],
-        [
-          false,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          false,
-          false
-        ],
-        [
-          false,
-          true,
-          false,
-          false,
-          true,
-          false,
-          false,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          false
-        ],
-        [
-          false,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          true,
-          false,
-          false
-        ],
-        [
           false,
           false,
           true,
@@ -358,8 +359,7 @@
           true,
           true,
           true,
-          true,
-          true,
+          false,
           false
         ],
         [
@@ -396,22 +396,63 @@
                   "chapterId": "ch1"
                 },
                 {
-                  "code": "text",
-                  "text": "（晚上十點。自動門「叮咚」一聲，林先生走了進來。）"
+                  "code": "time",
+                  "period": 2
                 },
                 {
                   "code": "text",
-                  "text": "一杯熱美式。……今天也下雨啊。",
-                  "actorId": "lin"
+                  "text": "（晚上十一點五十九分。雨下個不停。）"
                 },
                 {
                   "code": "text",
-                  "text": "（收銀機下面壓著一封信，信封上寫著「給店長」。）"
+                  "text": "（大夜班店員小周盯著收銀機下面那封信。店長下午交代過：「明天早上有人會來拿。不要讓任何人碰。」）"
                 },
                 {
                   "code": "text",
-                  "text": "撐到十二點就好。……應該吧。",
+                  "text": "（十二點。店裡的燈閃了一下——）"
+                },
+                {
+                  "code": "text",
+                  "text": "（再看過去的時候，信不見了。）"
+                },
+                {
+                  "code": "text",
+                  "text": "……不會吧。我一直在店裡啊。",
                   "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "（時鐘的指針開始倒轉。自動門「叮咚」一聲——）"
+                },
+                {
+                  "code": "time",
+                  "period": 0
+                },
+                {
+                  "code": "text",
+                  "text": "（晚上十點。林先生走進來：「一杯熱美式。……今天也下雨啊。」）"
+                },
+                {
+                  "code": "text",
+                  "text": "……又是十點？剛剛那是夢嗎？",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "（口袋裡，剛才寫到一半的交班筆記還在。最後一行的時間是 23:59。）"
+                },
+                {
+                  "code": "text",
+                  "text": "不是夢。十二點以前，有人會拿走那封信。這一次，我要知道是誰。",
+                  "actorId": "player"
+                },
+                {
+                  "code": "text",
+                  "text": "（店裡現在有三個客人：買咖啡的林先生、等外送的阿凱、坐在窗邊寫作業的芷妤。）"
+                },
+                {
+                  "code": "text",
+                  "text": "（「聊兩句」不花時間；「仔細問」會花掉一個時段。有人十一點就會離開。十二點一到，夜晚會再重來一次，但筆記會留著。）"
                 },
                 {
                   "code": "quest",
@@ -471,12 +512,12 @@
                   "then": [
                     {
                       "code": "text",
-                      "text": "……我剛剛明明一直在店裡。是誰？什麼時候？",
+                      "text": "……又被拿走了。我還沒問完。",
                       "actorId": "player"
                     },
                     {
                       "code": "text",
-                      "text": "（時鐘的指針開始倒轉。耳邊傳來自動門的叮咚聲——）"
+                      "text": "（時鐘倒轉，自動門叮咚——）"
                     },
                     {
                       "code": "quest",
@@ -524,7 +565,7 @@
                   "then": [
                     {
                       "code": "text",
-                      "text": "……又是十點？我口袋裡的筆記，還在。",
+                      "text": "筆記還在。上一輪問到的事，都寫在上面。這一輪，先問還沒問的人。",
                       "actorId": "player"
                     }
                   ]
@@ -537,7 +578,7 @@
           "id": "letter",
           "name": "收銀機",
           "x": 12,
-          "y": 3,
+          "y": 5,
           "pages": [
             {
               "trigger": "action",
@@ -554,8 +595,8 @@
         {
           "id": "ring",
           "name": "櫃檯",
-          "x": 12,
-          "y": 4,
+          "x": 11,
+          "y": 5,
           "pages": [
             {
               "trigger": "action",
@@ -614,7 +655,7 @@
         {
           "id": "coffee",
           "name": "咖啡機",
-          "x": 6,
+          "x": 8,
           "y": 1,
           "pages": [
             {
@@ -650,7 +691,7 @@
         {
           "id": "door",
           "name": "自動門",
-          "x": 6,
+          "x": 5,
           "y": 8,
           "pages": [
             {
@@ -668,7 +709,7 @@
         {
           "id": "lin",
           "name": "林先生",
-          "x": 7,
+          "x": 8,
           "y": 2,
           "pages": [
             {
@@ -787,7 +828,7 @@
         {
           "id": "kai",
           "name": "阿凱",
-          "x": 3,
+          "x": 7,
           "y": 7,
           "pages": [
             {
@@ -889,8 +930,8 @@
         {
           "id": "yu",
           "name": "芷妤",
-          "x": 11,
-          "y": 6,
+          "x": 3,
+          "y": 7,
           "pages": [
             {
               "graphic": {
@@ -901,7 +942,7 @@
               "commands": [
                 {
                   "code": "text",
-                  "text": "（芷妤戴著耳機寫作業。桌上放著一杯喝了一半的奶茶。）"
+                  "text": "（芷妤坐在靠窗的位子，戴著耳機寫作業。窗台上放著一杯喝了一半的奶茶。）"
                 },
                 {
                   "code": "choices",
@@ -1106,6 +1147,24 @@
               ]
             }
           ]
+        },
+        {
+          "id": "door2",
+          "name": "自動門",
+          "x": 6,
+          "y": 8,
+          "pages": [
+            {
+              "trigger": "touch",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（自動門「叮咚」一聲開了，又關上。外面下著大雨。）"
+                }
+              ]
+            }
+          ]
         }
       ]
     }
@@ -1210,7 +1269,7 @@
       }
     ]
   },
-  "intro": "晚上十點。雨下個不停，自動門每開一次，就帶進一陣濕冷的風。\n\n店長下午打電話來，交代了一件事：收銀機下面那封信，明天早上有人會來拿。\n\n「你幫我顧好。不要讓任何人碰。」",
+  "intro": "晚上十點到早上六點，是小周的大夜班。\n\n他以為今晚也會跟平常一樣無聊。",
   "cover": {
     "mapId": "store",
     "characterAssetIds": [

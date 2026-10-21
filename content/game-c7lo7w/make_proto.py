@@ -57,7 +57,7 @@ ASK_COST = TIME(advance=1)
 db = [
     {"op": "project.update", "title": "午夜的大夜班", "genre": "modern",
      "description": "每到午夜十二點，這間便利商店的夜晚就會重來一次，只有大夜班店員記得。收銀機下面那封信，每一輪都在十二點前不見。是誰拿走的？",
-     "intro": "晚上十點。雨下個不停，自動門每開一次，就帶進一陣濕冷的風。\n\n店長下午打電話來，交代了一件事：收銀機下面那封信，明天早上有人會來拿。\n\n「你幫我顧好。不要讓任何人碰。」",
+     "intro": "晚上十點到早上六點，是小周的大夜班。\n\n他以為今晚也會跟平常一樣無聊。",
      "cover": {"mapId": MAP, "characterAssetIds": ["char_modern_boy", "char_modern_girl"], "tagline": "這個夜晚，已經重來第幾次了？"},
      "release": {"status": "ongoing", "plannedChapters": 3}},
     {"op": "system.update", "clock": {"periods": ["十點", "十一點", "十二點"]}},
@@ -80,8 +80,8 @@ for id, name, desc in notes:
     db.append({"op": "item.upsert", "item": {"id": id, "name": name, "description": desc, "iconAssetId": "icon_letter"}})
 db += [
     {"op": "quest.upsert", "quest": {"id": "q_letter", "title": "收銀機下面的信", "description": "店長交代：收銀機下面那封信，明天早上有人會來拿，誰都不准碰。", "steps": [
-        {"text": "顧好收銀機下面的信，撐到十二點"},
-        {"text": "信在十二點前不見了，時間又回到十點。「仔細問」會花掉一個時段，想清楚先問誰"},
+        {"text": "找出十二點前拿走信的人。「仔細問」會花掉一個時段（十點 → 十一點 → 十二點），先想好要問誰"},
+        {"text": "夜晚又重來了。上一輪問到的事都在筆記裡（選單的「物品」），這一輪先問還沒問的人"},
         {"text": "有人說了謊。找到證據，跟那個人對質"},
     ]}},
     {"op": "ending.upsert", "ending": {"id": "end_hand", "title": "她自己交給他", "mood": "bittersweet",
@@ -100,14 +100,14 @@ for sid, name in [("k_lin", "仔細問過林先生"), ("k_yu", "仔細問過芷�
 
 rows = [
     "bbbbbbbbbbbbbb",
-    "byyyyyooyyyyyb",
-    "boooooooooooob",
-    "boyyoyyooooojb",
-    "booooooooooojb",
-    "boyyoyyoooooob",
-    "booooooooooohb",
-    "bpooooooooooob",
-    "bbbbbbdbbbbbbb",
+    "biiiiiiiQssssb",
+    "bssssssssssssb",
+    "bsgzAssgzAsssb",
+    "bssssssssssssb",
+    "bsAzgssAgzJJKb",
+    "bssssssssssssb",
+    "bVVsssssssssib",
+    "bwwwwNNwwwwwwb",
 ]
 assert all(len(r) == 14 for r in rows)
 mapops = [
@@ -123,10 +123,20 @@ events = [
     ev("opening", "開場", 1, 2, [
         page([
             {"code": "chapter", "chapterId": "ch1"},
-            T("（晚上十點。自動門「叮咚」一聲，林先生走了進來。）"),
-            T("一杯熱美式。……今天也下雨啊。", LIN),
-            T("（收銀機下面壓著一封信，信封上寫著「給店長」。）"),
-            T("撐到十二點就好。……應該吧。", ZHOU),
+            TIME(period=2),
+            T("（晚上十一點五十九分。雨下個不停。）"),
+            T("（大夜班店員小周盯著收銀機下面那封信。店長下午交代過：「明天早上有人會來拿。不要讓任何人碰。」）"),
+            T("（十二點。店裡的燈閃了一下——）"),
+            T("（再看過去的時候，信不見了。）"),
+            T("……不會吧。我一直在店裡啊。", ZHOU),
+            T("（時鐘的指針開始倒轉。自動門「叮咚」一聲——）"),
+            TIME(period=0),
+            T("（晚上十點。林先生走進來：「一杯熱美式。……今天也下雨啊。」）"),
+            T("……又是十點？剛剛那是夢嗎？", ZHOU),
+            T("（口袋裡，剛才寫到一半的交班筆記還在。最後一行的時間是 23:59。）"),
+            T("不是夢。十二點以前，有人會拿走那封信。這一次，我要知道是誰。", ZHOU),
+            T("（店裡現在有三個客人：買咖啡的林先生、等外送的阿凱、坐在窗邊寫作業的芷妤。）"),
+            T("（「聊兩句」不花時間；「仔細問」會花掉一個時段。有人十一點就會離開。十二點一到，夜晚會再重來一次，但筆記會留著。）"),
             QUEST("q_letter", "start"),
             {"code": "selfSwitch", "key": "A", "value": True},
         ], trigger="autorun", priority="below"),
@@ -138,30 +148,31 @@ events = [
             T("（十二點。店裡的燈閃了一下。）"),
             T("（收銀機下面的信，不見了。）"),
             IF(v("loop", "==", 0), [
-                T("……我剛剛明明一直在店裡。是誰？什麼時候？", ZHOU),
-                T("（時鐘的指針開始倒轉。耳邊傳來自動門的叮咚聲——）"),
+                T("……又被拿走了。我還沒問完。", ZHOU),
+                T("（時鐘倒轉，自動門叮咚——）"),
                 QUEST("q_letter", "step", 1),
             ], [T("（又來了。時鐘倒轉，自動門叮咚。）")]),
             VAR("loop"),
             TIME(period=0),
             GO(MAP, 11, 4, "left"),
             T("（晚上十點。林先生走進來：「一杯熱美式。……今天也下雨啊。」）"),
-            IF(v("loop", "==", 1), [T("……又是十點？我口袋裡的筆記，還在。", ZHOU)]),
+            IF(v("loop", "==", 1), [T("筆記還在。上一輪問到的事，都寫在上面。這一輪，先問還沒問的人。", ZHOU)]),
         ], trigger="autorun", priority="below", cond={"variable": {"id": "period", "min": 2}}),
     ], note="夜晚重來"),
-    look("letter", "收銀機", 12, 3, ["（收銀機下面壓著一封信，信封上寫著「給店長」。字很工整，像是練習過很多次。）"]),
-    ev("ring", "櫃檯", 12, 4, [
+    look("letter", "收銀機", 12, 5, ["（收銀機下面壓著一封信，信封上寫著「給店長」。字很工整，像是練習過很多次。）"]),
+    ev("ring", "櫃檯", 11, 5, [
         page([T("（櫃檯擦得很乾淨。）")]),
         page([
             T("（櫃檯上有一圈還沒乾的水痕。大小……跟窗邊那杯奶茶的杯底一樣。）"),
             IF(s("k_ring", False), [T("（小周把它記進筆記：十一點，櫃檯上的水痕。）"), ITEM("note_ring"), SW("k_ring")]),
         ], cond={"variable": {"id": "period", "min": 1}}),
     ]),
-    look("coffee", "咖啡機", 6, 1, ["（咖啡機。林先生每晚十點的熱美式，都是從這裡出來的。）"]),
+    look("coffee", "咖啡機", 8, 1, ["（咖啡機。林先生每晚十點的熱美式，都是從這裡出來的。）"]),
     look("shelf", "貨架", 2, 3, ["（泡麵、零食、雨傘。今晚雨傘賣得特別好。）"]),
-    ev("door", "自動門", 6, 8, [page([T("（外面下著大雨。大夜班不能離開店裡。）")], trigger="touch")]),
+    ev("door", "自動門", 5, 8, [page([T("（外面下著大雨。大夜班不能離開店裡。）")], trigger="touch")]),
+    ev("door2", "自動門", 6, 8, [page([T("（自動門「叮咚」一聲開了，又關上。外面下著大雨。）")], trigger="touch")]),
     # 林先生：只在十點
-    ev("lin", "林先生", 7, 2, [
+    ev("lin", "林先生", 8, 2, [
         page([
             T("（林先生端著熱美式，看著手機上的行事曆。）"),
             CH(
@@ -177,7 +188,7 @@ events = [
         page([], cond={"variable": {"id": "period", "min": 1}}),
     ]),
     # 阿凱：十點、十一點都在
-    ev("kai", "阿凱", 3, 7, [
+    ev("kai", "阿凱", 7, 7, [
         page([
             T("滷味還沒好喔？我已經等二十分鐘了欸。", KAI),
             CH(
@@ -192,9 +203,9 @@ events = [
         ], graphic="char_modern_worker"),
     ]),
     # 芷妤：說謊的人。拿出證詞或水痕對質
-    ev("yu", "芷妤", 11, 6, [
+    ev("yu", "芷妤", 3, 7, [
         page([
-            T("（芷妤戴著耳機寫作業。桌上放著一杯喝了一半的奶茶。）"),
+            T("（芷妤坐在靠窗的位子，戴著耳機寫作業。窗台上放著一杯喝了一半的奶茶。）"),
             CH(
                 OPT("聊兩句。", [T("……我在寫作業。", YU), again]),
                 OPT("仔細問她（花掉一個時段）", [
