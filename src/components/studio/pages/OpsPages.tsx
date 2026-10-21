@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { achievementList } from "@/game/achievements";
 import { commandAt } from "@/game/refs";
 import type { GameProject } from "@/game/schema";
-import { PLAYER_SITE_URL, studioApi, type AdminOverview, type AdminPlayerDetail, type AdminPlayerRow, type FeedbackEntry, type GameInsights, type PlayAnalytics } from "@/lib/studioApi";
+import { PLAYER_SITE_URL, studioApi, type AdminOverview, type AdminPlayerDetail, type AdminPlayerRow, type FeedbackEntry, type GameInsights, type NoticeRow, type PlayAnalytics } from "@/lib/studioApi";
 import StudioShell, { PageHeader } from "../StudioShell";
 
 /**
@@ -15,6 +15,7 @@ import StudioShell, { PageHeader } from "../StudioShell";
  * - 玩家：誰在玩（匿名裝置代號＋邀請連結／暱稱），單一玩家的時間軸
  * - 玩家回饋：所有遊戲的星等與留言
  * - 遊戲數據：單一遊戲的漏斗、每章時間、選擇比例、卡關、沒人發現的事件
+ * - 通知：發出公告並推播給開啟通知的玩家（新章節、更新、修正、新遊戲推出）
  * - 登入紀錄：後台的登入（含 IP）
  * 每個數字都附一句定義，避免看不懂；這些紀錄同時會整理成 AI 案例庫。
  */
@@ -587,6 +588,177 @@ export function GameStatsPage() {
 }
 
 // ---------------------------------------------------------------------------
+// 通知（推播）
+
+const NOTICE_KIND_LABEL: Record<NoticeRow["kind"], string> = { chapter: "📖 新章節", update: "✨ 更新", fix: "🔧 修正", new_game: "🎮 新遊戲推出" };
+const NOTICE_TEMPLATE: Record<NoticeRow["kind"], (game: string) => { title: string; body: string }> = {
+  chapter: (g) => ({ title: `《${g}》新章節上線`, body: "接著上次的進度繼續玩吧！" }),
+  update: (g) => ({ title: `《${g}》更新了`, body: "" }),
+  fix: (g) => ({ title: `《${g}》問題修正`, body: "" }),
+  new_game: (g) => ({ title: `新遊戲《${g}》推出`, body: "" }),
+};
+
+export function NoticesPage() {
+  const [data, setData] = useState<{ notices: NoticeRow[]; subscribers: number; ready: boolean } | null>(null);
+  const [games, setGames] = useState<Array<{ id: string; title: string }>>([]);
+  const [kind, setKind] = useState<NoticeRow["kind"]>("chapter");
+  const [game, setGame] = useState("");
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [progress, setProgress] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const reload = () =>
+    studioApi
+      .notices()
+      .then(setData)
+      .catch((e: Error) => setError(e.message));
+  useEffect(() => {
+    void reload();
+    studioApi
+      .listProjects()
+      .then((r) => setGames(r.projects.filter((p) => p.published_version).map((p) => ({ id: p.id, title: p.title }))))
+      .catch(() => {});
+  }, []);
+  const fill = (k: NoticeRow["kind"], g: string) => {
+    const name = games.find((x) => x.id === g)?.title;
+    if (!name) return;
+    const t = NOTICE_TEMPLATE[k](name);
+    setTitle(t.title);
+    setBody(t.body);
+  };
+  const url = game ? `/play/?pack=${game}` : "/";
+  const send = async () => {
+    if (!data) return;
+    if (!window.confirm(`要把這則公告推播給 ${data.subscribers} 位開啟通知的玩家嗎？送出後無法收回。`)) return;
+    setError(null);
+    try {
+      await studioApi.createNotice({ kind, title, body, url, gameId: game || undefined });
+      setProgress("已送出，正在推播給玩家（人數多時，排程會每分鐘接著送）");
+      setTitle("");
+      setBody("");
+      void reload();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  return (
+    <StudioShell title="營運">
+      <div className="page stack">
+        <PageHeader title="通知" subtitle="通知會在發布時自動發出：新遊戲推出、新章節上線、附了更新說明的更新／修正（同一款遊戲 12 小時內最多一次）。修改途中反覆發布不會通知玩家。這裡是發送紀錄，也可以補發其他公告。" />
+        {data && !data.ready && <div className="notice err">推播金鑰還沒設定，只會建立公告、不會推播。請在後台 Worker 設定 VAPID_PRIVATE_JWK、VAPID_PUBLIC_KEY、VAPID_SUBJECT。</div>}
+        <div className="metrics">
+          <Metric label="開啟通知的玩家" value={data?.subscribers ?? "-"} hint="同一位玩家用不同瀏覽器或裝置開啟，會各算一位；取消訂閱或清除瀏覽器資料的會在下次推播時自動移除" />
+          <Metric label="已發出的通知" value={data ? data.notices.filter((n) => n.done !== 2).length : "-"} hint="最近 50 則（不含基準紀錄）" />
+        </div>
+        <section className="card stack" data-testid="notice-form">
+          <h2>補發公告（選用）</h2>
+          <div className="small muted">平常不需要用：發布時會自動通知。只有活動、維護公告這類跟發布無關的消息才在這裡發。</div>
+          <div className="row">
+            <label className="field">
+              類型
+              <select
+                value={kind}
+                onChange={(e) => {
+                  const k = e.target.value as NoticeRow["kind"];
+                  setKind(k);
+                  fill(k, game);
+                }}
+              >
+                {(Object.keys(NOTICE_KIND_LABEL) as NoticeRow["kind"][]).map((k) => (
+                  <option key={k} value={k}>
+                    {NOTICE_KIND_LABEL[k]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              遊戲（點通知後開啟）
+              <select
+                value={game}
+                onChange={(e) => {
+                  setGame(e.target.value);
+                  fill(kind, e.target.value);
+                }}
+              >
+                <option value="">玩家網站首頁</option>
+                {games.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="field">
+            標題（60 字內）
+            <input value={title} maxLength={60} onChange={(e) => setTitle(e.target.value)} placeholder="例如：《最後一個會哭的人》第 2 章上線" data-testid="notice-title" />
+          </label>
+          <label className="field">
+            內容（200 字內）
+            <textarea value={body} maxLength={200} onChange={(e) => setBody(e.target.value)} placeholder="一兩句話說明更新了什麼" data-testid="notice-body" />
+          </label>
+          <div className="small muted">
+            玩家看到的樣子：<b>{NOTICE_KIND_LABEL[kind].split(" ")[0]} {title || "（標題）"}</b>　{body || "（內容）"}　→ 開啟 <code>{url}</code>
+          </div>
+          <div className="row">
+            <button className="btn primary" disabled={!title.trim() || !body.trim() || !data} onClick={send} data-testid="notice-send">
+              📣 送出通知
+            </button>
+            {progress && <span className="small">{progress}</span>}
+            {error && <span className="small err-text">{error}</span>}
+          </div>
+        </section>
+        <section className="card">
+          <h2>發送紀錄</h2>
+          {!data ? (
+            <div className="small muted">載入中…</div>
+          ) : data.notices.length === 0 ? (
+            <div className="small muted">還沒有發過通知。</div>
+          ) : (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>時間</th>
+                  <th>類型</th>
+                  <th>標題與內容</th>
+                  <th>送達</th>
+                  <th>發送者</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.notices.map((n) => (
+                  <tr key={n.id}>
+                    <td>{time(n.created_at)}</td>
+                    <td>{NOTICE_KIND_LABEL[n.kind] ?? n.kind}</td>
+                    <td>
+                      <b>{n.title}</b>
+                      <div className="small muted">
+                        {n.body}　<code>{n.url}</code>
+                      </div>
+                    </td>
+                    <td>
+                      {n.done === 2 ? (
+                        <span className="small muted">基準紀錄（不推播）</span>
+                      ) : (
+                        <>
+                          {n.sent}
+                          {n.failed ? <span className="small muted">（失敗 {n.failed}）</span> : null}
+                          {n.done === 0 && <span className="badge warn">送出中</span>}
+                        </>
+                      )}
+                    </td>
+                    <td>{n.author}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      </div>
+    </StudioShell>
+  );
+}
+
 // 登入紀錄（系統管理）
 
 type LoginRow = Awaited<ReturnType<typeof studioApi.logins>>["logins"][number];

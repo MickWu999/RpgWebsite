@@ -4,6 +4,7 @@ import { projectRevision } from "../src/game/engine";
 import { gameProjectSchema, type GameProject } from "../src/game/schema";
 import { applyOps, blankProject, opSchema } from "../src/studio/ops";
 import { DESIGN_GUIDE } from "../src/ai/designGuide";
+import { createNotice, deliverNotices, NOTICE_KINDS, pushReady, type NoticeKind } from "./push";
 import { z } from "zod";
 import { error, getCookie, hashPassword, HttpError, json, nowIso, randomId, randomToken, readJson, safeEqual, sha256hex, type Env } from "./lib";
 
@@ -27,18 +28,54 @@ const LOCK_MINUTES = 15;
 const VERSION_KEEP = 60;
 const PASSWORD_ITERATIONS = 100_000;
 
+
+/** 同一款遊戲的「更新／修正」通知，間隔至少這麼久（AI 修改後反覆發布時不會一直打擾玩家） */
+const UPDATE_NOTICE_COOLDOWN_HOURS = 12;
+
+/**
+ * 發布時自動發出的通知（不需要人另外操作），以「已經通知過什麼」為準，不是跟上一次發布比：
+ * - 這款遊戲從沒通知過 → 新遊戲推出（下架再上架不會再通知）
+ * - 章節數超過已通知過的最大章節數 → 新章節上線（還原舊版再發布、重複發布都不會再通知）
+ * - 附了更新說明（update.text）→ 更新或修正，同一款遊戲 12 小時內只通知一次
+ * - 其他重新發布（AI 修改、改錯字）一律不通知
+ * 回傳 skipped 說明這次為什麼沒通知，讓發布的人知道。
+ */
+export async function publishNotice(env: Env, gameId: string, project: GameProject, update?: { kind?: string; text?: string }): Promise<{ notice: { kind: NoticeKind; title: string; body: string } | null; skipped?: string }> {
+  const name = `《${project.title}》`;
+  const history = await env.DB.prepare("SELECT COUNT(*) AS n, MAX(chapters) AS chapters, MAX(CASE WHEN kind IN ('update', 'fix') THEN created_at END) AS last_update FROM notices WHERE game_id = ?")
+    .bind(gameId)
+    .first<{ n: number; chapters: number | null; last_update: string | null }>();
+  if (!history?.n) return { notice: { kind: "new_game", title: `新遊戲${name}推出`, body: (project.cover?.tagline ?? project.description).slice(0, 200) } };
+  const announced = history.chapters ?? 0;
+  if (project.chapters.length > announced) {
+    const added = project.chapters.slice(announced);
+    const range = added.length === 1 ? `第 ${announced + 1} 章` : `第 ${announced + 1}～${project.chapters.length} 章`;
+    const more = project.release?.status === "ongoing" ? "接著上次的進度繼續玩吧！" : "故事完結，接著上次的進度玩到最後吧！";
+    return { notice: { kind: "chapter", title: `${name}${range}上線`, body: `${added.map((c) => `「${c.title.replace(/^第.+?章[\s　]*/, "")}」`).join("、")}。${more}` } };
+  }
+  const text = update?.text?.trim();
+  if (!text) return { notice: null, skipped: "沒有新章節，也沒有附更新說明" };
+  const hours = history.last_update ? (Date.now() - Date.parse(history.last_update)) / 36e5 : Infinity;
+  if (hours < UPDATE_NOTICE_COOLDOWN_HOURS) return { notice: null, skipped: `${UPDATE_NOTICE_COOLDOWN_HOURS} 小時內已經通知過一次更新（${Math.floor(hours * 60)} 分鐘前），這次不通知` };
+  return { notice: { kind: update?.kind === "fix" ? "fix" : "update", title: `${name}${update?.kind === "fix" ? "問題修正" : "更新了"}`, body: text.slice(0, 200) } };
+}
+
 /** label 會寫進版本紀錄、審查與文件：共用帳號時顯示「操作者（帳號）」，API Token 顯示 Token 名稱 */
 type Actor = { userId: string; username: string; kind: "user" | "token"; tokenName?: string; operator?: string | null; label: string };
 type ProjectRow = { id: string; owner_id: string; title: string; data: string; version: number; is_valid: number; created_at: string; updated_at: string; archived_at: string | null };
 
 export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
+  /** 排程（每分鐘）：接著送還沒送完的推播通知 */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(deliverNotices(env));
+  },
+  async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url);
     try {
       // 後台網址的根目錄直接進 Studio（前台頁面不會出現在後台）
       if (url.pathname === "/") return Response.redirect(new URL("/studio/", url).toString(), 302);
       if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(req);
-      return await route(req, env, url);
+      return await route(req, env, url, ctx);
     } catch (e) {
       if (e instanceof HttpError) return error(e.status, e.message, e.extra);
       console.error(e);
@@ -47,7 +84,7 @@ export default {
   },
 };
 
-async function route(req: Request, env: Env, url: URL): Promise<Response> {
+async function route(req: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
   const path = url.pathname.replace(/\/+$/, "");
   const method = req.method;
 
@@ -131,6 +168,25 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
     if (path === "/api/admin/feedback" && method === "GET") {
       const { results } = await env.DB.prepare("SELECT game_id, chapter_id, rating, tags, comment, created_at FROM player_feedback ORDER BY created_at DESC LIMIT 300").all<{ game_id: string; chapter_id: string; rating: number; tags: string; comment: string; created_at: string }>();
       return json({ ok: true, feedback: results.map((r) => ({ ...r, tags: JSON.parse(r.tags) as string[] })) });
+    }
+    // 通知：發布時會自動發出（見 publish）；這裡是發送紀錄，以及人工補發其他公告
+    if (path === "/api/admin/notices" && method === "GET") {
+      const { results } = await env.DB.prepare("SELECT id, kind, title, body, url, author, game_id, sent, failed, done, created_at FROM notices ORDER BY id DESC LIMIT 50").all();
+      const subs = await env.DB.prepare("SELECT COUNT(*) AS n FROM push_subscriptions").first<{ n: number }>();
+      return json({ ok: true, notices: results, subscribers: subs?.n ?? 0, ready: pushReady(env) });
+    }
+    if (path === "/api/admin/notices" && method === "POST") {
+      const body = await readJson<{ kind?: string; title?: string; body?: string; url?: string; gameId?: string }>(req);
+      const kind = String(body.kind ?? "") as NoticeKind;
+      const title = String(body.title ?? "").trim();
+      const text = String(body.body ?? "").trim();
+      const link = String(body.url ?? "/").trim();
+      if (!NOTICE_KINDS.includes(kind)) return error(400, `類型只能是 ${NOTICE_KINDS.join("、")}`);
+      if (!title || !text) return error(400, "標題與內容都要填");
+      if (!/^\/[\w\-/?=&.#%]*$/.test(link)) return error(400, "連結只能是站內路徑（例如 /play/?pack=xxx）");
+      const id = await createNotice(env, { kind, title, body: text, url: link, author: actor.label, gameId: body.gameId ?? null });
+      ctx.waitUntil(deliverNotices(env));
+      return json({ ok: true, id });
     }
     const pm = path.match(/^\/api\/admin\/players\/([\w-]{1,64})$/);
     if (pm && method === "GET") return json({ ok: true, ...(await adminPlayer(env, pm[1])) });
@@ -278,7 +334,7 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
       const source = JSON.parse(row.data) as GameProject;
       return insertProject(env, actor, { ...source, title: String(body.title ?? `${source.title}（複製）`).slice(0, 200) }, `從「${row.title}」複製`);
     }
-    if (sub === "publish" && method === "POST") return publish(req, env, row, actor);
+    if (sub === "publish" && method === "POST") return publish(req, env, row, actor, ctx);
     if (sub === "publish" && method === "DELETE") {
       await env.DB.prepare("DELETE FROM published_games WHERE project_id = ?").bind(row.id).run();
       return json({ ok: true });
@@ -475,8 +531,8 @@ async function saveVersion(env: Env, row: ProjectRow, project: GameProject, base
   return { version };
 }
 
-async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
-  const body = await readJson<{ allowQualityWarnings?: boolean; check?: { revision?: string; valid?: boolean; playtestOk?: boolean; qualityBlocking?: number; typicalMinutes?: [number, number] | null } }>(req);
+async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor, ctx: ExecutionContext) {
+  const body = await readJson<{ allowQualityWarnings?: boolean; update?: { kind?: string; text?: string }; silent?: boolean; check?: { revision?: string; valid?: boolean; playtestOk?: boolean; qualityBlocking?: number; typicalMinutes?: [number, number] | null } }>(req);
   const project = JSON.parse(row.data) as GameProject;
   const check = body.check;
   // 檢查在瀏覽器／本機執行；伺服器只確認報告是針對「目前這一版內容」做的
@@ -508,7 +564,13 @@ async function publish(req: Request, env: Env, row: ProjectRow, actor: Actor) {
     .bind(row.id, row.id, row.version, row.data, JSON.stringify(catalog), nowIso())
     .run();
   await env.DB.prepare("UPDATE projects SET is_valid = 1 WHERE id = ?").bind(row.id).run();
-  return json({ ok: true, published: row.id, version: row.version });
+  const { notice, skipped } = body.silent ? { notice: null, skipped: "發布時選擇不通知" } : await publishNotice(env, row.id, project, body.update);
+  let noticeId: number | null = null;
+  if (notice) {
+    noticeId = await createNotice(env, { ...notice, url: `/play/?pack=${row.id}`, author: actor.label, gameId: row.id, chapters: project.chapters.length });
+    ctx.waitUntil(deliverNotices(env));
+  }
+  return json({ ok: true, published: row.id, version: row.version, notice: notice ? { id: noticeId, ...notice } : null, noticeSkipped: skipped ?? null });
 }
 
 /**
@@ -779,7 +841,7 @@ const API_DOCS = `# AI RPG Studio API
 | GET /api/projects/:id/insights | 玩家行為洞察（選擇比例、沒人發現的事件、卡關的地方、成就解鎖率、選單、設定、錯誤） |
 | GET /api/projects/:id/analytics | 遊玩數據（玩家數、每章完成率與時間、結局分布、最常離開的地方） |
 | GET /api/lessons?game=<id> | AI 案例庫（Markdown）：玩家回饋與審查最常退件的問題，製作前必讀 |
-| POST /api/projects/:id/publish \`{check}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標與審查關卡。建議用 \`npm run game -- remote publish <id>\` |
+| POST /api/projects/:id/publish \`{check, update?, silent?}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標與審查關卡。新遊戲、新章節自動推播通知玩家；\`update: {kind: "update"|"fix", text}\` 才通知更新／修正（12 小時內最多一次）。回傳 \`notice\`／\`noticeSkipped\`。建議用 \`npm run game -- remote publish <id>\` |
 
 資料模型是 RPG Maker 式（資料庫、地圖、多頁事件、事件指令），說明見 docs/ai-development-spec.md 第 6 節。
 建議流程：remote story（讀故事）→ 寫大綱 → remote review-treatment → 一章一章 remote apply／remote check／remote review --chapter → remote review → remote publish。

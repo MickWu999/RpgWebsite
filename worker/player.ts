@@ -6,7 +6,9 @@ import { sha256hex, type Env } from "./lib";
  * - /games/<id>/project.json：先查 D1 已發布的遊戲，沒有再回傳靜態檔
  * - POST /api/feedback：玩完一章時的回饋（同一位玩家同一章只保留最新一筆；不保存 IP）
  * - POST /api/events：匿名遊玩紀錄（每個操作：對話、選擇、換地圖、物品、任務、選單、設定、錯誤…；一次最多 100 筆），並更新匿名玩家與遊玩階段
- * 除了回饋與遊玩數據之外，前台不提供任何寫入或後台功能。
+ * - POST /api/push/subscribe、/api/push/unsubscribe：推播訂閱（只存推播服務的網址與瀏覽器產生的公鑰，不保存 IP）
+ * - GET /api/notices/latest、/api/notices：公告（推播不帶內容，service worker 收到後來這裡讀最新一則）
+ * 除了回饋、遊玩數據與推播訂閱之外，前台不提供任何寫入或後台功能。
  */
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -79,6 +81,35 @@ export default {
         await env.DB.batch(stmts);
       }
       return new Response(JSON.stringify({ ok: true, saved: events.length }), { headers });
+    }
+
+    if (url.pathname === "/api/push/subscribe" && req.method === "POST") {
+      const body = (await req.json().catch(() => null)) as { subscription?: { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } }; visitor?: unknown } | null;
+      const sub = body?.subscription;
+      const endpoint = typeof sub?.endpoint === "string" ? sub.endpoint : "";
+      const b64 = /^[\w-]{8,200}$/;
+      if (!/^https:\/\/[^\s]{10,900}$/.test(endpoint) || typeof sub?.keys?.p256dh !== "string" || !b64.test(sub.keys.p256dh) || typeof sub.keys.auth !== "string" || !b64.test(sub.keys.auth)) {
+        return new Response(JSON.stringify({ ok: false, error: "格式錯誤" }), { status: 400, headers });
+      }
+      const visitor = typeof body?.visitor === "string" && /^[\w-]{1,64}$/.test(body.visitor) ? body.visitor : null;
+      await env.DB.prepare(
+        "INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, visitor, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(id) DO UPDATE SET p256dh = ?3, auth = ?4, visitor = COALESCE(?5, visitor)",
+      )
+        .bind(await sha256hex(endpoint), endpoint, sub.keys.p256dh, sub.keys.auth, visitor, new Date().toISOString())
+        .run();
+      return new Response(JSON.stringify({ ok: true }), { headers });
+    }
+
+    if (url.pathname === "/api/push/unsubscribe" && req.method === "POST") {
+      const body = (await req.json().catch(() => null)) as { endpoint?: unknown } | null;
+      if (typeof body?.endpoint === "string") await env.DB.prepare("DELETE FROM push_subscriptions WHERE id = ?").bind(await sha256hex(body.endpoint)).run();
+      return new Response(JSON.stringify({ ok: true }), { headers });
+    }
+
+    if ((url.pathname === "/api/notices" || url.pathname === "/api/notices/latest") && req.method === "GET") {
+      const limit = url.pathname.endsWith("/latest") ? 1 : 10;
+      const { results } = await env.DB.prepare("SELECT id, kind, title, body, url, created_at FROM notices WHERE done != 2 ORDER BY id DESC LIMIT ?").bind(limit).all();
+      return new Response(JSON.stringify(limit === 1 ? { notice: results[0] ?? null } : { notices: results }), { headers });
     }
 
     if (url.pathname === "/games/index.json") {

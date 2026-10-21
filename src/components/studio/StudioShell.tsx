@@ -49,6 +49,7 @@ export default function StudioShell({ children, title, fullBleed = false }: { ch
     { href: "/studio/dashboard/", icon: "📊", label: "儀表板", hint: "全站的玩家與遊玩情況、每款遊戲的通關率" },
     { href: "/studio/players/", icon: "👥", label: "玩家", hint: "誰在玩、玩到哪裡；邀請連結" },
     { href: "/studio/feedback/", icon: "💬", label: "玩家回饋", hint: "所有遊戲的星等、標籤與留言" },
+    { href: "/studio/notices/", icon: "📣", label: "通知", hint: "發出公告並推播給開啟通知的玩家：新章節、更新、修正、新遊戲推出" },
   ];
   const systemNav: NavItem[] = [{ href: "/studio/logins/", icon: "🔐", label: "登入紀錄", hint: "Studio 的登入紀錄（含 IP），發現陌生人登入" }];
   const [menu, setMenu] = useState(false);

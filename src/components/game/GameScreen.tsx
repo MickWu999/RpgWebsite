@@ -58,6 +58,7 @@ import DebugPanel from "./DebugPanel";
 import FeedbackDialog, { feedbackAsked } from "./FeedbackDialog";
 import TouchPad from "./TouchPad";
 import { flushPlayEvents, trackErrors, trackPlay } from "@/lib/analytics";
+import { disablePush, enablePush, fetchLatestNotice, getPushStatus, NOTICE_ICON, PUSH_STATUS_LABEL, type Notice, type PushStatus } from "@/lib/push";
 import MessageWindow, { type TypingControl } from "./MessageWindow";
 
 const GameCanvas = dynamic(() => import("../GameCanvas"), { ssr: false });
@@ -195,6 +196,18 @@ export default function GameScreen({ source }: { source: GameSource }) {
   const [debugOpen, setDebugOpen] = useState(false);
   /** 玩完一章時的回饋（只在玩家網站詢問） */
   const [feedbackFor, setFeedbackFor] = useState<{ chapterId: string; title: string } | null>(null);
+  /** 推播通知狀態（設定選單的「通知」）與這款遊戲的最新公告（標題畫面） */
+  const [pushStatus, setPushStatus] = useState<PushStatus>("unsupported");
+  const pushRef = useRef<PushStatus>("unsupported");
+  const [titleNotice, setTitleNotice] = useState<Notice | null>(null);
+  useEffect(() => {
+    if (source.kind !== "pack") return;
+    void getPushStatus().then((s) => {
+      pushRef.current = s;
+      setPushStatus(s);
+    });
+    void fetchLatestNotice().then((n) => setTitleNotice(n && n.url.includes(source.id) ? n : null));
+  }, [source.kind, source.id]);
   const feedbackOpen = useRef(false);
   const [layout, setLayout] = useState({ scale: 1, height: SCREEN_H, touch: false, portrait: false, canFullscreen: false });
   const [portraitOk, setPortraitOk] = useState(false);
@@ -701,7 +714,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
         update({ ...u, menuPage: "root" });
         return;
       }
-      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 7, title: 2 }[u.menuPage];
+      const count = { items: Object.keys(u.game.items).length, quests: questJournal(p, u.game).length, status: 0, save: 3, load: 4, options: 8, title: 2 }[u.menuPage];
       if (vertical) {
         update({ ...u, subCursor: wrap(u.subCursor + delta, count) });
         return;
@@ -719,6 +732,21 @@ export default function GameScreen({ source }: { source: GameSource }) {
         if (u.subCursor === 4) s.touch = TOUCH_MODES[wrap(TOUCH_MODES.indexOf(s.touch) + 1, TOUCH_MODES.length)];
         if (u.subCursor === 5) s.padOpacity = PAD_OPACITIES[wrap(PAD_OPACITIES.indexOf(s.padOpacity) + (key === "left" ? -1 : 1), PAD_OPACITIES.length)];
         if (u.subCursor === 6) s.analytics = !s.analytics;
+        if (u.subCursor === 7) {
+          // 通知：開啟時會跳出瀏覽器的權限詢問；封鎖、不支援時按了沒有作用
+          const cur = pushRef.current;
+          if (cur === "on" || cur === "off") {
+            void (cur === "on" ? disablePush() : enablePush())
+              .catch(() => getPushStatus())
+              .then((next) => {
+                pushRef.current = next;
+                setPushStatus(next);
+                if (source.kind === "pack") trackPlay(p.id, "setting", { ref: "notify", detail: next });
+              });
+          }
+          sfx(cur === "on" || cur === "off" ? SOUNDS.select : SOUNDS.bump);
+          return;
+        }
         // 先記錄再存：關閉遊玩紀錄的那一下也要記到（之後就不再記錄）
         const settingKey = ["textSpeed", "sound", "bgm", "voice", "touch", "padOpacity", "analytics"][u.subCursor];
         if (source.kind === "pack" && settingKey) trackPlay(p.id, "setting", { ref: settingKey, detail: settingKey === "sound" ? String(!getAudio().muted) : String(s[settingKey as keyof typeof s]) });
@@ -1089,6 +1117,11 @@ export default function GameScreen({ source }: { source: GameSource }) {
             <div className="rm-title" data-testid="title-screen">
               <h1 className="rm-game-title">{project.title}</h1>
               <p className="rm-subtitle">{project.cover?.tagline ?? project.description}</p>
+              {titleNotice && (
+                <div className="rm-title-notice" data-testid="title-notice">
+                  {NOTICE_ICON[titleNotice.kind]} {titleNotice.title}
+                </div>
+              )}
               {ui.titleLoad ? (
                 <div className="rm-window rm-title-slots">
                   {(["auto", "1", "2", "3"] as SaveSlot[]).map((slot, i) => (
@@ -1201,6 +1234,7 @@ export default function GameScreen({ source }: { source: GameSource }) {
                     ["觸控操作", TOUCH_MODE_LABEL[ui.settings.touch]],
                     ["按鍵透明度", PAD_OPACITY_LABEL[ui.settings.padOpacity]],
                     ["匿名遊玩紀錄", ui.settings.analytics ? "開" : "關"],
+                    ["通知（新章節・更新）", PUSH_STATUS_LABEL[pushStatus]],
                   ].map(([label, value], i) => (
                     <button
                       key={label}

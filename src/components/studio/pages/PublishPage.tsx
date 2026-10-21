@@ -17,6 +17,8 @@ export default function PublishPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "info" | "err"; text: string } | null>(null);
   const [allowQuality, setAllowQuality] = useState(false);
+  const [updateKind, setUpdateKind] = useState<"update" | "fix">("update");
+  const [updateText, setUpdateText] = useState("");
   const [project, setProject] = useState<GameProject | null>(null);
   const [reviews, setReviews] = useState<ReviewEntry[]>([]);
 
@@ -98,6 +100,16 @@ export default function PublishPage() {
               <input type="checkbox" checked={allowQuality} onChange={(e) => setAllowQuality(e.target.checked)} /> 我了解品質指標或審查尚未全部通過，仍要以人工判斷發布（AI 透過 API Token 無法略過這些關卡）
             </label>
           )}
+          {state.published && (
+            <div className="row">
+              <select value={updateKind} onChange={(e) => setUpdateKind(e.target.value as "update" | "fix")} aria-label="更新類型">
+                <option value="update">✨ 更新</option>
+                <option value="fix">🔧 修正</option>
+              </select>
+              <input className="grow" value={updateText} maxLength={200} onChange={(e) => setUpdateText(e.target.value)} placeholder="給玩家的更新說明（選填；有填才會通知玩家）" data-testid="publish-update-text" />
+            </div>
+          )}
+          <div className="small muted">通知會自動發出：第一次發布 → 🎮 新遊戲推出；章節變多 → 📖 新章節上線；填了更新說明 → ✨ 更新／🔧 修正。只改錯字之類的小地方不用填，就不會打擾玩家。</div>
           <div className="row">
             <button
               className="btn"
@@ -115,8 +127,9 @@ export default function PublishPage() {
               onClick={async () => {
                 setBusy(true);
                 try {
-                  const r = await studioApi.publish(id, check!, allowQuality);
-                  setMessage({ kind: "info", text: `已發布第 ${r.version} 版` });
+                  const r = await studioApi.publish(id, check!, allowQuality, updateText.trim() ? { kind: updateKind, text: updateText.trim() } : undefined);
+                  setMessage({ kind: "info", text: `已發布第 ${r.version} 版${r.notice ? `，並通知玩家：${r.notice.title}` : "（這次沒有通知玩家）"}` });
+                  setUpdateText("");
                   load();
                 } catch (e) {
                   setMessage({ kind: "err", text: (e as Error).message });

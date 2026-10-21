@@ -175,6 +175,8 @@ export const studioApi = {
   adminPlayers: (limit = 50, offset = 0) => call<{ total: number; players: AdminPlayerRow[] }>("GET", `/api/admin/players?limit=${limit}&offset=${offset}`),
   adminFeedback: () => call<{ feedback: Array<FeedbackEntry & { game_id: string }> }>("GET", "/api/admin/feedback"),
   adminPlayer: (visitor: string) => call<AdminPlayerDetail>("GET", `/api/admin/players/${visitor}`),
+  notices: () => call<{ notices: NoticeRow[]; subscribers: number; ready: boolean }>("GET", "/api/admin/notices"),
+  createNotice: (n: { kind: NoticeRow["kind"]; title: string; body: string; url: string; gameId?: string }) => call<{ id: number }>("POST", "/api/admin/notices", n),
   notes: (id: string) => call<{ notes: NoteEntry[] }>("GET", `/api/projects/${id}/notes`),
   addNote: (id: string, note: { body: string; locator: string | null; mapId: string; x: number; y: number; chapterId: string | null; excerpt: string; state: unknown }) =>
     call<{ id: string }>("POST", `/api/projects/${id}/notes`, note),
@@ -191,7 +193,9 @@ export const studioApi = {
   versions: (id: string) => call<{ versions: VersionEntry[] }>("GET", `/api/projects/${id}/versions`),
   restore: (id: string, version: number) => call<{ version: number }>("POST", `/api/projects/${id}/restore`, { version }),
   /** 發布：附上在瀏覽器執行的檢查摘要（伺服器只比對內容指紋） */
-  publish: (id: string, check: CheckReport, allowQualityWarnings = false) => call<{ version: number }>("POST", `/api/projects/${id}/publish`, { allowQualityWarnings, check: publishSummary(check) }),
+  /** update：給玩家的更新說明（有填才會推播「更新／修正」；新遊戲與新章節一律自動推播） */
+  publish: (id: string, check: CheckReport, allowQualityWarnings = false, update?: { kind: "update" | "fix"; text: string }) =>
+    call<{ version: number; notice: { kind: NoticeRow["kind"]; title: string; body: string } | null }>("POST", `/api/projects/${id}/publish`, { allowQualityWarnings, check: publishSummary(check), update }),
   unpublish: (id: string) => call("DELETE", `/api/projects/${id}/publish`),
   listTokens: () => call<{ tokens: TokenEntry[] }>("GET", "/api/tokens"),
   createToken: (name: string) => call<{ id: string; token: string }>("POST", "/api/tokens", { name }),
@@ -200,4 +204,7 @@ export const studioApi = {
 
 /** 前台網址（只顯示成文字，不做成連結；前後台互相獨立） */
 /** 玩家網站網址：build 時從 .env.local 的 NEXT_PUBLIC_PLAYER_URL 讀取（實際網址不寫進 repo） */
+/** 後台發出的公告（推播通知） */
+export type NoticeRow = { id: number; kind: "chapter" | "update" | "fix" | "new_game"; title: string; body: string; url: string; author: string; game_id: string | null; sent: number; failed: number; done: number; created_at: string };
+
 export const PLAYER_SITE_URL = process.env.NEXT_PUBLIC_PLAYER_URL ?? "";

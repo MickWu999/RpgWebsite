@@ -47,7 +47,7 @@ npm run check                                # 修改程式後必須跑：lint�
 | `content/<id>/` | 遊戲原始檔（story.md、pitches.md、treatment.md、project.json、reviews/），會提交進 git |
 | `knowledge/` | 知識庫：AI 查回來的研究資料（附出處）與使用者提供的參考文件，規則見 `knowledge/README.md` |
 | `public/games/<id>/` | 遊戲模組包；`index.json` 是自動產生的，不要手動修改 |
-| `worker/` | Cloudflare Worker：前台（player.ts）與後台 API（studio.ts） |
+| `worker/` | Cloudflare Worker：前台（player.ts）與後台 API（studio.ts）；推播通知的 VAPID 簽名在 push.ts（私鑰只在後台 Worker 的 secret） |
 
 ## 撰寫或修改 GameProject 的規則
 

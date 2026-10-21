@@ -59,7 +59,9 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- remote notes <id> [--all]      修改清單：人在測試遊玩時按 📌 標記的意見（含位置代碼、當下台詞與狀態）
  *   npm run game -- remote resolve <id> <noteId> --reply "怎麼改的" [--wontfix]   改完後標成已處理
  *   npm run game -- remote refs <id> <ID 或文字>
- *   npm run game -- remote publish <id>            在本機檢查後發布；API Token 不能略過品質指標
+ *   npm run game -- remote publish <id> [--note "給玩家的更新說明" [--fix]] [--silent]
+ *                                                  在本機檢查後發布；API Token 不能略過品質指標。新遊戲、新章節會自動通知玩家；
+ *                                                  --note 才會通知「更新／修正」（12 小時內最多一次），--silent 不通知
  * 結束碼 0＝成功／通過，2＝失敗，1＝用法錯誤。
  */
 
@@ -67,7 +69,7 @@ loadLocalEnv();
 const CONTENT = "content";
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { title: { type: "string" }, genre: { type: "string" }, demo: { type: "boolean" }, chapter: { type: "string" }, reply: { type: "string" }, wontfix: { type: "boolean" }, all: { type: "boolean" } },
+  options: { title: { type: "string" }, genre: { type: "string" }, demo: { type: "boolean" }, chapter: { type: "string" }, reply: { type: "string" }, wontfix: { type: "boolean" }, all: { type: "boolean" }, note: { type: "string" }, fix: { type: "boolean" }, silent: { type: "boolean" } },
 });
 const [command, id, arg] = positionals;
 
@@ -408,7 +410,9 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       await syncReviews(target!);
       const gate = gateStatus(target!, r.data.project);
       if (gate.blockers.length) return out({ ok: false, stage: "gate", ...gate }, 2);
-      return done(await api("POST", `/api/projects/${target}/publish`, { check: publishSummary(report) }));
+      // 通知玩家由伺服器自動判斷（新遊戲、新章節）；--note 附更新說明才會通知「更新／修正」，--silent 這次完全不通知
+      const update = values.note?.trim() ? { kind: values.fix ? "fix" : "update", text: values.note.trim() } : undefined;
+      return done(await api("POST", `/api/projects/${target}/publish`, { check: publishSummary(report), update, silent: values.silent === true }));
     }
     default:
       fail("用法：npm run game -- remote <list|create|lessons|story|push-docs|pull|inspect|refs|apply|check|review-treatment|review|status|versions|insights|notes|resolve|publish> …", 1);

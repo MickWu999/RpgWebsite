@@ -21,6 +21,8 @@
       "main": "worker/studio.ts",
       // 後台每個請求都要查好幾次資料庫（D1 在亞太區）：讓 Cloudflare 把 Worker 放在靠近資料庫的地方執行，減少跨區往返
       "placement": { "mode": "smart" },
+      // 每分鐘接著送還沒送完的推播通知（worker/push.ts；沒有待送的通知時只查一次資料庫）
+      "triggers": { "crons": ["* * * * *"] },
       "assets": {
         "directory": "./out",
         "binding": "ASSETS",

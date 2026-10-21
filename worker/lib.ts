@@ -3,6 +3,10 @@
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
+  /** 推播通知（只有後台 Worker 有）：VAPID 私鑰（JWK）、公鑰（base64url）、聯絡網址；用 wrangler secret 設定，不進 repo */
+  VAPID_PRIVATE_JWK?: string;
+  VAPID_PUBLIC_KEY?: string;
+  VAPID_SUBJECT?: string;
 }
 
 const enc = new TextEncoder();
