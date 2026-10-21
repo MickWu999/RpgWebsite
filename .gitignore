@@ -11,9 +11,5 @@ generated
 public/games/index.json
 .wrangler
 
-# 使用者的遊戲原始檔與 AI 案例庫（含故事與玩家留言）不進公開 repo；只保留示範遊戲
-content/*
-!content/demo-lantern/
-
-# 使用者的企劃文件不進 repo
-*.docx
+# AI 案例庫由線上資料庫即時彙整（含真實玩家的留言），不進公開 repo；隨時可以用 npm run game -- remote lessons 重新產生
+content/lessons.md

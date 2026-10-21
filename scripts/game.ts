@@ -14,6 +14,7 @@ import { applyAction, settle } from "@/game/playtest";
 import { runPlaytest } from "@/game/playtest";
 import { lintDesign } from "@/game/lint";
 import { assessQuality } from "@/game/quality";
+import { commandAt, findRefs } from "@/game/refs";
 import { gameProjectSchema, type GameProject } from "@/game/schema";
 import { validateProject } from "@/game/validate";
 import { publishSummary, runCheck } from "@/studio/check";
@@ -29,6 +30,7 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- seeds [n]                                    抽 n 組故事種子（世界規則×主角處境×情緒問題×語氣），發想提案用
  *   npm run game -- new <id> --title <名稱> [--genre fantasy]   建立空白專案（一張起始地圖、主角、一個佔位結局）
  *   npm run game -- inspect <id>                                 以 RPG Maker 事件清單的形式輸出目前內容
+ *   npm run game -- refs <id> <ID 或文字>                        找出所有用到某個開關／物品／角色／地圖…的地方，或搜尋台詞（回傳位置代碼）
  *   npm run game -- apply <id> <ops.json>                        套用操作（每筆都成功才寫檔）
  *   npm run game -- check <id>                                   驗證＋自動試玩＋品質指標
  *   npm run game -- review-treatment <id>                        劇本大綱審查（動工前，通過後才能 apply）
@@ -52,6 +54,9 @@ import { loadLocalEnv } from "./env";
  *   npm run game -- remote review <id> [--chapter <章節ID>]
  *   npm run game -- remote status <id>
  *   npm run game -- remote versions <id>
+ *   npm run game -- remote notes <id> [--all]      修改清單：人在測試遊玩時按 📌 標記的意見（含位置代碼、當下台詞與狀態）
+ *   npm run game -- remote resolve <id> <noteId> --reply "怎麼改的" [--wontfix]   改完後標成已處理
+ *   npm run game -- remote refs <id> <ID 或文字>
  *   npm run game -- remote publish <id>            在本機檢查後發布；API Token 不能略過品質指標
  * 結束碼 0＝成功／通過，2＝失敗，1＝用法錯誤。
  */
@@ -60,7 +65,7 @@ loadLocalEnv();
 const CONTENT = "content";
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { title: { type: "string" }, genre: { type: "string" }, demo: { type: "boolean" }, chapter: { type: "string" } },
+  options: { title: { type: "string" }, genre: { type: "string" }, demo: { type: "boolean" }, chapter: { type: "string" }, reply: { type: "string" }, wontfix: { type: "boolean" }, all: { type: "boolean" } },
 });
 const [command, id, arg] = positionals;
 
@@ -311,6 +316,35 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       await api("POST", `/api/projects/${target}/reviews`, rev);
       return reviewOut(rev, { uploaded: true });
     }
+    case "refs": {
+      if (!target || !file) fail("用法：npm run game -- remote refs <id> <ID 或文字>", 1);
+      const r = await api("GET", `/api/projects/${target}`);
+      if (!r.ok) return done(r);
+      const hits = findRefs(r.data.project, file!);
+      return out({ ok: true, query: file, count: hits.length, hits }, 0);
+    }
+    case "notes": {
+      // 修改清單：每一筆附上位置代碼指到的指令，AI 不必再搜尋「在哪裡」
+      need("notes <id>");
+      const [p, n] = await Promise.all([api("GET", `/api/projects/${target}`), api("GET", `/api/projects/${target}/notes`)]);
+      if (!p.ok) return done(p);
+      if (!n.ok) return done(n);
+      const notes = (n.data.notes as Array<{ id: string; status: string; locator: string | null; body: string }>).filter((x) => values.all || x.status === "open");
+      return out(
+        {
+          ok: true,
+          open: notes.filter((x) => x.status === "open").length,
+          notes: notes.map((x) => ({ ...x, at: x.locator ? commandAt(p.data.project, x.locator) : null })),
+          next: "一次處理一筆：照意見修改（apply）→ check → remote resolve <id> <noteId> --reply \"怎麼改的\"。位置代碼的指令已經被改動時，用 remote refs 搜尋台詞重新定位",
+        },
+        0,
+      );
+    }
+    case "resolve": {
+      if (!target || !file) fail('用法：npm run game -- remote resolve <id> <noteId> --reply "怎麼改的" [--wontfix]', 1);
+      if (!values.reply?.trim()) fail("請用 --reply 寫明怎麼處理的（會顯示在 Studio 給人看）", 1);
+      return done(await api("PATCH", `/api/projects/${target}/notes/${file}`, { status: values.wontfix ? "wontfix" : "resolved", resolution: values.reply }));
+    }
     case "versions":
       need("versions <id>");
       return done(await api("GET", `/api/projects/${target}/versions`));
@@ -326,7 +360,7 @@ async function remote(sub: string | undefined, target: string | undefined, file:
       return done(await api("POST", `/api/projects/${target}/publish`, { check: publishSummary(report) }));
     }
     default:
-      fail("用法：npm run game -- remote <list|create|lessons|story|push-docs|pull|inspect|apply|check|review-treatment|review|status|versions|publish> …", 1);
+      fail("用法：npm run game -- remote <list|create|lessons|story|push-docs|pull|inspect|refs|apply|check|review-treatment|review|status|versions|notes|resolve|publish> …", 1);
   }
 }
 
@@ -388,6 +422,11 @@ async function main() {
     }
     case "inspect":
       return inspect(load(id));
+    case "refs": {
+      if (!arg) fail("用法：npm run game -- refs <id> <ID 或文字>", 1);
+      const hits = findRefs(load(id), arg);
+      return out({ ok: true, query: arg, count: hits.length, hits }, 0);
+    }
     case "apply": {
       if (!arg) fail("用法：npm run game -- apply <id> <ops.json>", 1);
       const ops = JSON.parse(readFileSync(arg, "utf8"));

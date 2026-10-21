@@ -164,6 +164,32 @@ async function route(req: Request, env: Env, url: URL): Promise<Response> {
       const { results } = await env.DB.prepare("SELECT chapter_id, rating, tags, comment, created_at FROM player_feedback WHERE game_id = ? ORDER BY created_at DESC LIMIT 300").bind(row.id).all<{ chapter_id: string; rating: number; tags: string; comment: string; created_at: string }>();
       return json({ ok: true, feedback: results.map((r) => ({ ...r, tags: JSON.parse(r.tags) as string[] })) });
     }
+    // 修改清單：人在測試遊玩時標記的修改意見（AI 讀取、修改後標成已處理）
+    if (sub === "notes" && method === "GET") {
+      const { results } = await env.DB.prepare("SELECT * FROM project_notes WHERE project_id = ? ORDER BY status = 'open' DESC, created_at DESC LIMIT 300").bind(row.id).all();
+      return json({ ok: true, notes: results.map((n) => ({ ...n, state: n.state ? JSON.parse(String(n.state)) : null })) });
+    }
+    if (sub === "notes" && method === "POST") {
+      const body = await readJson<{ locator?: string; mapId?: string; x?: number; y?: number; chapterId?: string; excerpt?: string; state?: unknown; body?: string }>(req);
+      const text = String(body.body ?? "").trim().slice(0, 2000);
+      if (!text) return error(400, "請寫下要修改什麼");
+      const id = randomId("note");
+      const opt = (v: unknown, n = 200) => (typeof v === "string" && v ? v.slice(0, n) : null);
+      await env.DB.prepare("INSERT INTO project_notes (id, project_id, locator, map_id, x, y, chapter_id, excerpt, state, body, author, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(id, row.id, opt(body.locator), opt(body.mapId, 64), Number.isInteger(body.x) ? body.x : null, Number.isInteger(body.y) ? body.y : null, opt(body.chapterId, 64), opt(body.excerpt, 500), body.state ? JSON.stringify(body.state).slice(0, 20_000) : null, text, actor.label, nowIso())
+        .run();
+      return json({ ok: true, id });
+    }
+    const nm = sub?.match(/^notes\/(note_[\w-]+)$/);
+    if (nm && method === "PATCH") {
+      const body = await readJson<{ status?: string; resolution?: string }>(req);
+      if (!["open", "resolved", "wontfix"].includes(String(body.status))) return error(400, "status 只能是 open、resolved、wontfix");
+      const done = body.status !== "open";
+      await env.DB.prepare("UPDATE project_notes SET status = ?, resolution = ?, resolved_by = ?, resolved_at = ? WHERE id = ? AND project_id = ?")
+        .bind(body.status, String(body.resolution ?? "").slice(0, 2000) || null, done ? actor.label : null, done ? nowIso() : null, nm[1], row.id)
+        .run();
+      return json({ ok: true });
+    }
     // 遊玩數據（前台匿名事件的統計）
     if (sub === "analytics" && method === "GET") return json({ ok: true, analytics: await playAnalytics(env, row.id) });
     // 故事原文與劇本大綱（人寫故事交給 AI；AI 寫的大綱放上來給人看）
@@ -541,6 +567,9 @@ const API_DOCS = `# AI RPG Studio API
 | GET /api/projects/:id/docs、PUT .../docs/story\|treatment \`{content}\` | 故事原文與劇本大綱 |
 | GET /api/projects/:id/reviews、POST .../reviews \`{kind,target,revision,passed,review}\` | 審查紀錄（由 \`npm run game -- remote review…\` 自動上傳） |
 | GET /api/projects/:id/feedback | 玩家回饋（玩完一章時的星等、標籤、留言） |
+| GET /api/projects/:id/notes | 修改清單（人在測試遊玩時按 📌 標記的意見，含位置代碼與當下狀態） |
+| POST /api/projects/:id/notes \`{body, locator?, mapId?, x?, y?, chapterId?, excerpt?, state?}\` | 新增一筆修改意見 |
+| PATCH /api/projects/:id/notes/:noteId \`{status: "resolved"\|"wontfix"\|"open", resolution}\` | 標成已處理（寫明怎麼改的）或不處理 |
 | GET /api/projects/:id/analytics | 遊玩數據（玩家數、每章完成率與時間、結局分布、最常離開的地方） |
 | GET /api/lessons | AI 案例庫（Markdown）：玩家回饋與審查最常退件的問題，製作前必讀 |
 | POST /api/projects/:id/publish \`{check}\` | 附上本機檢查摘要（含 revision）發布；API Token 不能略過品質指標與審查關卡。建議用 \`npm run game -- remote publish <id>\` |

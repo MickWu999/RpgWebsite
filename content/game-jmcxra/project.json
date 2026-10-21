@@ -1,0 +1,2334 @@
+{
+  "schemaVersion": "2.0",
+  "id": "game-jmcxra",
+  "title": "明天再拯救世界！",
+  "description": "連村口的雞都打不贏的冒牌勇者，接到的第一份委託是「八天內把外賣送到魔王城」。（Demo：第一章）",
+  "genre": "fantasy",
+  "system": {
+    "start": {
+      "mapId": "start",
+      "x": 6,
+      "y": 9,
+      "direction": "up"
+    },
+    "playerActorId": "player",
+    "initialItems": []
+  },
+  "actors": [
+    {
+      "id": "player",
+      "name": "洛可",
+      "profile": "17 歲，夢想成為傳說中的勇者，實際上連村口的雞都打不贏。不管多荒謬都會認真想辦法。",
+      "spriteAssetId": "char_youth",
+      "voice": {
+        "pitch": "mid",
+        "speed": "normal",
+        "timbre": "bright"
+      }
+    },
+    {
+      "id": "examiner",
+      "name": "考官",
+      "profile": "加班四十年的勇者考官。",
+      "spriteAssetId": "char_wizard",
+      "voice": {
+        "pitch": "low",
+        "speed": "slow",
+        "timbre": "soft"
+      }
+    },
+    {
+      "id": "chief",
+      "name": "村長",
+      "profile": "每天都在找假牙。",
+      "spriteAssetId": "char_viking",
+      "voice": {
+        "pitch": "low",
+        "speed": "fast",
+        "timbre": "buzzy"
+      }
+    },
+    {
+      "id": "grandma",
+      "name": "奶奶",
+      "profile": "每天烤兩個蘋果派，家裡卻只有她一個人。",
+      "spriteAssetId": "char_villager",
+      "voice": {
+        "pitch": "mid",
+        "speed": "slow",
+        "timbre": "soft"
+      }
+    },
+    {
+      "id": "baker",
+      "name": "哥布林麵包師",
+      "profile": "每天多烤一個「保留」麵包。",
+      "spriteAssetId": "char_bald_villager",
+      "voice": {
+        "pitch": "high",
+        "speed": "fast",
+        "timbre": "buzzy"
+      }
+    },
+    {
+      "id": "mira",
+      "name": "米菈",
+      "profile": "被吊銷執照的宮廷女巫。討厭英雄主義，只想領報酬、不加班。",
+      "spriteAssetId": "char_long_hair",
+      "voice": {
+        "pitch": "mid",
+        "speed": "normal",
+        "timbre": "soft"
+      }
+    },
+    {
+      "id": "bokki",
+      "name": "骨吉",
+      "profile": "骷髏吟遊詩人，生前是王宮會計。夢裡常聽見一首搖籃曲。",
+      "spriteAssetId": "char_hooded_elder",
+      "voice": {
+        "pitch": "low",
+        "speed": "slow",
+        "timbre": "buzzy"
+      }
+    },
+    {
+      "id": "ghost",
+      "name": "小幽靈",
+      "spriteAssetId": "char_ghost",
+      "voice": {
+        "pitch": "high",
+        "speed": "slow",
+        "timbre": "bright"
+      }
+    },
+    {
+      "id": "guard",
+      "name": "王宮守衛",
+      "spriteAssetId": "char_squire",
+      "voice": {
+        "pitch": "mid",
+        "speed": "fast",
+        "timbre": "buzzy"
+      }
+    }
+  ],
+  "items": [
+    {
+      "id": "dentures",
+      "name": "村長的假牙",
+      "description": "閃閃發亮，上面刻著「村長專用」。",
+      "iconAssetId": "icon_coin"
+    },
+    {
+      "id": "soup",
+      "name": "奶奶的熱湯",
+      "description": "冷掉的東西泡一泡就軟了。——奶奶",
+      "iconAssetId": "icon_potion_red"
+    },
+    {
+      "id": "takeout",
+      "name": "魔王的外賣",
+      "description": "收件人：魔王・星期一。備註：不要香菜。",
+      "iconAssetId": "icon_chest"
+    },
+    {
+      "id": "holy_sword",
+      "name": "聖劍",
+      "description": "傳說中的聖劍。上面還有一點馬鈴薯泥。",
+      "iconAssetId": "icon_sword"
+    },
+    {
+      "id": "wood_sword",
+      "name": "爸爸削的木劍",
+      "description": "握柄上刻著歪歪的「洛可」。",
+      "iconAssetId": "icon_staff"
+    }
+  ],
+  "quests": [
+    {
+      "id": "q1",
+      "title": "第一份勇者委託",
+      "description": "八天內把外賣送到魔王城。出發前，先拿回聖劍。",
+      "steps": [
+        {
+          "text": "找村長問聖劍的下落"
+        },
+        {
+          "text": "找回村長的假牙（村長說好像掉在井邊）"
+        },
+        {
+          "text": "把假牙還給村長"
+        },
+        {
+          "text": "請王宮守衛放行，到王宮廚房找聖劍"
+        },
+        {
+          "text": "處理吞了聖劍的寶箱怪"
+        },
+        {
+          "text": "回村子，準備出發"
+        }
+      ]
+    }
+  ],
+  "endings": [
+    {
+      "id": "end_wood",
+      "title": "第一章完　木劍勇者，出發！",
+      "text": "洛可握著爸爸削的木劍，揹著魔王的外賣，和一個骷髏、一個失業女巫一起走出了村子。月亮上的數字是 7。\n\n——《明天再拯救世界！》第二章「龍族勞動權益保衛戰」製作中。",
+      "mood": "bittersweet",
+      "epilogues": [
+        {
+          "condition": {
+            "type": "switch",
+            "id": "visited_ghost",
+            "value": true
+          },
+          "text": "村口的小幽靈揮著手：「明天，記得把明天送來喔！」"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "heard_pies",
+            "value": true
+          },
+          "text": "奶奶今天也烤了兩個蘋果派。其中一個，她放在窗邊等著。"
+        }
+      ],
+      "nextChapterId": "ch2"
+    },
+    {
+      "id": "end_holy",
+      "title": "第一章完　聖劍勇者，出發！",
+      "text": "洛可高舉沾著馬鈴薯泥的聖劍，村民們歡呼「勇者有聖劍了！」只有骨吉小聲說：「那把木劍，是你爸爸的心意吧。」月亮上的數字是 7。\n\n——《明天再拯救世界！》第二章「龍族勞動權益保衛戰」製作中。",
+      "mood": "triumphant",
+      "epilogues": [
+        {
+          "condition": {
+            "type": "switch",
+            "id": "visited_ghost",
+            "value": true
+          },
+          "text": "村口的小幽靈揮著手：「明天，記得把明天送來喔！」"
+        },
+        {
+          "condition": {
+            "type": "switch",
+            "id": "heard_pies",
+            "value": true
+          },
+          "text": "奶奶今天也烤了兩個蘋果派。其中一個，她放在窗邊等著。"
+        }
+      ],
+      "nextChapterId": "ch2"
+    }
+  ],
+  "chapters": [
+    {
+      "id": "ch1",
+      "title": "第一章　勇者資格考，史萊姆零分",
+      "summary": "勇者最重要的能力是什麼？",
+      "testStart": {
+        "mapId": "start",
+        "x": 6,
+        "y": 9
+      }
+    }
+  ],
+  "switches": [
+    {
+      "id": "visited_ghost",
+      "name": "visited_ghost"
+    },
+    {
+      "id": "heard_pies",
+      "name": "heard_pies"
+    },
+    {
+      "id": "chief_ok",
+      "name": "chief_ok"
+    },
+    {
+      "id": "baguette_soft",
+      "name": "baguette_soft"
+    },
+    {
+      "id": "met_mira",
+      "name": "met_mira"
+    },
+    {
+      "id": "mira_joined",
+      "name": "mira_joined"
+    },
+    {
+      "id": "chest_done",
+      "name": "chest_done"
+    },
+    {
+      "id": "kept_wooden_sword",
+      "name": "kept_wooden_sword"
+    },
+    {
+      "id": "met_bokki",
+      "name": "met_bokki"
+    },
+    {
+      "id": "bokki_joined",
+      "name": "bokki_joined"
+    }
+  ],
+  "variables": [],
+  "commonEvents": [],
+  "maps": [
+    {
+      "id": "start",
+      "name": "新手村",
+      "width": 24,
+      "height": 16,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "terrain": [
+        "TTTTTTTTTTTTTTTTTTTTTTTT",
+        "T......................T",
+        "T..RRR.......GGG.......T",
+        "T..HDH.......SDS.......T",
+        "T...=.........=.....*..T",
+        "T...=....,....=........T",
+        "T...=.........=........T",
+        "T.W.=......X..=........T",
+        "T...===================T",
+        "T......................T",
+        "T......................T",
+        "T......................T",
+        "T*.....*...........*.*.T",
+        "T........FFF...........T",
+        "T......................T",
+        "TTTTTTTTTTTTTTTTTTTTTTTT"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "music": "lively",
+      "events": [
+        {
+          "id": "opening",
+          "name": "資格考",
+          "x": 0,
+          "y": 0,
+          "note": "開場（自動執行一次）",
+          "pages": [
+            {
+              "trigger": "autorun",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "chapter",
+                  "chapterId": "ch1"
+                },
+                {
+                  "code": "text",
+                  "text": "洛可・零，勇者資格考最後一題。勇者最重要的能力是什麼？",
+                  "actorId": "examiner"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "準時下班。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……準、準時下班……我加班四十年了……",
+                          "actorId": "examiner"
+                        },
+                        {
+                          "code": "text",
+                          "text": "（考官摘下眼鏡，擦了擦眼淚。）合格！你是我見過最懂勇者的人！",
+                          "actorId": "examiner"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "勇氣！",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "很好，標準答案。……其實我比較想聽到準時下班。合格。",
+                          "actorId": "examiner"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "……可以先吃午餐嗎？",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "你懂得照顧自己，這很重要。合格。",
+                          "actorId": "examiner"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "text",
+                  "text": "那麼，這是你的第一份委託：八天內把這份外賣送到魔王城，順便打倒魔王。",
+                  "actorId": "examiner"
+                },
+                {
+                  "code": "text",
+                  "text": "月亮上的倒數停下來的那天，你就是正式勇者。",
+                  "actorId": "examiner"
+                },
+                {
+                  "code": "text",
+                  "text": "（抬頭一看，月亮上浮著一個大大的「8」。）"
+                },
+                {
+                  "code": "item",
+                  "itemId": "takeout",
+                  "delta": 1
+                },
+                {
+                  "code": "item",
+                  "itemId": "wood_sword",
+                  "delta": 1
+                },
+                {
+                  "code": "text",
+                  "text": "對了，勇者總得有把劍。去問村長吧，聽說聖劍出了點狀況。",
+                  "actorId": "examiner"
+                },
+                {
+                  "code": "quest",
+                  "questId": "q1",
+                  "action": "start"
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "examiner",
+          "name": "考官",
+          "x": 8,
+          "y": 9,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_wizard"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "外賣要趁熱送喔。……雖然要走八天。",
+                  "actorId": "examiner"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "chief",
+          "name": "村長",
+          "x": 10,
+          "y": 5,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_viking"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "哈哈哈，勇者來了！聖劍啊……咻咻……掉進王宮廚房的馬鈴薯堆裡了。",
+                  "actorId": "chief"
+                },
+                {
+                  "code": "text",
+                  "text": "守衛只聽我的話，可是我的假牙不見了，說話漏風，咻咻，守衛聽不懂。",
+                  "actorId": "chief"
+                },
+                {
+                  "code": "text",
+                  "text": "好像是早上在井邊打水的時候掉的……",
+                  "actorId": "chief"
+                },
+                {
+                  "code": "quest",
+                  "questId": "q1",
+                  "action": "step",
+                  "step": 1
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "quest": {
+                  "questId": "q1",
+                  "status": "active"
+                },
+                "custom": {
+                  "type": "quest",
+                  "questId": "q1",
+                  "status": "active",
+                  "step": 1
+                }
+              },
+              "graphic": {
+                "assetId": "char_viking"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "井邊……咻……井邊啦。",
+                  "actorId": "chief"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "itemId": "dentures"
+              },
+              "graphic": {
+                "assetId": "char_viking"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "我的假牙！（喀嚓）——咳咳，這下說話清楚多了。",
+                  "actorId": "chief"
+                },
+                {
+                  "code": "text",
+                  "text": "我寫一張證明給你，拿去給王宮守衛看。",
+                  "actorId": "chief"
+                },
+                {
+                  "code": "item",
+                  "itemId": "dentures",
+                  "delta": -1
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "chief_ok"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "quest",
+                  "questId": "q1",
+                  "action": "step",
+                  "step": 3
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "chief_ok"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_viking"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "守衛在村子東邊。廚房很亂，小心馬鈴薯。",
+                  "actorId": "chief"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "well",
+          "name": "古井",
+          "x": 2,
+          "y": 7,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "一口古井。井水清澈見底。"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "quest",
+                    "questId": "q1",
+                    "status": "active",
+                    "step": 1
+                  },
+                  "then": [
+                    {
+                      "code": "text",
+                      "text": "井邊的石縫裡有東西在發光……是一副假牙！上面刻著「村長專用」。"
+                    },
+                    {
+                      "code": "item",
+                      "itemId": "dentures",
+                      "delta": 1
+                    },
+                    {
+                      "code": "quest",
+                      "questId": "q1",
+                      "action": "step",
+                      "step": 2
+                    },
+                    {
+                      "code": "selfSwitch",
+                      "key": "A",
+                      "value": true
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "一口古井。水面映出月亮上的數字「8」。"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "grandma",
+          "name": "奶奶",
+          "x": 6,
+          "y": 5,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_villager"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "哎呀，是要去冒險的勇者呀。",
+                  "actorId": "grandma"
+                },
+                {
+                  "code": "text",
+                  "text": "我每天都烤兩個蘋果派……家裡只有我一個人，可是不烤兩個就覺得少了什麼。",
+                  "actorId": "grandma"
+                },
+                {
+                  "code": "text",
+                  "text": "這碗熱湯帶著吧。冷掉的東西，泡一泡就軟了。",
+                  "actorId": "grandma"
+                },
+                {
+                  "code": "item",
+                  "itemId": "soup",
+                  "delta": 1
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "heard_pies"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "selfSwitch",
+                  "key": "A",
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "selfSwitch": "A"
+              },
+              "graphic": {
+                "assetId": "char_villager"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "路上小心，勇者。明天……不知道為什麼，我總覺得明天很遠。",
+                  "actorId": "grandma"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "grandma_door",
+          "name": "奶奶家",
+          "x": 4,
+          "y": 3,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "門口飄出蘋果派的香味。桌上擺著兩個盤子。",
+                  "speaker": "奶奶家"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "sign",
+          "name": "村口告示",
+          "x": 11,
+          "y": 7,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "「勇者資格考今日舉行」……背面好像還有字。",
+                  "speaker": "告示"
+                },
+                {
+                  "code": "text",
+                  "text": "（背面用小孩子的字寫著：「明天不要來」。）",
+                  "speaker": "告示"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "baguette",
+          "name": "邪惡法式長棍麵包",
+          "x": 14,
+          "y": 4,
+          "note": "第一章的對話戰鬥",
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "icon_staff"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（一根巨大的長棍麵包堵住了麵包店的門。）"
+                },
+                {
+                  "code": "text",
+                  "text": "吾乃邪惡法式長棍麵包！誰也別想進來！",
+                  "speaker": "長棍麵包"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "用木劍敲它",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "（叩。）……木劍斷了一小塊。麵包毫髮無傷。",
+                          "speaker": "長棍麵包"
+                        },
+                        {
+                          "code": "text",
+                          "text": "吾乃外酥內硬！",
+                          "speaker": "長棍麵包"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "請米菈施法",
+                      "condition": {
+                        "type": "switch",
+                        "id": "met_mira",
+                        "value": true
+                      },
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "我早就說過了，魔法對麵包沒用。",
+                          "actorId": "mira"
+                        },
+                        {
+                          "code": "text",
+                          "text": "（麵包被烤得更硬了。）",
+                          "speaker": "長棍麵包"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "把奶奶的熱湯倒上去",
+                      "condition": {
+                        "type": "item",
+                        "itemId": "soup"
+                      },
+                      "commands": [
+                        {
+                          "code": "item",
+                          "itemId": "soup",
+                          "delta": -1
+                        },
+                        {
+                          "code": "text",
+                          "text": "（嘶——熱湯淋上去，麵包慢慢軟了下來。）"
+                        },
+                        {
+                          "code": "text",
+                          "text": "……對不起。我不是壞，我只是太硬了。",
+                          "speaker": "長棍麵包"
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "baguette_soft"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    },
+                    {
+                      "text": "先離開",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "（也許得想想別的辦法……冷掉的東西要怎麼變軟呢？）"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "baguette_soft"
+                ]
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "baker",
+          "name": "哥布林麵包師",
+          "x": 16,
+          "y": 4,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_bald_villager"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "嗚嗚，那根長棍麵包堵住門，我的麵包都送不出去啦！",
+                  "actorId": "baker"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "baguette_soft"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_bald_villager"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "謝謝你，勇者！櫃台上那個「保留」的麵包？那是留給一位明天就會回來的客人的。",
+                  "actorId": "baker"
+                },
+                {
+                  "code": "text",
+                  "text": "……雖然他已經說「明天回來」說好多年了。",
+                  "actorId": "baker"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mira",
+          "name": "米菈",
+          "x": 17,
+          "y": 6,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_long_hair"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "別看我。我是被吊銷執照的女巫，在等麵包店付我的外賣報酬。",
+                  "actorId": "mira"
+                },
+                {
+                  "code": "text",
+                  "text": "那根麵包堵住門，老闆出不來，我就領不到錢。真是最不合理的加班理由。",
+                  "actorId": "mira"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "met_mira"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "baguette_soft"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_long_hair"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "……好吧，麵包店付錢了。你要去魔王城？",
+                  "actorId": "mira"
+                },
+                {
+                  "code": "text",
+                  "text": "聽說魔王城的外賣費很高。我先跟著你，領到下一筆報酬再說。",
+                  "actorId": "mira"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "歡迎加入！",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "別誤會，我只是為了錢。",
+                          "actorId": "mira"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "你真的只是為了錢？",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……不然呢？拯救世界嗎？那是最不合理的加班理由。",
+                          "actorId": "mira"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "mira_joined"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "erase"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "mira_joined"
+                ]
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "ghost",
+          "name": "小幽靈",
+          "x": 20,
+          "y": 11,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_ghost"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "勇者，你可以把明天送來嗎？",
+                  "actorId": "ghost"
+                },
+                {
+                  "code": "text",
+                  "text": "我想知道……明天天氣好不好。",
+                  "actorId": "ghost"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "visited_ghost"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "visited_ghost"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_ghost"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "明天天氣好不好呢……",
+                  "actorId": "ghost"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "guard",
+          "name": "王宮守衛",
+          "x": 22,
+          "y": 8,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_squire"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "站住！要進王宮廚房，得有村長的證明！",
+                  "actorId": "guard"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "chief_ok"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_squire"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "村長的證明……確認無誤！",
+                  "actorId": "guard"
+                },
+                {
+                  "code": "text",
+                  "text": "不過王宮規定，勇者至少要兩人組隊才能進廚房。上次有個勇者一個人進去，被馬鈴薯埋了三天。",
+                  "actorId": "guard"
+                },
+                {
+                  "code": "text",
+                  "text": "麵包店門口那位女巫好像很閒，你問問看？",
+                  "actorId": "guard"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "chief_ok",
+                  "mira_joined"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_squire"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "村長的證明、隊員一名……確認無誤！廚房很亂，請小心馬鈴薯。",
+                  "actorId": "guard"
+                },
+                {
+                  "code": "quest",
+                  "questId": "q1",
+                  "action": "step",
+                  "step": 4
+                },
+                {
+                  "code": "transfer",
+                  "mapId": "kitchen",
+                  "x": 5,
+                  "y": 7,
+                  "direction": "up"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "chest_done"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_squire"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "勇者，路上小心！",
+                  "actorId": "guard"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "campfire",
+          "name": "營火",
+          "x": 1,
+          "y": 1,
+          "note": "第一章結尾",
+          "pages": [
+            {
+              "conditions": {
+                "switches": [
+                  "chest_done"
+                ]
+              },
+              "trigger": "autorun",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（夜晚。村外的營火劈啪作響。）"
+                },
+                {
+                  "code": "text",
+                  "text": "我說，這筆帳我記下了：外賣一份、勇者一位、女巫一位、骷髏一具。",
+                  "actorId": "bokki"
+                },
+                {
+                  "code": "text",
+                  "text": "……誰要跟一個骷髏露營啊。",
+                  "actorId": "mira"
+                },
+                {
+                  "code": "text",
+                  "text": "（骨吉輕輕哼起一段旋律。很溫柔，像是唱給小孩子聽的搖籃曲。）"
+                },
+                {
+                  "code": "text",
+                  "text": "……奇怪，我沒學過這首歌。",
+                  "actorId": "bokki"
+                },
+                {
+                  "code": "text",
+                  "text": "（骨吉空洞的眼眶裡，冒出了藍色的火焰。）"
+                },
+                {
+                  "code": "text",
+                  "text": "我好像……忘記了一個很重要的人。",
+                  "actorId": "bokki"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "我們一起想起來吧。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……嗯。這筆帳，我們一起算。",
+                          "actorId": "bokki"
+                        }
+                      ]
+                    },
+                    {
+                      "text": "現在先睡吧，明天再說。",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "明天啊……好，明天再說。",
+                          "actorId": "bokki"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "code": "text",
+                  "text": "（抬頭一看，月亮上的數字變成了「7」。）"
+                },
+                {
+                  "code": "text",
+                  "text": "村民都說，那是魔王的詛咒。",
+                  "actorId": "mira"
+                },
+                {
+                  "code": "quest",
+                  "questId": "q1",
+                  "action": "complete"
+                },
+                {
+                  "code": "if",
+                  "condition": {
+                    "type": "switch",
+                    "id": "kept_wooden_sword",
+                    "value": true
+                  },
+                  "then": [
+                    {
+                      "code": "ending",
+                      "endingId": "end_wood"
+                    }
+                  ],
+                  "else": [
+                    {
+                      "code": "ending",
+                      "endingId": "end_holy"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kitchen",
+      "name": "王宮廚房",
+      "parentId": "start",
+      "width": 12,
+      "height": 9,
+      "tileSize": 40,
+      "tilesetId": "tileset_tiny_town",
+      "terrain": [
+        "bbbbbbbbbbbb",
+        "buuuuoooyypb",
+        "boooooooooob",
+        "boojoooojoob",
+        "boohooooohob",
+        "boooooooooob",
+        "boooooooooob",
+        "boooooooooob",
+        "bbbbbobbbbbb"
+      ],
+      "walkable": [
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          true,
+          true,
+          false,
+          false,
+          false,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false
+        ],
+        [
+          false,
+          false,
+          false,
+          false,
+          false,
+          true,
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      ],
+      "music": "peaceful",
+      "events": [
+        {
+          "id": "exit",
+          "name": "回新手村",
+          "x": 5,
+          "y": 8,
+          "pages": [
+            {
+              "trigger": "touch",
+              "priority": "below",
+              "commands": [
+                {
+                  "code": "transfer",
+                  "mapId": "start",
+                  "x": 21,
+                  "y": 8,
+                  "direction": "left"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "bokki",
+          "name": "骨吉",
+          "x": 3,
+          "y": 6,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "char_hooded_elder"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "哦？活人。我是骨吉，王宮的臨時會計，生前也是。",
+                  "actorId": "bokki"
+                },
+                {
+                  "code": "text",
+                  "text": "聖劍？被那邊的寶箱怪吞了。連我的帳本也一起吞了。",
+                  "actorId": "bokki"
+                },
+                {
+                  "code": "text",
+                  "text": "寶箱怪說，要一樣「有回憶的東西」才肯吐出來。",
+                  "actorId": "bokki"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "met_bokki"
+                  ],
+                  "value": true
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "met_bokki"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_hooded_elder"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "寶箱怪要「有回憶的東西」……你身上有嗎？",
+                  "actorId": "bokki"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "chest_done"
+                ]
+              },
+              "graphic": {
+                "assetId": "char_hooded_elder"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "帳本拿回來了，這筆帳我記下了。……你要去魔王城？我跟你去。我很好奇，魔王的帳是怎麼算的。",
+                  "actorId": "bokki"
+                },
+                {
+                  "code": "switch",
+                  "ids": [
+                    "bokki_joined"
+                  ],
+                  "value": true
+                },
+                {
+                  "code": "erase"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "bokki_joined"
+                ]
+              },
+              "trigger": "action",
+              "priority": "below",
+              "commands": []
+            }
+          ]
+        },
+        {
+          "id": "chest",
+          "name": "寶箱怪",
+          "x": 8,
+          "y": 2,
+          "pages": [
+            {
+              "graphic": {
+                "assetId": "icon_chest"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（寶箱怪的蓋子一開一闔，發出咀嚼聲。旁邊的骷髏似乎知道些什麼。）"
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "met_bokki"
+                ]
+              },
+              "graphic": {
+                "assetId": "icon_chest"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "（寶箱的蓋子一開一闔，發出咀嚼聲。）"
+                },
+                {
+                  "code": "text",
+                  "text": "嗝。聖劍好吃。要拿回去，就給我一樣「有回憶的東西」。",
+                  "speaker": "寶箱怪"
+                },
+                {
+                  "code": "choices",
+                  "options": [
+                    {
+                      "text": "交出爸爸削的木劍",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "這把木劍……有好多好多回憶的味道。成交！",
+                          "speaker": "寶箱怪"
+                        },
+                        {
+                          "code": "item",
+                          "itemId": "wood_sword",
+                          "delta": -1
+                        },
+                        {
+                          "code": "item",
+                          "itemId": "holy_sword",
+                          "delta": 1
+                        },
+                        {
+                          "code": "text",
+                          "text": "（寶箱怪吐出了聖劍，上面還沾著馬鈴薯泥。）"
+                        },
+                        {
+                          "code": "quest",
+                          "questId": "q1",
+                          "action": "step",
+                          "step": 5
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "chest_done"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    },
+                    {
+                      "text": "留下木劍，聖劍送你當玩具",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "……你不要聖劍？那我收下囉。順便把會計的帳本還給他。",
+                          "speaker": "寶箱怪"
+                        },
+                        {
+                          "code": "text",
+                          "text": "（洛可握緊了木劍。握柄上，爸爸刻的「洛可」兩個字有點歪。）"
+                        },
+                        {
+                          "code": "quest",
+                          "questId": "q1",
+                          "action": "step",
+                          "step": 5
+                        },
+                        {
+                          "code": "switch",
+                          "ids": [
+                            "chest_done",
+                            "kept_wooden_sword"
+                          ],
+                          "value": true
+                        }
+                      ]
+                    },
+                    {
+                      "text": "再想想",
+                      "commands": [
+                        {
+                          "code": "text",
+                          "text": "我不急，嗝。",
+                          "speaker": "寶箱怪"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "conditions": {
+                "switches": [
+                  "chest_done"
+                ]
+              },
+              "graphic": {
+                "assetId": "icon_chest"
+              },
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "嗝。謝謝招待。",
+                  "speaker": "寶箱怪"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "potato",
+          "name": "馬鈴薯堆",
+          "x": 9,
+          "y": 4,
+          "pages": [
+            {
+              "trigger": "action",
+              "priority": "same",
+              "commands": [
+                {
+                  "code": "text",
+                  "text": "堆積如山的馬鈴薯。據說聖劍原本就插在這裡。",
+                  "speaker": "馬鈴薯堆"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "assetManifest": {
+    "assets": [
+      {
+        "id": "tileset_tiny_town",
+        "kind": "tileset",
+        "src": "/assets/kenney/tiny-town/tilemap_packed.png",
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-town",
+        "attribution": "Tiny Town by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_hero",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 97,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_youth",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 88,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_hooded_elder",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 100,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_long_hair",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 99,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "tileset_urban",
+        "kind": "tileset",
+        "src": "/assets/kenney/rpg-urban/tilemap_packed.png",
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/rpg-urban-pack",
+        "attribution": "RPG Urban Pack by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "tileset_indoor",
+        "kind": "tileset",
+        "src": "/assets/kenney/roguelike-indoors/tilemap_packed.png",
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney Vleugels (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/roguelike-indoors",
+        "attribution": "Roguelike Indoors by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_wizard",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 84,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_viking",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 87,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_villager",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 85,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_bald_villager",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 86,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_ghost",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 121,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "char_squire",
+        "kind": "character",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 98,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_coin",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-town/tilemap_packed.png",
+        "frame": 93,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-town",
+        "attribution": "Tiny Town by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_potion_red",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 115,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_chest",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 89,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_sword",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 104,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      },
+      {
+        "id": "icon_staff",
+        "kind": "icon",
+        "src": "/assets/kenney/tiny-dungeon/tilemap_packed.png",
+        "frame": 130,
+        "frameSize": 16,
+        "license": "CC0-1.0",
+        "author": "Kenney (www.kenney.nl)",
+        "sourceUrl": "https://kenney.nl/assets/tiny-dungeon",
+        "attribution": "Tiny Dungeon by Kenney (www.kenney.nl), CC0"
+      }
+    ]
+  },
+  "intro": "嘻嘻大陸的物理法則很有個性：相信自己會飛的人，有時真的會飛起來。\n\n每個村莊都有勇者，其中至少一半是填錯了公務員考試志願。\n\n今天，是洛可的勇者資格考。",
+  "cover": {
+    "characterAssetIds": [
+      "char_youth",
+      "char_hooded_elder",
+      "char_long_hair"
+    ],
+    "tagline": "明天的事，明天再說。"
+  },
+  "release": {
+    "status": "ongoing",
+    "plannedChapters": 3
+  }
+}

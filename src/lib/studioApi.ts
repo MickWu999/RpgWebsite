@@ -58,6 +58,23 @@ export type PlayAnalytics = {
   quits: Array<{ chapter_id: string | null; ref: string | null; players: number }>;
   daily: Array<{ day: string; visitors: number }>;
 };
+export type NoteEntry = {
+  id: string;
+  locator: string | null;
+  map_id: string | null;
+  x: number | null;
+  y: number | null;
+  chapter_id: string | null;
+  excerpt: string | null;
+  state: { switches: string[]; variables: Record<string, number>; items: Record<string, number>; quests: Record<string, string> } | null;
+  body: string;
+  author: string;
+  status: "open" | "resolved" | "wontfix";
+  resolution: string | null;
+  resolved_by: string | null;
+  created_at: string;
+  resolved_at: string | null;
+};
 export type FeedbackEntry = { chapter_id: string; rating: number; tags: string[]; comment: string; created_at: string };
 export type ProjectDoc = { kind: "story" | "treatment"; content: string; updated_at: string; updated_by: string };
 export type ReviewEntry = {
@@ -99,6 +116,10 @@ export const studioApi = {
   saveDoc: (id: string, kind: "story" | "treatment", content: string) => call("PUT", `/api/projects/${id}/docs/${kind}`, { content }),
   reviews: (id: string) => call<{ reviews: ReviewEntry[] }>("GET", `/api/projects/${id}/reviews`),
   feedback: (id: string) => call<{ feedback: FeedbackEntry[] }>("GET", `/api/projects/${id}/feedback`),
+  notes: (id: string) => call<{ notes: NoteEntry[] }>("GET", `/api/projects/${id}/notes`),
+  addNote: (id: string, note: { body: string; locator: string | null; mapId: string; x: number; y: number; chapterId: string | null; excerpt: string; state: unknown }) =>
+    call<{ id: string }>("POST", `/api/projects/${id}/notes`, note),
+  updateNote: (id: string, noteId: string, status: NoteEntry["status"], resolution = "") => call<{ ok: true }>("PATCH", `/api/projects/${id}/notes/${noteId}`, { status, resolution }),
   analytics: (id: string) => call<{ analytics: PlayAnalytics }>("GET", `/api/projects/${id}/analytics`),
   importProject: (project: unknown, title?: string) => call<{ id: string }>("POST", "/api/projects", { project, title }),
   getProject: (id: string) => call<{ id: string; version: number; project: GameProject; updatedAt: string }>("GET", `/api/projects/${id}`),

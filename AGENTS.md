@@ -44,7 +44,8 @@ npm run check                                # 修改程式後必須跑：lint�
 | `src/components/game/` | 遊戲畫面：標題、訊息、選單、章節標題卡、F9 除錯、手機操作 |
 | `src/components/studio/` | RPG Maker 式編輯器：地圖、事件編輯、指令清單、資料庫 |
 | `src/components/GameCanvas.tsx` | Phaser 3 渲染層，只負責繪製 |
-| `content/<id>/` | 本機模式的遊戲原始檔（story.md、treatment.md、project.json） |
+| `content/<id>/` | 遊戲原始檔（story.md、pitches.md、treatment.md、project.json、reviews/），會提交進 git |
+| `knowledge/` | 知識庫：AI 查回來的研究資料（附出處）與使用者提供的參考文件，規則見 `knowledge/README.md` |
 | `public/games/<id>/` | 遊戲模組包；`index.json` 是自動產生的，不要手動修改 |
 | `worker/` | Cloudflare Worker：前台（player.ts）與後台 API（studio.ts） |
 

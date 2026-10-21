@@ -26,6 +26,7 @@ import {
   type PlayerState,
 } from "@/game/engine";
 import { pathToFace, pathToTile } from "@/game/pathfinding";
+import { currentLocator } from "@/game/refs";
 import type { GameProject } from "@/game/schema";
 import { coverDataOf } from "@/game/cover";
 import { listSaves, savePlayerState, type SaveSlot } from "@/game/storage";
@@ -1210,6 +1211,39 @@ export default function GameScreen({ source }: { source: GameSource }) {
       {isStudio && (
         <button className="rm-debug-toggle" onClick={() => setDebugOpen((v) => !v)} data-testid="debug-toggle">
           🐞 F9 除錯
+        </button>
+      )}
+      {isStudio && (
+        <button
+          className="rm-debug-toggle rm-pin"
+          data-testid="pin-note"
+          title="把這裡要改的地方加進修改清單（AI 會依位置代碼找到這句台詞或事件）"
+          onClick={async () => {
+            // 修改清單：附上位置代碼、當下台詞與狀態，AI 不必再問「在哪裡」
+            const g = uiRef.current?.game;
+            if (!g) return;
+            // 開場文字（project.intro）顯示中：它不是事件指令，位置代碼用 intro
+            const intro = uiRef.current?.messages[0];
+            const locator = intro ? "intro" : projectRef.current ? currentLocator(projectRef.current, g) : null;
+            const m = g.message?.kind === "text" ? g.message : null;
+            const excerpt = intro ?? (m ? [m.text, ...(m.choices ?? []).map((c) => `▸ ${c.text}`)].filter(Boolean).join("\n") : "");
+            const where = `${locator ?? `${g.mapId} (${g.x},${g.y})`}${excerpt ? `\n「${excerpt.slice(0, 80)}」` : ""}`;
+            const body = window.prompt(`📌 這裡要改什麼？\n位置：${where}`);
+            if (!body?.trim()) return;
+            const state = {
+              switches: Object.keys(g.switches).filter((k) => g.switches[k]),
+              variables: g.variables,
+              items: g.items,
+              quests: Object.fromEntries(Object.entries(g.quests).map(([k, v]) => [k, v.status])),
+            };
+            const ok = await studioApi
+              .addNote(projectId, { body, locator, mapId: g.mapId, x: g.x, y: g.y, chapterId: g.chapterId, excerpt, state })
+              .then(() => true)
+              .catch(() => false);
+            flash({ notice: ok ? "📌 已加入修改清單" : "加入修改清單失敗，請確認登入狀態" }, 2500, "notice");
+          }}
+        >
+          📌 標記修改
         </button>
       )}
       {isStudio && debugOpen && (

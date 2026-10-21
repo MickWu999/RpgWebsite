@@ -9,7 +9,7 @@ import { walkProject } from "@/game/commands";
 import { coverDataOf } from "@/game/cover";
 import type { GameProject } from "@/game/schema";
 import { projectRevision } from "@/game/engine";
-import { studioApi, type CheckResult, type FeedbackEntry, type PlayAnalytics, type ProjectDoc, type ReviewEntry, type VersionEntry } from "@/lib/studioApi";
+import { studioApi, type CheckResult, type FeedbackEntry, type NoteEntry, type PlayAnalytics, type ProjectDoc, type ReviewEntry, type VersionEntry } from "@/lib/studioApi";
 import Pipeline from "../Pipeline";
 import { runCheckAsync } from "@/studio/check";
 import StudioShell, { PageHeader } from "../StudioShell";
@@ -80,6 +80,7 @@ export default function ProjectOverview() {
   const [storyDraft, setStoryDraft] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackEntry[]>([]);
   const [analytics, setAnalytics] = useState<PlayAnalytics | null>(null);
+  const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -97,6 +98,7 @@ export default function ProjectOverview() {
     studioApi.reviews(id).then((r) => setReviews(r.reviews)).catch(() => {});
     studioApi.feedback(id).then((r) => setFeedback(r.feedback)).catch(() => {});
     studioApi.analytics(id).then((r) => setAnalytics(r.analytics)).catch(() => {});
+    studioApi.notes(id).then((r) => setNotes(r.notes)).catch(() => {});
     studioApi
       .listProjects()
       .then((r) => setPublished(Boolean(r.projects.find((p) => p.id === id)?.published_version)))
@@ -275,6 +277,45 @@ export default function ProjectOverview() {
                   </details>
                 );
               })}
+            </section>
+
+            <section className="card" data-testid="notes-board">
+              <h2>
+                修改清單 <span className="badge">{notes.filter((n) => n.status === "open").length} 筆待處理</span>
+              </h2>
+              {notes.length === 0 ? (
+                <div className="small muted">
+                  測試遊玩時看到要改的地方，按右上角的「📌 標記修改」寫一句意見。系統會附上位置代碼、當下的台詞與開關狀態，AI 執行 <code>npm run game -- remote notes {id}</code> 就能直接找到那裡修改，改完標成已處理。
+                </div>
+              ) : (
+                notes.slice(0, 30).map((n) => (
+                  <div key={n.id} className={`issue ${n.status === "open" ? "warn" : ""}`} data-testid="note-item">
+                    <div>
+                      <span className={`badge ${n.status === "open" ? "err" : "ok"}`}>{n.status === "open" ? "待處理" : n.status === "resolved" ? "已處理" : "不處理"}</span> {n.body}
+                    </div>
+                    <div className="path">
+                      {n.locator ?? `${n.map_id} (${n.x},${n.y})`}
+                      {n.excerpt ? `・「${n.excerpt.split("\n")[0].slice(0, 40)}」` : ""}・{n.author}・{time(n.created_at)}
+                    </div>
+                    {n.resolution && (
+                      <div className="small muted">
+                        處理方式（{n.resolved_by}）：{n.resolution}
+                      </div>
+                    )}
+                    <button
+                      className="btn small"
+                      onClick={async () => {
+                        const next = n.status === "open" ? "resolved" : "open";
+                        const resolution = next === "resolved" ? (window.prompt("怎麼處理的？（選填）") ?? "") : "";
+                        await studioApi.updateNote(id, n.id, next, resolution).catch(() => {});
+                        setNotes((list) => list.map((x) => (x.id === n.id ? { ...x, status: next, resolution: resolution || null } : x)));
+                      }}
+                    >
+                      {n.status === "open" ? "標成已處理" : "重新打開"}
+                    </button>
+                  </div>
+                ))
+              )}
             </section>
 
             <section className="card" data-testid="analytics-board">

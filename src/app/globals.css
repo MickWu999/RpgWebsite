@@ -403,6 +403,7 @@ kbd { background: #23273a; border: 1px solid var(--border); border-bottom-width:
 .rm-chapter-summary { color: #e6e8f5; font-size: 15px; }
 
 /* ---------- 後台測試：F9 除錯 ---------- */
+.rm-debug-toggle.rm-pin { right: 120px; }
 .rm-debug-toggle { position: fixed; top: 10px; right: 10px; z-index: 40; background: #1d2238ee; color: #e6e8f5; border: 1px solid #4b5585; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
 .rm-debug { position: fixed; top: 48px; right: 10px; z-index: 41; width: min(360px, calc(100vw - 20px)); max-height: calc(100vh - 60px); display: flex; flex-direction: column; background: #151a2ef5; color: #e6e8f5; border: 1px solid #4b5585; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 24px #0008; }
 .rm-debug-head { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid #2f3758; }
